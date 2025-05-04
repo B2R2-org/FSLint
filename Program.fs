@@ -54,6 +54,9 @@ and checkExpression = function
     checkBindings LowerCamelCase bindings
     checkExpression body
   | SynExpr.Const _
+  | SynExpr.ArrayOrList _
+  | SynExpr.ArrayOrListComputed _
+  | SynExpr.IndexRange _
   | SynExpr.ForEach _
   | SynExpr.Ident _
   | SynExpr.LongIdent _

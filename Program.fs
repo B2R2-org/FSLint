@@ -56,6 +56,7 @@ and checkExpression = function
   | SynExpr.Const _
   | SynExpr.ForEach _
   | SynExpr.Ident _
+  | SynExpr.LongIdent _
   | SynExpr.IfThenElse _
   | SynExpr.DotGet _
   | SynExpr.Sequential _
@@ -69,8 +70,9 @@ and checkMemberDefns members =
     match memberDefn with
     | SynMemberDefn.Member (binding, _) ->
       checkBinding PascalCase binding
-    | SynMemberDefn.GetSetMember _ ->
-      failwith "TODO"
+    | SynMemberDefn.GetSetMember (get, set, _, _) ->
+      if get.IsSome then checkBinding PascalCase get.Value else ()
+      if set.IsSome then checkBinding PascalCase set.Value else ()
     | SynMemberDefn.LetBindings (bindings = bindings) ->
       checkBindings LowerCamelCase bindings
     | SynMemberDefn.AbstractSlot (slotSig = SynValSig (ident = id)) ->

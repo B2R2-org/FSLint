@@ -8,6 +8,14 @@ module IdentifierConvention =
   open System
   open FSharp.Compiler.Text
 
+  let private keywords =
+    [| "new" |]
+
+  let private isKnownKeyWord (identifier: string) =
+    Array.exists (fun kw -> kw = identifier) keywords
+    || identifier.StartsWith "op_"
+    || identifier.StartsWith "|" (* active patterns *)
+
   let private caseCheck style (identifier: string) (range: range) =
     match style with
     | LowerCamelCase ->
@@ -21,6 +29,9 @@ module IdentifierConvention =
     if identifier[1..].Contains "_" then
       exitWithError $"{range} '{identifier}' contains underscore(s)."
 
-  let check style (identifier: string) (range: range) =
-    caseCheck style identifier range
-    underscoreCheck identifier range
+  let check style checkUnderscore (identifier: string) (range: range) =
+    if identifier.Contains " " || isKnownKeyWord identifier then ()
+    else
+      caseCheck style identifier range
+      if checkUnderscore then underscoreCheck identifier range
+      else ()

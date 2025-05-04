@@ -5,9 +5,9 @@ open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
-let parseFile (path: string) =
+let parseFile txt (path: string) =
   let checker = FSharpChecker.Create ()
-  let src = File.ReadAllText path |> SourceText.ofString
+  let src = SourceText.ofString txt
   let projOptions, _ =
     checker.GetProjectOptionsFromScript (path, src)
     |> Async.RunSynchronously
@@ -239,10 +239,11 @@ and checkBindings case bindings =
   for binding in bindings do
     checkBinding case binding
 
-let lintFile (path: string) =
-  if not <| File.Exists path then exitWithError $"File '{path}' not found"
-  else printfn $"Linting file: {path}"
-  parseFile path
+let checkWithString txt =
+  LineConvention.check txt
+
+let checkWithAST txt path =
+  parseFile txt path
   |> function
     | ParsedInput.ImplFile (ParsedImplFileInput (contents=modules))->
       for m in modules do
@@ -253,6 +254,13 @@ let lintFile (path: string) =
       printfn "Linting completed."
     | ParsedInput.SigFile _ ->
       () (* ignore fsi files *)
+
+let lintFile (path: string) =
+  if not <| File.Exists path then exitWithError $"File '{path}' not found"
+  else printfn $"Linting file: {path}"
+  let txt = File.ReadAllText path
+  checkWithString txt
+  checkWithAST txt path
 
 [<EntryPoint>]
 let main args =

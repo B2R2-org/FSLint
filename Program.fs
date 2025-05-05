@@ -264,7 +264,7 @@ let lintFile (path: string) =
 
 [<EntryPoint>]
 let main args =
-  if args.Length < 1 then exitWithError "Usage: FSLint <file|dir>"
+  if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then lintFile args[0]; 0
   elif Directory.Exists args[0] then runOnEveryFile args[0] lintFile; 0
   else exitWithError $"File or directory '{args[0]}' not found"

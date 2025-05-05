@@ -3,6 +3,19 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>fslint</ToolCommandName>
+    <PackageOutputPath>./build</PackageOutputPath>
+    <Product>B2R2.FSLint</Product>
+    <Authors>SoftSec Lab. @ KAIST</Authors>
+    <Company>SoftSec Lab. @ KAIST</Company>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Copyright>Copyright (c) SoftSec Lab. @ KAIST, since 2016</Copyright>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RepositoryUrl>https://github.com/B2R2-org/FSLint</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://b2r2.org/B2R2</PackageProjectUrl>
+    <PackageTags>Binary;B2R2;lint</PackageTags>
     <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
 

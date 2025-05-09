@@ -255,12 +255,15 @@ let checkWithAST txt path =
     | ParsedInput.SigFile _ ->
       () (* ignore fsi files *)
 
+let lintTextString (path: string) (txt: string) =
+  checkWithString txt
+  checkWithAST txt path
+
 let lintFile (path: string) =
   if not <| File.Exists path then exitWithError $"File '{path}' not found"
   else printfn $"Linting file: {path}"
   let txt = File.ReadAllText path
-  checkWithString txt
-  checkWithAST txt path
+  lintTextString path txt
 
 let lintFileAndExitWhenFailed (path: string) =
   try lintFile path

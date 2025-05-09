@@ -14,10 +14,10 @@ module LineConvention =
       if line.Length > MaxLineLength then
         Console.WriteLine line
         Console.WriteLine ("|" + String.replicate (MaxLineLength - 2) "-" + "|")
-        exitWithError $"Line {i + 1} exceeds {MaxLineLength} characters."
+        raiseWithError $"Line {i + 1} exceeds {MaxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         Console.WriteLine line
         Console.WriteLine (String.replicate (line.Length - 1) " " + "^")
-        exitWithError $"Line {i + 1} contains trailing whitespace."
+        raiseWithError $"Line {i + 1} contains trailing whitespace."
       else ()
     )

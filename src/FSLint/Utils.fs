@@ -5,6 +5,11 @@ open System
 open System.IO
 open System.Text.RegularExpressions
 
+exception LintException of string
+
+let raiseWithError (message: string) =
+  raise <| LintException message
+
 let exitWithError (message: string) =
   Console.WriteLine message
   exit 1

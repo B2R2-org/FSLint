@@ -20,14 +20,14 @@ module IdentifierConvention =
     match style with
     | LowerCamelCase ->
       if Char.IsLower identifier[0] || identifier[0] = '_' then ()
-      else exitWithError $"{range} '{identifier}' is not in {LowerCamelCase}."
+      else raiseWithError $"{range} '{identifier}' is not in {LowerCamelCase}."
     | PascalCase ->
       if Char.IsUpper identifier[0] || identifier[0] = '_' then ()
-      else exitWithError $"{range} '{identifier}' is not in {PascalCase}."
+      else raiseWithError $"{range} '{identifier}' is not in {PascalCase}."
 
   let private underscoreCheck (identifier: string) (range: range) =
     if identifier[1..].Contains "_" then
-      exitWithError $"{range} '{identifier}' contains underscore(s)."
+      raiseWithError $"{range} '{identifier}' contains underscore(s)."
 
   let check style checkUnderscore (identifier: string) (range: range) =
     if identifier.Contains " " || isKnownKeyWord identifier then ()

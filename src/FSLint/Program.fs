@@ -262,9 +262,16 @@ let lintFile (path: string) =
   checkWithString txt
   checkWithAST txt path
 
+let lintFileAndExitWhenFailed (path: string) =
+  try lintFile path
+  with LintException msg ->
+    System.Console.WriteLine msg
+    exit 1
+
 [<EntryPoint>]
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
-  elif File.Exists args[0] then lintFile args[0]; 0
-  elif Directory.Exists args[0] then runOnEveryFile args[0] lintFile; 0
+  elif File.Exists args[0] then lintFileAndExitWhenFailed args[0]; 0
+  elif Directory.Exists args[0] then
+    runOnEveryFile args[0] lintFileAndExitWhenFailed; 0
   else exitWithError $"File or directory '{args[0]}' not found"

@@ -23,6 +23,7 @@
     <Compile Include="Utils.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />
+    <Compile Include="LiteralConvention.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

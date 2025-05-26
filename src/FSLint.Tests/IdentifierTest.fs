@@ -6,9 +6,6 @@ open B2R2.FSLint.Program
 
 [<TestClass>]
 type IdentifierTest () =
-
-  let fakePath = "IdentifierTest.fs"
-
   let goodBindingLowercaseTest = """
 let age = 30
 """
@@ -17,27 +14,27 @@ let age = 30
 let Age = 30
 """
 
-  let goodBindingPascalcaseTest = """
+  let goodBindingPascalCaseTest = """
 let [<Literal>] Age = 30
 """
 
-  let badBindingPascalcaseTest = """
+  let badBindingPascalCaseTest = """
 let [<Literal>] age = 30
 """
 
-  let goodRecordDefPascalcaseTest = """
+  let goodRecordDefPascalCaseTest = """
 type Person = { Age: int }
 """
 
-  let badRecordDefPascalcaseTest = """
+  let badRecordDefPascalCaseTest = """
 type person = { Age: int }
 """
 
-  let goodRecordFieldNamePascalcaseTest = """
+  let goodRecordFieldNamePascalCaseTest = """
 type Person = { Age: int }
 """
 
-  let badRecordFieldNamePascalcaseTest = """
+  let badRecordFieldNamePascalCaseTest = """
 type Person = { age: int }
 """
 
@@ -52,54 +49,54 @@ let age_ = 30
   [<TestMethod>]
   member _.``[ID] Binding Lowercase Test`` () =
     lintTextString
-      fakePath
+      Constants.FakeFsPath
       goodBindingLowercaseTest
     Assert.ThrowsException<LintException> (fun () ->
       lintTextString
-        fakePath
+        Constants.FakeFsPath
         badBindingLowercaseTest
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[ID] Binding Pascalcase Test`` () =
+  member _.``[ID] Binding PascalCase Test`` () =
     lintTextString
-      fakePath
-      goodBindingPascalcaseTest
+      Constants.FakeFsPath
+      goodBindingPascalCaseTest
     Assert.ThrowsException<LintException> (fun () ->
       lintTextString
-        fakePath
-        badBindingPascalcaseTest
+        Constants.FakeFsPath
+        badBindingPascalCaseTest
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[ID] Record Definition Pascalcase Test`` () =
+  member _.``[ID] Record Definition PascalCase Test`` () =
     lintTextString
-      fakePath
-      goodRecordDefPascalcaseTest
+      Constants.FakeFsPath
+      goodRecordDefPascalCaseTest
     Assert.ThrowsException<LintException> (fun () ->
       lintTextString
-        fakePath
-        badRecordDefPascalcaseTest
+        Constants.FakeFsPath
+        badRecordDefPascalCaseTest
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[ID] Record Field Name Pascalcase Test`` () =
+  member _.``[ID] Record Field Name PascalCase Test`` () =
     lintTextString
-      fakePath
-      goodRecordFieldNamePascalcaseTest
+      Constants.FakeFsPath
+      goodRecordFieldNamePascalCaseTest
     Assert.ThrowsException<LintException> (fun () ->
       lintTextString
-        fakePath
-        badRecordFieldNamePascalcaseTest
+        Constants.FakeFsPath
+        badRecordFieldNamePascalCaseTest
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Binding Underscore Test`` () =
     lintTextString
-      fakePath
+      Constants.FakeFsPath
       goodBindingUnderscoreTest
     Assert.ThrowsException<LintException> (fun () ->
       lintTextString
-        fakePath
+        Constants.FakeFsPath
         badBindingUnderscoreTest
     ) |> ignore

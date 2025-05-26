@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <Compile Include="MSTestSettings.fs" />
+    <Compile Include="Constants.fs" />
+    <Compile Include="IdentifierTest.fs" />
     <Compile Include="LineTest.fs" />
   </ItemGroup>
 

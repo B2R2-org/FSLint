@@ -58,28 +58,13 @@ and checkMatchClause clause =
   let SynMatchClause (resultExpr = expr) = clause
   checkExpression expr
 
-and checkLiterals bindingTrivia = function
-  | SynExpr.ArrayOrListComputed (isArray = isArr; expr = expr; range = range) ->
-    if isNested expr then 
-      LiteralConvention.checkNested bindingTrivia isArr range expr
-    else
-      LiteralConvention.check bindingTrivia isArr range expr
-      checkExpression expr
-  | SynExpr.ArrayOrList (isArray = isArr; exprs = exprs; range = range) ->
-    if exprs.IsEmpty then
-      LiteralConvention.check bindingTrivia isArr range (SynExpr.Null range)
-    else
-      for expr in exprs do checkExpression expr
-  | expr -> checkExpression expr
-
-and isNested = function
-  | SynExpr.Sequential (expr1 = expr1; expr2 = expr2) ->
-    isNested expr1 || isNested expr2
-  | SynExpr.Paren (expr = innerExpr) -> isNested innerExpr
-  | SynExpr.Tuple (exprs = exprs) -> List.exists isNested exprs
-  | SynExpr.ArrayOrListComputed _
-  | SynExpr.ArrayOrList _ -> true
-  | _ -> false
+and checkArrayOrList = function
+  | SynExpr.ArrayOrListComputed (isArray, expr, range) ->
+    ArrayOrListConvention.check isArray range expr
+  | SynExpr.ArrayOrList (isArray, exprs, range) ->
+    let enclosureWidth = if isArray then 4 else 2
+    ArrayOrListConvention.checkEmpty enclosureWidth exprs range
+  | _ -> ()
 
 and checkExpression = function
   | SynExpr.Paren (expr = expr) ->
@@ -253,14 +238,11 @@ and hasAttr attrName attrs =
   )
 
 and checkBinding case binding =
-  let SynBinding (headPat = pat
-                  expr = body
-                  attributes = attrs
-                  trivia = trivia) = binding
+  let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern case false pat
   checkExpression body
-  checkLiterals trivia body
+  checkArrayOrList body
 
 and checkBindings case bindings =
   for binding in bindings do

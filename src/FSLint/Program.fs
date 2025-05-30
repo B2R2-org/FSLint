@@ -58,6 +58,14 @@ and checkMatchClause clause =
   let SynMatchClause (resultExpr = expr) = clause
   checkExpression expr
 
+and checkArrayOrList = function
+  | SynExpr.ArrayOrListComputed (isArray = isArr; expr = expr; range = range) ->
+    ArrayOrListConvention.check isArr range expr
+  | SynExpr.ArrayOrList (isArray = isArray; exprs = exprs; range = range) ->
+    let arity = if isArray then 4 else 2
+    ArrayOrListConvention.checkEmptyArrayOrList arity exprs range
+  | _ -> ()
+
 and checkExpression = function
   | SynExpr.Paren (expr = expr) ->
     checkExpression expr
@@ -89,8 +97,8 @@ and checkExpression = function
   | SynExpr.TryWith (tryExpr = tryExpr; withCases = clauses) ->
     checkExpression tryExpr
     for clause in clauses do checkMatchClause clause
-  | SynExpr.ArrayOrList _
   | SynExpr.ArrayOrListComputed _
+  | SynExpr.ArrayOrList _
   | SynExpr.App _
   | SynExpr.Assert _
   | SynExpr.Const _
@@ -234,6 +242,7 @@ and checkBinding case binding =
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern case false pat
   checkExpression body
+  checkArrayOrList body
 
 and checkBindings case bindings =
   for binding in bindings do

@@ -5,13 +5,13 @@ module ArrayOrListConvention =
   open FSharp.Compiler.Syntax
   open FSharp.Compiler.SyntaxTrivia
 
-  /// Checks proper spacing after semicolons between list/array elements.
-  /// Ensures exactly one space after each semicolon (e.g., "1; 2; 3").
   let rec collectRanges = function
     | SynExpr.Sequential (expr1 = expr1; expr2 = expr2; trivia = trivia) ->
       [ expr1.Range, trivia.SeparatorRange.Value ] @ collectRanges expr2
     | expr -> [ expr.Range, Range.Zero ]
 
+  /// Checks proper spacing after semicolons between list/array elements.
+  /// Ensures exactly one space after each semicolon (e.g., "1; 2; 3").
   and checkElementSpacing expr =
     let elementAndSeparatorRange = collectRanges expr
     for i = 0 to List.length elementAndSeparatorRange - 2 do
@@ -55,23 +55,43 @@ module ArrayOrListConvention =
     if expr.IsEmpty && range.EndColumn - range.StartColumn <> arity then
       raiseWithError $"Line {range.StartLine} Contains Invalid Whitespace"
 
-  let checkSingleLine arity range = function
-    | SynExpr.Const (range = insideRange) ->
-      checkBracketSpacing arity insideRange range
-    | SynExpr.Sequential (range = insideRange) as expr ->
-      checkBracketSpacing arity insideRange range
+  let rec checkArrayOrListSingleLine arity range = function
+    | SynExpr.Sequential (expr1 = expr1
+                          expr2 = expr2
+                          range = innerRange) as expr ->
+      checkNestedArrayOrList checkArrayOrListSingleLine expr1
+      checkNestedArrayOrList checkArrayOrListSingleLine expr2
+      checkBracketSpacing arity innerRange range
       checkElementSpacing expr
     | SynExpr.IndexRange (expr1 = expr1
                           opm = opm
                           range2 = range2
-                          range = insideRange) ->
-      checkBracketSpacing arity insideRange range
+                          range = innerRange) ->
+      checkBracketSpacing arity innerRange range
       checkRangeOperatorSpacing range2 opm expr1
+    | SynExpr.Const (range = innerRange) ->
+      checkBracketSpacing arity innerRange range
+    | SynExpr.ArrayOrListComputed (isArray, expr, innerRange) ->
+      let arity = if isArray then 3 else 2
+      checkBracketSpacing arity innerRange range
+      checkArrayOrListSingleLine arity innerRange expr
+    | SynExpr.ArrayOrList (isArray = isArray; exprs = exprs; range = range) ->
+      let arity = if isArray then 4 else 2
+      checkEmptyArrayOrList arity exprs range
     | expr -> failwith $"TODO: {expr}"
+
+  and checkNestedArrayOrList recursiveCheck = function
+    | SynExpr.ArrayOrListComputed (isArray, expr, innerRange) ->
+      let arity = if isArray then 3 else 2
+      recursiveCheck arity innerRange expr
+    | SynExpr.ArrayOrList (isArray = isArray; range = innerRange) as expr ->
+      let arity = if isArray then 4 else 2
+      recursiveCheck arity innerRange expr
+    | _ -> ()
 
   let check isArray (range: range) expr =
     if range.StartLine = range.EndLine then
       let arity = if isArray then 3 else 2
-      checkSingleLine arity range expr
+      checkArrayOrListSingleLine arity range expr
     else
       failwith $"TODO: {expr}"

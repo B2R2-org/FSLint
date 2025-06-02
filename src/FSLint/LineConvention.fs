@@ -8,8 +8,16 @@ module LineConvention =
 
   let [<Literal>] private MaxLineLength = 80
 
+  let [<Literal>] private WindowsLineEnding = "\r\n"
+
+  let private checkWindowsLineEndings (txt: string) =
+    if txt.Contains WindowsLineEnding then
+      raiseWithError "Windows line endings are not allowed. Use LF instead."
+    else ()
+
   let check (txt: string) =
-    txt.Split ([| "\n"; "\r\n" |], StringSplitOptions.None)
+    checkWindowsLineEndings txt
+    txt.Split ([| "\n"; WindowsLineEnding |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
       if line.Length > MaxLineLength then
         Console.WriteLine line

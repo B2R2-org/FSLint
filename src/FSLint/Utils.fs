@@ -14,7 +14,7 @@ let exitWithError (message: string) =
   Console.WriteLine message
   exit 1
 
-let runOnEveryFile (path: string) (action: string -> unit) =
+let runOnEveryFsFile (path: string) (action: string -> unit) =
   let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape
   let exclusionPatterns =
     [| Regex $"obj{sep}Debug{sep}"
@@ -24,3 +24,8 @@ let runOnEveryFile (path: string) (action: string -> unit) =
   for f in Directory.EnumerateFiles(path, "*.fs", searchOpt) do
     if exclusionPatterns |> Array.exists (fun r -> r.IsMatch f) then ()
     else action f
+
+let runOnEveryProjectSlnFile (path: string) (action: string -> unit) =
+  let searchOpt = SearchOption.AllDirectories
+  for f in Directory.EnumerateFiles(path, "*.fsproj", searchOpt) do action f
+  for f in Directory.EnumerateFiles(path, "*.sln", searchOpt) do action f

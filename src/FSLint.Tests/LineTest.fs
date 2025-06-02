@@ -33,18 +33,18 @@ type A () ={space}
 
   [<TestMethod>]
   member _.``80 Line Test`` () =
-    lintTextString Constants.FakeFsPath goodLine80Test
+    linterForFs.Lint Constants.FakeFsPath goodLine80Test
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString Constants.FakeFsPath badLine80Test
+      linterForFs.Lint Constants.FakeFsPath badLine80Test
     ) |> ignore
 
   [<TestMethod>]
   member _.``Trailing Whitespace Test`` () =
-    lintTextString
+    linterForFs.Lint
       Constants.FakeFsPath
       goodTrailingWhiteSpaceTest
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString
+      linterForFs.Lint
         Constants.FakeFsPath
         badTrailingWhiteSpaceTest
     ) |> ignore

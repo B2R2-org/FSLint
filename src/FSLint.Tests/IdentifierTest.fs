@@ -48,55 +48,55 @@ let age_ = 30
 
   [<TestMethod>]
   member _.``[ID] Binding Lowercase Test`` () =
-    lintTextString
+    linterForFs.Lint
       Constants.FakeFsPath
       goodBindingLowercaseTest
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString
+      linterForFs.Lint
         Constants.FakeFsPath
         badBindingLowercaseTest
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Binding PascalCase Test`` () =
-    lintTextString
+    linterForFs.Lint
       Constants.FakeFsPath
       goodBindingPascalCaseTest
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString
+      linterForFs.Lint
         Constants.FakeFsPath
         badBindingPascalCaseTest
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Record Definition PascalCase Test`` () =
-    lintTextString
+    linterForFs.Lint
       Constants.FakeFsPath
       goodRecordDefPascalCaseTest
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString
+      linterForFs.Lint
         Constants.FakeFsPath
         badRecordDefPascalCaseTest
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Record Field Name PascalCase Test`` () =
-    lintTextString
+    linterForFs.Lint
       Constants.FakeFsPath
       goodRecordFieldNamePascalCaseTest
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString
+      linterForFs.Lint
         Constants.FakeFsPath
         badRecordFieldNamePascalCaseTest
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Binding Underscore Test`` () =
-    lintTextString
+    linterForFs.Lint
       Constants.FakeFsPath
       goodBindingUnderscoreTest
     Assert.ThrowsException<LintException> (fun () ->
-      lintTextString
+      linterForFs.Lint
         Constants.FakeFsPath
         badBindingUnderscoreTest
     ) |> ignore

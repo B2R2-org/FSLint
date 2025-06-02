@@ -251,30 +251,41 @@ let checkWithAST txt path =
         for id in lid do
           IdentifierConvention.check PascalCase true id.idText id.idRange
         checkDeclarations decls
-      printfn "Linting completed."
     | ParsedInput.SigFile _ ->
       () (* ignore fsi files *)
 
-let lintTextString (path: string) (txt: string) =
-  checkWithString txt
-  checkWithAST txt path
-
-let lintFile (path: string) =
+let lintFile (linter: ILintable) (path: string) =
   if not <| File.Exists path then exitWithError $"File '{path}' not found"
   else printfn $"Linting file: {path}"
   let txt = File.ReadAllText path
-  lintTextString path txt
+  linter.Lint path txt
 
-let lintFileAndExitWhenFailed (path: string) =
-  try lintFile path
+let runLinter linter (path: string) =
+  try lintFile linter path
   with LintException msg ->
     System.Console.WriteLine msg
     exit 1
 
+let linterForFs =
+  { new ILintable with
+      member _.Lint path txt =
+        checkWithString txt
+        checkWithAST txt path }
+
+let linterForProjSln =
+  { new ILintable with
+      member _.Lint _path txt =
+        LineConvention.checkWindowsLineEndings txt }
+
 [<EntryPoint>]
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
-  elif File.Exists args[0] then lintFileAndExitWhenFailed args[0]; 0
+  elif File.Exists args[0] then
+    runLinter linterForFs args[0]
+    0
   elif Directory.Exists args[0] then
-    runOnEveryFile args[0] lintFileAndExitWhenFailed; 0
+    runOnEveryProjectSlnFile args[0] (runLinter linterForProjSln)
+    runOnEveryFsFile args[0] (runLinter linterForFs)
+    System.Console.WriteLine "Linting completed."
+    0
   else exitWithError $"File or directory '{args[0]}' not found"

@@ -10,7 +10,7 @@ module LineConvention =
 
   let [<Literal>] private WindowsLineEnding = "\r\n"
 
-  let private checkWindowsLineEndings (txt: string) =
+  let checkWindowsLineEndings (txt: string) =
     if txt.Contains WindowsLineEnding then
       raiseWithError "Windows line endings are not allowed. Use LF instead."
     else ()

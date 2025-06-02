@@ -1,4 +1,4 @@
-﻿namespace B2R2.FSLint
+namespace B2R2.FSLint
 
 module LineConvention =
   open System

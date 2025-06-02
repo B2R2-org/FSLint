@@ -1,4 +1,4 @@
-﻿namespace B2R2.FSLint.Tests
+namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
 open B2R2.FSLint

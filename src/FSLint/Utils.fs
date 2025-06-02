@@ -1,4 +1,4 @@
-﻿[<AutoOpen>]
+[<AutoOpen>]
 module B2R2.FSLint.Utils
 
 open System

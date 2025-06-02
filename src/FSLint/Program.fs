@@ -1,4 +1,4 @@
-﻿module B2R2.FSLint.Program
+module B2R2.FSLint.Program
 
 open System.IO
 open FSharp.Compiler.CodeAnalysis
@@ -239,9 +239,6 @@ and checkBindings case bindings =
   for binding in bindings do
     checkBinding case binding
 
-let checkWithString txt =
-  LineConvention.check txt
-
 let checkWithAST txt path =
   parseFile txt path
   |> function
@@ -254,10 +251,17 @@ let checkWithAST txt path =
     | ParsedInput.SigFile _ ->
       () (* ignore fsi files *)
 
+let ensureNoBOM (bs: byte[]) =
+  if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy then
+    exitWithError "Byte Order Mark (BOM) should be removed from the file."
+  else
+    bs
+
 let lintFile (linter: ILintable) (path: string) =
   if not <| File.Exists path then exitWithError $"File '{path}' not found"
   else printfn $"Linting file: {path}"
-  let txt = File.ReadAllText path
+  let bytes = File.ReadAllBytes path |> ensureNoBOM
+  let txt = System.Text.Encoding.UTF8.GetString bytes
   linter.Lint path txt
 
 let runLinter linter (path: string) =
@@ -269,7 +273,7 @@ let runLinter linter (path: string) =
 let linterForFs =
   { new ILintable with
       member _.Lint path txt =
-        checkWithString txt
+        LineConvention.check txt
         checkWithAST txt path }
 
 let linterForProjSln =

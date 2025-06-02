@@ -7,12 +7,16 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type LineTest () =
 
-  let goodLine80Test = """
-let x = 111111111111111111111111111111111111111111111111111111111111111111111111
+  let goodOnes = String.replicate 72 "1"
+
+  let badOnes = String.replicate 73 "1"
+
+  let goodLine80Test = $"""
+let x = {goodOnes}
 """
 
-  let badLine80Test = """
-let x = 1111111111111111111111111111111111111111111111111111111111111111111111111
+  let badLine80Test = $"""
+let x = {badOnes}
 """
 
   let goodTrailingWhiteSpaceTest = """
@@ -20,8 +24,10 @@ type A () =
   member _.X = 42
 """
 
-  let badTrailingWhiteSpaceTest = """
-type A () = 
+  let space = " "
+
+  let badTrailingWhiteSpaceTest = $"""
+type A () ={space}
   member _.X = 42
 """
 

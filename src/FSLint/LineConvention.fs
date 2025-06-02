@@ -15,9 +15,18 @@ module LineConvention =
       raiseWithError "Windows line endings are not allowed. Use LF instead."
     else ()
 
+  let checkControlChar (txt: string) =
+    if txt |> String.exists Char.IsControl then
+      txt
+      |> String.filter Char.IsControl
+      |> String.iter (fun c ->
+        Console.WriteLine $"Control char: {c} (0x{int c:X2})")
+      raiseWithError "File contains control characters. Please remove them."
+    else ()
+
   let check (txt: string) =
     checkWindowsLineEndings txt
-    txt.Split ([| "\n"; WindowsLineEnding |], StringSplitOptions.None)
+    txt.Split ([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
       if line.Length > MaxLineLength then
         Console.WriteLine line
@@ -27,5 +36,5 @@ module LineConvention =
         Console.WriteLine line
         Console.WriteLine (String.replicate (line.Length - 1) " " + "^")
         raiseWithError $"Line {i + 1} contains trailing whitespace."
-      else ()
+      else checkControlChar line
     )

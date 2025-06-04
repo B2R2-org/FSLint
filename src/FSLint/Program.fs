@@ -1,4 +1,4 @@
-﻿module B2R2.FSLint.Program
+module B2R2.FSLint.Program
 
 open System.IO
 open FSharp.Compiler.CodeAnalysis

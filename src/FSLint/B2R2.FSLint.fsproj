@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -23,6 +23,7 @@
     <Compile Include="Utils.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />
+    <Compile Include="ArrayOrListConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

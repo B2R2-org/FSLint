@@ -20,8 +20,9 @@
   <ItemGroup>
     <Compile Include="MSTestSettings.fs" />
     <Compile Include="Constants.fs" />
-    <Compile Include="IdentifierTest.fs" />
-    <Compile Include="LineTest.fs" />
+    <Compile Include="ArrayOrListTests.fs" />
+    <Compile Include="IdentifierTests.fs" />
+    <Compile Include="LineTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

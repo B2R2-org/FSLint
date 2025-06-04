@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type LineTest () =
+type LineTests () =
 
   let goodOnes = String.replicate 72 "1"
 

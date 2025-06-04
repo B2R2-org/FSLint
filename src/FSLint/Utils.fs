@@ -14,6 +14,9 @@ let exitWithError (message: string) =
   Console.WriteLine message
   exit 1
 
+let warn (message: string) =
+  Console.Error.WriteLine message
+
 let runOnEveryFsFile (path: string) (action: string -> unit) =
   let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape
   let exclusionPatterns =

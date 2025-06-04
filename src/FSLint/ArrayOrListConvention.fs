@@ -77,7 +77,7 @@ let checkSingleLine distanceFstElemToOpeningBracket range = function
                         range = innerRange) ->
     checkBracketSpacing distanceFstElemToOpeningBracket innerRange range
     checkRangeOperatorSpacing exprOfFirstElement rangeOfSecondElement opm
-  | expr -> failwith $"TODO: {expr}"
+  | expr -> warn $"TODO: {expr}"
 
 let check isArray (range: range) expr =
   // TODO: ISourceText -> semicolon check
@@ -85,4 +85,4 @@ let check isArray (range: range) expr =
     let distanceFstElemToOpeningBracket = if isArray then 3 else 2
     checkSingleLine distanceFstElemToOpeningBracket range expr
   else
-    failwith $"TODO: {expr}"
+    warn $"TODO: {expr}"

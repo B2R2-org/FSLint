@@ -215,6 +215,7 @@ and checkDeclarations decls =
     | SynModuleDecl.Let (_, bindings, _range) ->
       checkBindings LowerCamelCase bindings
     | SynModuleDecl.Expr (expr = expr) ->
+      checkArrayOrList expr
       checkExpression expr
     | SynModuleDecl.Types (typeDefns, _range) ->
       for typeDefn in typeDefns do checkTypeDefn typeDefn
@@ -241,8 +242,8 @@ and checkBinding case binding =
   let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern case false pat
-  checkExpression body
   checkArrayOrList body
+  checkExpression body
 
 and checkBindings case bindings =
   for binding in bindings do

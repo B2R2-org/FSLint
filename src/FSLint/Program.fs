@@ -25,8 +25,9 @@ let rec checkPattern case isArg = function
     () (* no need to check this *)
   | SynPat.Named (ident = SynIdent (ident = id); range = range) ->
     IdentifierConvention.check case true id.idText range
-  | SynPat.Typed (pat = pat) ->
+  | SynPat.Typed (pat = pat; targetType = typ; range = range) ->
     checkPattern case isArg pat
+    TypeAnnotation.check pat typ range
   | SynPat.LongIdent (lid, _, _, SynArgPats.Pats args, _, range) ->
     let SynLongIdent (id = lid) = lid
     let name = (List.last lid).idText

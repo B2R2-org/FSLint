@@ -281,9 +281,8 @@ let runLinter linter (path: string) =
 let linterForFs =
   { new ILintable with
       member _.Lint path txt =
-        let src, parseTree = parseFile txt path
         LineConvention.check txt
-        checkWithAST src parseTree }
+        parseFile txt path ||> checkWithAST }
 
 let linterForProjSln =
   { new ILintable with

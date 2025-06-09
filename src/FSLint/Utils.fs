@@ -4,6 +4,7 @@ module B2R2.FSLint.Utils
 open System
 open System.IO
 open System.Text.RegularExpressions
+open FSharp.Compiler.Text
 
 exception LintException of string
 
@@ -16,6 +17,11 @@ let exitWithError (message: string) =
 
 let warn (message: string) =
   Console.Error.WriteLine message
+
+let reportError (src: ISourceText) (range: range) message =
+  Console.Error.WriteLine (src.GetLineString (range.StartLine - 1))
+  Console.Error.WriteLine (String.replicate range.StartColumn " " + "^")
+  raiseWithError $"{range.StartLine} {message}"
 
 let runOnEveryFsFile (path: string) (action: string -> unit) =
   let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape

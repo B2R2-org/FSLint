@@ -15,88 +15,88 @@ let parseFile txt (path: string) =
     checker.GetParsingOptionsFromProjectOptions projOptions
   checker.ParseFile (path, src, parsingOptions)
   |> Async.RunSynchronously
-  |> fun r -> r.ParseTree
+  |> fun r -> src, r.ParseTree
 
-let rec checkPattern case isArg = function
+let rec checkPattern src case isArg = function
   | SynPat.Attrib _
   | SynPat.Const _
   | SynPat.Record _
   | SynPat.Wild _ ->
     () (* no need to check this *)
   | SynPat.Named (ident = SynIdent (ident = id); range = range) ->
-    IdentifierConvention.check case true id.idText range
+    IdentifierConvention.check src case true id.idText range
   | SynPat.Typed (pat = pat) ->
-    checkPattern case isArg pat
+    checkPattern src case isArg pat
   | SynPat.LongIdent (lid, _, _, SynArgPats.Pats args, _, range) ->
     let SynLongIdent (id = lid) = lid
     let name = (List.last lid).idText
     let case = if not (List.isEmpty args) && isArg then PascalCase else case
-    IdentifierConvention.check case true name range
-    for arg in args do checkPattern LowerCamelCase true arg
+    IdentifierConvention.check src case true name range
+    for arg in args do checkPattern src LowerCamelCase true arg
   | SynPat.LongIdent (lid, _, _, SynArgPats.NamePatPairs _, _, range) ->
     let SynLongIdent (id = lid) = lid
     let name = (List.last lid).idText
-    IdentifierConvention.check PascalCase true name range
+    IdentifierConvention.check src PascalCase true name range
   | SynPat.Paren (pat = pat) ->
-    checkPattern case isArg pat
+    checkPattern src case isArg pat
   | SynPat.Tuple (elementPats = pats) ->
-    for pat in pats do checkPattern case isArg pat
+    for pat in pats do checkPattern src case isArg pat
   | SynPat.OptionalVal (ident = id) ->
-    IdentifierConvention.check LowerCamelCase true id.idText id.idRange
+    IdentifierConvention.check src LowerCamelCase true id.idText id.idRange
   | pat ->
     failwith $"{nameof checkPattern} TODO: {pat}"
 
-and checkSimplePattern case = function
+and checkSimplePattern src case = function
   | SynSimplePat.Id (ident = id) ->
-    IdentifierConvention.check case true id.idText id.idRange
+    IdentifierConvention.check src case true id.idText id.idRange
   | SynSimplePat.Typed (pat = pat) ->
-    checkSimplePattern case pat
+    checkSimplePattern src case pat
   | pat ->
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
-and checkMatchClause clause =
+and checkMatchClause src clause =
   let SynMatchClause (resultExpr = expr) = clause
-  checkExpression expr
+  checkExpression src expr
 
-and checkArrayOrList = function
+and checkArrayOrList src = function
   | SynExpr.ArrayOrListComputed (isArray, expr, range) ->
-    ArrayOrListConvention.check isArray range expr
+    ArrayOrListConvention.check src isArray range expr
   | SynExpr.ArrayOrList (isArray, exprs, range) ->
     let enclosureWidth = if isArray then 4 else 2
-    ArrayOrListConvention.checkEmpty enclosureWidth exprs range
+    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
   | _ -> ()
 
-and checkExpression = function
+and checkExpression src = function
   | SynExpr.Paren (expr = expr) ->
-    checkExpression expr
+    checkExpression src expr
   | SynExpr.Typed (expr = expr) ->
-    checkExpression expr
+    checkExpression src expr
   | SynExpr.Lambda (args = args; body = body) ->
     let SynSimplePats.SimplePats (pats = pats) = args
-    for pat in pats do checkSimplePattern LowerCamelCase pat
-    checkExpression body
+    for pat in pats do checkSimplePattern src LowerCamelCase pat
+    checkExpression src body
   | SynExpr.LetOrUse (_, _, bindings, body, _, _) ->
-    checkBindings LowerCamelCase bindings
-    checkExpression body
+    checkBindings src LowerCamelCase bindings
+    checkExpression src body
   | SynExpr.Do (expr = expr)
   | SynExpr.For (doBody = expr)
   | SynExpr.ForEach (bodyExpr = expr)
   | SynExpr.While (doExpr = expr) ->
-    checkExpression expr
+    checkExpression src expr
   | SynExpr.IfThenElse (thenExpr = thenExpr; elseExpr = elseExpr) ->
-    checkExpression thenExpr
-    if Option.isSome elseExpr then checkExpression (Option.get elseExpr)
+    checkExpression src thenExpr
+    if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
   | SynExpr.MatchLambda (matchClauses = clauses)
   | SynExpr.Match (clauses = clauses) ->
-    for clause in clauses do checkMatchClause clause
+    for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple (exprs = exprs) ->
-    for expr in exprs do checkExpression expr
+    for expr in exprs do checkExpression src expr
   | SynExpr.TryFinally (tryExpr = tryExpr; finallyExpr = finallyExpr) ->
-    checkExpression tryExpr
-    checkExpression finallyExpr
+    checkExpression src tryExpr
+    checkExpression src finallyExpr
   | SynExpr.TryWith (tryExpr = tryExpr; withCases = clauses) ->
-    checkExpression tryExpr
-    for clause in clauses do checkMatchClause clause
+    checkExpression src tryExpr
+    for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed _
   | SynExpr.ArrayOrList _
   | SynExpr.App _
@@ -128,30 +128,30 @@ and checkExpression = function
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
 
-and checkIdOpt case = function
+and checkIdOpt src case = function
   | Some (id: Ident) ->
-    IdentifierConvention.check case true id.idText id.idRange
+    IdentifierConvention.check src case true id.idText id.idRange
   | None -> failwith "?"
 
-and checkMemberDefns members =
+and checkMemberDefns src members =
   for memberDefn in members do
     match memberDefn with
     | SynMemberDefn.Member (binding, _) ->
-      checkBinding PascalCase binding
+      checkBinding src PascalCase binding
     | SynMemberDefn.GetSetMember (get, set, _, _) ->
-      if get.IsSome then checkBinding PascalCase get.Value else ()
-      if set.IsSome then checkBinding PascalCase set.Value else ()
+      if get.IsSome then checkBinding src PascalCase get.Value else ()
+      if set.IsSome then checkBinding src PascalCase set.Value else ()
     | SynMemberDefn.LetBindings (bindings = bindings) ->
-      checkBindings LowerCamelCase bindings
+      checkBindings src LowerCamelCase bindings
     | SynMemberDefn.AbstractSlot (slotSig = SynValSig (ident = id)) ->
       let SynIdent (ident = id) = id
-      IdentifierConvention.check PascalCase true id.idText id.idRange
+      IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.Interface (members = Some members) ->
-      checkMemberDefns members
+      checkMemberDefns src members
     | SynMemberDefn.ValField (SynField (idOpt = idOpt), _) ->
-      checkIdOpt PascalCase idOpt
+      checkIdOpt src PascalCase idOpt
     | SynMemberDefn.AutoProperty (ident = id) ->
-      IdentifierConvention.check PascalCase true id.idText id.idRange
+      IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.ImplicitCtor _
     | SynMemberDefn.ImplicitInherit _
     | SynMemberDefn.Inherit _ ->
@@ -159,68 +159,68 @@ and checkMemberDefns members =
     | _ ->
       failwith $"{nameof checkMemberDefns} TODO: {memberDefn}"
 
-and checkTypeDefnSimpleRepr = function
+and checkTypeDefnSimpleRepr src = function
   | SynTypeDefnSimpleRepr.Union (unionCases=cases) ->
     for case in cases do
       let SynUnionCase (ident = SynIdent (ident = id); range = range) = case
-      IdentifierConvention.check PascalCase false id.idText range
+      IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Enum (cases = cases) ->
     for case in cases do
       let SynEnumCase (ident = SynIdent (ident = id); range = range) = case
-      IdentifierConvention.check PascalCase false id.idText range
+      IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Record (recordFields = fields) ->
     for field in fields do
       let SynField (idOpt = idOpt) = field
-      checkIdOpt PascalCase idOpt
+      checkIdOpt src PascalCase idOpt
   | SynTypeDefnSimpleRepr.Exception repr ->
-    checkExceptionDefnRepr repr
+    checkExceptionDefnRepr src repr
   | SynTypeDefnSimpleRepr.TypeAbbrev _
   | SynTypeDefnSimpleRepr.None _ ->
     () (* no need to check this *)
   | repr ->
     failwith $"{nameof checkTypeDefnSimpleRepr} TODO: {repr}"
 
-and checkExceptionDefnRepr repr =
+and checkExceptionDefnRepr src repr =
   let SynExceptionDefnRepr (caseName = caseName) = repr
   let SynUnionCase (ident = SynIdent (ident = id); range = range) = caseName
-  IdentifierConvention.check PascalCase true id.idText range
+  IdentifierConvention.check src PascalCase true id.idText range
 
-and checkTypeDefnRepr repr =
+and checkTypeDefnRepr src repr =
   match repr with
   | SynTypeDefnRepr.ObjectModel (_, members, _) ->
-    checkMemberDefns members
+    checkMemberDefns src members
   | SynTypeDefnRepr.Simple (repr, _) ->
-    checkTypeDefnSimpleRepr repr
+    checkTypeDefnSimpleRepr src repr
   | SynTypeDefnRepr.Exception repr ->
-    checkExceptionDefnRepr repr
+    checkExceptionDefnRepr src repr
 
-and checkTypeDefn defn =
+and checkTypeDefn src defn =
   let SynTypeDefn (typeInfo = info; typeRepr = repr; members = members) = defn
   let SynComponentInfo (longId = lid; range = range; attributes = attrs) = info
   let case = if hasAttr "Measure" attrs then LowerCamelCase else PascalCase
   let name = (List.last lid).idText
-  IdentifierConvention.check case true name range
-  checkTypeDefnRepr repr
-  checkMemberDefns members
+  IdentifierConvention.check src case true name range
+  checkTypeDefnRepr src repr
+  checkMemberDefns src members
 
-and checkDeclarations decls =
+and checkDeclarations src decls =
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev (ident = id) ->
-      IdentifierConvention.check PascalCase true id.idText id.idRange
+      IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynModuleDecl.NestedModule (moduleInfo = info) ->
       let SynComponentInfo (longId = lid) = info
       for id in lid do
-        IdentifierConvention.check PascalCase true id.idText id.idRange
+        IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynModuleDecl.Let (_, bindings, _range) ->
-      checkBindings LowerCamelCase bindings
+      checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr (expr = expr) ->
-      checkArrayOrList expr
-      checkExpression expr
+      checkArrayOrList src expr
+      checkExpression src expr
     | SynModuleDecl.Types (typeDefns, _range) ->
-      for typeDefn in typeDefns do checkTypeDefn typeDefn
+      for typeDefn in typeDefns do checkTypeDefn src typeDefn
     | SynModuleDecl.Exception (SynExceptionDefn (exnRepr = repr), _) ->
-      checkExceptionDefnRepr repr
+      checkExceptionDefnRepr src repr
     | SynModuleDecl.Open _
     | SynModuleDecl.HashDirective _
     | SynModuleDecl.Attributes _ ->
@@ -238,28 +238,26 @@ and hasAttr attrName attrs =
     )
   )
 
-and checkBinding case binding =
+and checkBinding src case binding =
   let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
-  checkPattern case false pat
-  checkArrayOrList body
-  checkExpression body
+  checkPattern src case false pat
+  checkArrayOrList src body
+  checkExpression src body
 
-and checkBindings case bindings =
+and checkBindings src case bindings =
   for binding in bindings do
-    checkBinding case binding
+    checkBinding src case binding
 
-let checkWithAST txt path =
-  parseFile txt path
-  |> function
-    | ParsedInput.ImplFile (ParsedImplFileInput (contents=modules))->
-      for m in modules do
-        let SynModuleOrNamespace (longId = lid; decls = decls) = m
-        for id in lid do
-          IdentifierConvention.check PascalCase true id.idText id.idRange
-        checkDeclarations decls
-    | ParsedInput.SigFile _ ->
-      () (* ignore fsi files *)
+let checkWithAST src = function
+  | ParsedInput.ImplFile (ParsedImplFileInput (contents=modules))->
+    for m in modules do
+      let SynModuleOrNamespace (longId = lid; decls = decls) = m
+      for id in lid do
+        IdentifierConvention.check src PascalCase true id.idText id.idRange
+      checkDeclarations src decls
+  | ParsedInput.SigFile _ ->
+    () (* ignore fsi files *)
 
 let ensureNoBOM (bs: byte[]) =
   if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy then
@@ -283,8 +281,9 @@ let runLinter linter (path: string) =
 let linterForFs =
   { new ILintable with
       member _.Lint path txt =
+        let src, parseTree = parseFile txt path
         LineConvention.check txt
-        checkWithAST txt path }
+        checkWithAST src parseTree }
 
 let linterForProjSln =
   { new ILintable with

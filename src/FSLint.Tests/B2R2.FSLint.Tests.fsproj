@@ -23,6 +23,7 @@
     <Compile Include="ArrayOrListTests.fs" />
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="LineTests.fs" />
+    <Compile Include="TypeAnnotationTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

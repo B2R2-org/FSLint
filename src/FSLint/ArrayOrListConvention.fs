@@ -11,6 +11,9 @@ let private reportRangeOperatorError src range =
 let private reportBracketSpacingError src range =
   reportError src range "Wrong spacing inside brackets"
 
+let private reportOperatorError src range =
+  reportError src range "There must be a space before and after the operator"
+
 let rec collectSeparatorAndElementRanges acc = function
   | SynExpr.Sequential (expr1 = expr1; expr2 = expr2; trivia = trivia) ->
     collectSeparatorAndElementRanges
@@ -74,6 +77,29 @@ let checkEmpty src enclosureWidth (expr: list<SynExpr>) (fullRange: range) =
     reportError src fullRange "Contains Invalid Whitespace"
   else ()
 
+/// Check proper operator spacing in list/array literals.
+/// Ensures single space before and after operator (e.g., "a + b" not "a+b").
+let rec checkOperatorSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
+  match funcExpr with
+  | SynExpr.App (funcExpr = fExpr; argExpr = aExpr) ->
+    match aExpr with
+    | SynExpr.App (funcExpr = fExpr; argExpr = aExpr) ->
+      checkOperatorSpacing src fExpr aExpr
+    | SynExpr.LongIdent _ ->
+      let funcRange = fExpr.Range
+      let argRange = aExpr.Range
+      if funcRange.EndColumn - argRange.EndColumn <> 2 then
+        reportOperatorError src funcRange
+      else ()
+      match argExpr with
+      | SynExpr.App (range = range) ->
+        if range.StartColumn - funcRange.EndColumn <> 1 then
+          reportOperatorError src argExpr.Range
+        else ()
+      | _ -> ()
+    | _ -> ()
+  | _ -> ()
+
 let checkSingleLine src distFstElemToOpeningBracket range = function
   | SynExpr.Const (range = innerRange) ->
     checkBracketSpacing src distFstElemToOpeningBracket innerRange range
@@ -86,6 +112,17 @@ let checkSingleLine src distFstElemToOpeningBracket range = function
                         range = innerRange) ->
     checkBracketSpacing src distFstElemToOpeningBracket innerRange range
     checkRangeOpSpacing src exprOfFirstElement rangeOfSecondElement opm
+  | SynExpr.App (flag = flag
+                 isInfix = isInfix
+                 funcExpr = funExpr
+                 argExpr = argExpr
+                 range = innerRange) as expr ->
+    printfn "%A" expr
+    printfn "Infix: %b\nFlag: %A\nFunc: %A\nArg: %A\nRange: %A"
+      isInfix flag funExpr argExpr range
+    printfn "%A" <| src.GetLineString (range.StartLine - 1)
+    checkBracketSpacing src distFstElemToOpeningBracket innerRange range
+    checkOperatorSpacing src funExpr argExpr
   | expr -> warn $"TODO: {expr}"
 
 let check src isArray (range: range) expr =

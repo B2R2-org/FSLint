@@ -41,6 +41,14 @@ type ArrayOrListTests () =
 
   let badListRangeOperatorWithStepTest = """[ 1 ..2.. 10 ]"""
 
+  let goodArraySpaceOperatorsTest = """
+[| this.Address + uint64 this.Length + this.Name |]
+"""
+
+  let badArraySpaceOperatorsTest = """
+[| this.Address +  uint64 this.Length + this.Name |]
+"""
+
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodListEmptyTest
@@ -105,4 +113,11 @@ type ArrayOrListTests () =
     linterForFs.Lint Constants.FakeFsPath goodListRangeOperatorWithStepTest
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badListRangeOperatorWithStepTest
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] Array Space Before and After Operators Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodArraySpaceOperatorsTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badArraySpaceOperatorsTest
     ) |> ignore

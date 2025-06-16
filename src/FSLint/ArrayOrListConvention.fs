@@ -10,6 +10,9 @@ let private reportRangeOperatorError src range =
 let private reportBracketSpacingError src range =
   reportError src range "Wrong spacing inside brackets"
 
+let private reportOperatorError src range =
+  reportError src range "There must be a space before and after the operator"
+
 let private reportSingleElementPerLineError src range =
   reportError src range "Only one element per line allowed"
 
@@ -87,6 +90,33 @@ let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
     reportError src range "Misplaced bracket after binding keyword"
   else ()
 
+let private ensureOperSpacing src subFuncRange subArgRange argRange =
+  /// Check before operator spacing.
+  if (subFuncRange: range).EndColumn - (subArgRange: range).EndColumn <> 2 then
+    reportOperatorError src subFuncRange
+  else ()
+  /// Check after operator spacing.
+  if (argRange: range).StartColumn - subFuncRange.EndColumn <> 1 then
+    reportOperatorError src argRange
+  else ()
+
+/// Check proper operator spacing in list/array literals.
+/// Ensures single space before and after operator (e.g., "a + b" not "a+b").
+let rec checkOperatorSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
+  match funcExpr with
+  | SynExpr.App (funcExpr = subFuncExpr; argExpr = subArgExpr) ->
+    match subFuncExpr with
+    | SynExpr.LongIdent (_, SynLongIdent ([lid], _, _), _, _) ->
+      if lid.idText.Substring(0, 3) = "op_" then
+        ensureOperSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
+        match subArgExpr with
+        | SynExpr.App (funcExpr = subSubFuncExpr; argExpr = subSubArgExpr) ->
+          checkOperatorSpacing src subSubFuncExpr subSubArgExpr
+        | _ -> ()
+      else checkOperatorSpacing src subFuncExpr subArgExpr
+    | _ -> ()
+  | _ -> ()
+
 /// Checks proper one element per line in multi-line list/array literals.
 let checkSingleElementPerLine src (elemRanges: Range list) =
   elemRanges
@@ -156,6 +186,13 @@ let checkSingleLine src = function
                         opm = opm
                         range2 = rangeOfSecondElement) ->
     checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
+  | SynExpr.App (flag = _flag
+                 isInfix = _isInfix
+                 funcExpr = funExpr
+                 argExpr = argExpr
+                 range = innerRange) ->
+    checkBracketSpacing src distFstElemToOpeningBracket innerRange range
+    checkOperatorSpacing src funExpr argExpr
   | SynExpr.Const _
   | SynExpr.Ident _ -> ()
   | expr -> warn $"TODO: {expr}"

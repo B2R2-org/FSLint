@@ -136,6 +136,14 @@ let bad = [
   3(* Bad *) ]
 """
 
+  let goodArraySpaceOperatorsTest = """
+[| this.Address + uint64 this.Length + this.Name |]
+"""
+
+  let badArraySpaceOperatorsTest = """
+[| this.Address +  uint64 this.Length + this.Name |]
+"""
+
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodEmptyTest
@@ -244,6 +252,13 @@ let bad = [
     linterForFs.Lint Constants.FakeFsPath goodOpeningBracketInlineWithLetTest
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badOpeningBracketInlineWithLetTest
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] Array Space Before and After Operators Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodArraySpaceOperatorsTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badArraySpaceOperatorsTest
     ) |> ignore
 
   [<TestMethod>]

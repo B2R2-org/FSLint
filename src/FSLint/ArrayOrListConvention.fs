@@ -49,14 +49,19 @@ let checkBracketSpacing src distFstElemToOpeningBracket elemRange fullRange =
 /// Ensures single space before and after '..' (e.g., "1 .. 10" not "1..10").
 let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
   match fstElem with
-  | Some (SynExpr.Const (range = rangeOfFirstElem)) ->
+  | SynExpr.Const (range = rangeOfFirstElem) ->
     if opm.StartColumn = rangeOfFirstElem.EndColumn
       || opm.EndColumn = rangeOfSecondElem.StartColumn
     then reportRangeOperatorError src opm
     else ()
-  | Some (SynExpr.IndexRange (opm = stepOpm
-                              range1 = rangeOfFirstElem
-                              range2 = stepRange)) ->
+  | SynExpr.Ident ident ->
+    if opm.StartColumn = ident.idRange.EndColumn
+      || opm.EndColumn = rangeOfSecondElem.StartColumn
+    then reportRangeOperatorError src opm
+    else ()
+  | SynExpr.IndexRange (opm = stepOpm
+                        range1 = rangeOfFirstElem
+                        range2 = stepRange) ->
     if stepOpm.StartColumn = rangeOfFirstElem.EndColumn
       || stepOpm.EndColumn = stepRange.StartColumn
     then reportRangeOperatorError src stepOpm
@@ -77,6 +82,8 @@ let checkEmpty src enclosureWidth (expr: list<SynExpr>) (fullRange: range) =
 let checkSingleLine src distFstElemToOpeningBracket range = function
   | SynExpr.Const (range = innerRange) ->
     checkBracketSpacing src distFstElemToOpeningBracket innerRange range
+  | SynExpr.Ident ident ->
+    checkBracketSpacing src distFstElemToOpeningBracket ident.idRange range
   | SynExpr.Sequential (range = innerRange) as expr ->
     checkBracketSpacing src distFstElemToOpeningBracket innerRange range
     collectSeparatorAndElementRanges [] expr |> checkElementSpacing src
@@ -85,7 +92,7 @@ let checkSingleLine src distFstElemToOpeningBracket range = function
                         range2 = rangeOfSecondElement
                         range = innerRange) ->
     checkBracketSpacing src distFstElemToOpeningBracket innerRange range
-    checkRangeOpSpacing src exprOfFirstElement rangeOfSecondElement opm
+    checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
   | expr -> warn $"TODO: {expr}"
 
 let check src isArray (range: range) expr =

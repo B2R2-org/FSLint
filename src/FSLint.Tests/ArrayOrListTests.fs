@@ -37,9 +37,21 @@ type ArrayOrListTests () =
 
   let badListRangeOperatorTest = """[ 1..10 ]"""
 
+  let goodListRangeOperatorWithIdentTest = """[ startIdent .. endIdent ]"""
+
+  let badListRangeOperatorWithIdentTest = """[ startIdent..endIdent ]"""
+
   let goodListRangeOperatorWithStepTest = """[ 1 .. 2 .. 10 ]"""
 
   let badListRangeOperatorWithStepTest = """[ 1 ..2.. 10 ]"""
+
+  let goodListRangeOperatorWithStepAndIdentTest = """
+[ startIdent .. 2 .. endIdent ]
+"""
+
+  let badListRangeOperatorWithStepAndIdentTest = """
+[ startIdent..2 .. endIdent ]
+"""
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
@@ -101,8 +113,24 @@ type ArrayOrListTests () =
     ) |> ignore
 
   [<TestMethod>]
+  member _.``[ArrayOrList] List Range Operator With Ident Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodListRangeOperatorWithIdentTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badListRangeOperatorWithIdentTest
+    ) |> ignore
+
+  [<TestMethod>]
   member _.``[ArrayOrList] List Range Operator With Step Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodListRangeOperatorWithStepTest
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badListRangeOperatorWithStepTest
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List Range Operator With Step And Ident Test`` () =
+    linterForFs.Lint Constants.FakeFsPath
+      goodListRangeOperatorWithStepAndIdentTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath
+        badListRangeOperatorWithStepAndIdentTest
     ) |> ignore

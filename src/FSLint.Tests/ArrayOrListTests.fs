@@ -41,13 +41,17 @@ type ArrayOrListTests () =
 
   let badListRangeOperatorWithStepTest = """[ 1 ..2.. 10 ]"""
 
-  let goodArraySpaceOperatorsTest = """
-[| this.Address + uint64 this.Length + this.Name |]
+  let goodListSpaceInfixTest = """
+[ this.Address + uint64 this.Length + this.Name ]
 """
 
-  let badArraySpaceOperatorsTest = """
-[| this.Address +  uint64 this.Length + this.Name |]
+  let badListSpaceInfixTest = """
+[ this.Address +  uint64 this.Length + this.Name ]
 """
+
+  let goodListSpaceFunAppTest = """[ fn 1 2 3 x ]"""
+
+  let badListSpaceFunAppTest = """[ fn  1 2 3 x ]"""
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
@@ -116,8 +120,15 @@ type ArrayOrListTests () =
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[ArrayOrList] Array Space Before and After Operators Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodArraySpaceOperatorsTest
+  member _.``[ArrayOrList] List Space Before and After Infix Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodListSpaceInfixTest
     Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badArraySpaceOperatorsTest
+      linterForFs.Lint Constants.FakeFsPath badListSpaceInfixTest
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List Space Fununction Application Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodListSpaceFunAppTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badListSpaceFunAppTest
     ) |> ignore

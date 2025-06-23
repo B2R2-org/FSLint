@@ -59,14 +59,6 @@ and checkMatchClause src clause =
   let SynMatchClause (resultExpr = expr) = clause
   checkExpression src expr
 
-and checkArrayOrList src = function
-  | SynExpr.ArrayOrListComputed (isArray, expr, range) ->
-    ArrayOrListConvention.check src isArray range expr
-  | SynExpr.ArrayOrList (isArray, exprs, range) ->
-    let enclosureWidth = if isArray then 4 else 2
-    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
-  | _ -> ()
-
 and checkExpression src = function
   | SynExpr.Paren (expr = expr) ->
     checkExpression src expr
@@ -98,8 +90,13 @@ and checkExpression src = function
   | SynExpr.TryWith (tryExpr = tryExpr; withCases = clauses) ->
     checkExpression src tryExpr
     for clause in clauses do checkMatchClause src clause
-  | SynExpr.ArrayOrListComputed _
-  | SynExpr.ArrayOrList _
+  | SynExpr.ArrayOrListComputed (isArray, expr, range) ->
+    ArrayOrListConvention.check src isArray range expr
+    checkExpression src expr
+  | SynExpr.ArrayOrList (isArray, exprs, range) ->
+    let enclosureWidth = if isArray then 4 else 2
+    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
+    for expr in exprs do checkExpression src expr
   | SynExpr.App _
   | SynExpr.Assert _
   | SynExpr.Const _
@@ -216,7 +213,6 @@ and checkDeclarations src decls =
     | SynModuleDecl.Let (_, bindings, _range) ->
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr (expr = expr) ->
-      checkArrayOrList src expr
       checkExpression src expr
     | SynModuleDecl.Types (typeDefns, _range) ->
       for typeDefn in typeDefns do checkTypeDefn src typeDefn
@@ -243,7 +239,6 @@ and checkBinding src case binding =
   let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false pat
-  checkArrayOrList src body
   checkExpression src body
 
 and checkBindings src case bindings =

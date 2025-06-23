@@ -97,8 +97,10 @@ and checkExpression src = function
     let enclosureWidth = if isArray then 4 else 2
     ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
     for expr in exprs do checkExpression src expr
+  | SynExpr.AddressOf _
   | SynExpr.App _
   | SynExpr.Assert _
+  | SynExpr.ComputationExpr _
   | SynExpr.Const _
   | SynExpr.DotGet _
   | SynExpr.DotIndexedGet _
@@ -121,7 +123,9 @@ and checkExpression src = function
   | SynExpr.Sequential _
   | SynExpr.Set _
   | SynExpr.TypeApp _
-  | SynExpr.Upcast _ ->
+  | SynExpr.Upcast _
+  | SynExpr.YieldOrReturn _
+  | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"

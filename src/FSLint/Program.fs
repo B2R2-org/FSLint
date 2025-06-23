@@ -55,53 +55,63 @@ and checkSimplePattern src case = function
   | pat ->
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
-and checkMatchClause src clause =
+and checkMatchClause src isAtomic clause =
   let SynMatchClause (resultExpr = expr) = clause
-  checkExpression src expr
+  checkExpression src isAtomic expr
 
-and checkArrayOrList src = function
-  | SynExpr.ArrayOrListComputed (isArray, expr, range) ->
-    ArrayOrListConvention.check src isArray range expr
-  | SynExpr.ArrayOrList (isArray, exprs, range) ->
-    let enclosureWidth = if isArray then 4 else 2
-    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
-  | _ -> ()
-
-and checkExpression src = function
+and checkExpression src isAtomic = function
   | SynExpr.Paren (expr = expr) ->
-    checkExpression src expr
+    checkExpression src isAtomic expr
   | SynExpr.Typed (expr = expr) ->
-    checkExpression src expr
+    checkExpression src isAtomic expr
   | SynExpr.Lambda (args = args; body = body) ->
     let SynSimplePats.SimplePats (pats = pats) = args
     for pat in pats do checkSimplePattern src LowerCamelCase pat
-    checkExpression src body
+    checkExpression src isAtomic body
   | SynExpr.LetOrUse (_, _, bindings, body, _, _) ->
     checkBindings src LowerCamelCase bindings
-    checkExpression src body
+    checkExpression src isAtomic body
   | SynExpr.Do (expr = expr)
   | SynExpr.For (doBody = expr)
   | SynExpr.ForEach (bodyExpr = expr)
   | SynExpr.While (doExpr = expr) ->
-    checkExpression src expr
+    checkExpression src isAtomic expr
   | SynExpr.IfThenElse (thenExpr = thenExpr; elseExpr = elseExpr) ->
-    checkExpression src thenExpr
-    if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
+    checkExpression src isAtomic thenExpr
+    if Option.isSome elseExpr then
+      checkExpression src isAtomic (Option.get elseExpr)
+    else ()
   | SynExpr.MatchLambda (matchClauses = clauses)
   | SynExpr.Match (clauses = clauses) ->
-    for clause in clauses do checkMatchClause src clause
+    for clause in clauses do checkMatchClause src isAtomic clause
   | SynExpr.Tuple (exprs = exprs) ->
-    for expr in exprs do checkExpression src expr
+    for expr in exprs do checkExpression src isAtomic expr
   | SynExpr.TryFinally (tryExpr = tryExpr; finallyExpr = finallyExpr) ->
-    checkExpression src tryExpr
-    checkExpression src finallyExpr
+    checkExpression src isAtomic tryExpr
+    checkExpression src isAtomic finallyExpr
   | SynExpr.TryWith (tryExpr = tryExpr; withCases = clauses) ->
-    checkExpression src tryExpr
-    for clause in clauses do checkMatchClause src clause
-  | SynExpr.ArrayOrListComputed _
-  | SynExpr.ArrayOrList _
-  | SynExpr.App _
+    checkExpression src isAtomic tryExpr
+    for clause in clauses do checkMatchClause src isAtomic clause
+  | SynExpr.ArrayOrListComputed (isArray, expr, range) ->
+    (* TODO: App check *)
+    if isAtomic then ()
+    else ArrayOrListConvention.check src isArray range expr
+    checkExpression src isAtomic expr
+  | SynExpr.ArrayOrList (isArray, exprs, range) ->
+    if isAtomic then ()
+    else
+      let enclosureWidth = if isArray then 4 else 2
+      ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
+    for expr in exprs do checkExpression src isAtomic expr
+  | SynExpr.App (flag = flag; funcExpr = funcExpr; argExpr = argExpr) ->
+    checkExpression src (flag = ExprAtomicFlag.Atomic) funcExpr
+    checkExpression src argExpr.IsArrayOrListComputed argExpr
+  | SynExpr.Sequential (expr1 = expr1; expr2 = expr2) ->
+    checkExpression src isAtomic expr1
+    checkExpression src isAtomic expr2
+  | SynExpr.AddressOf _
   | SynExpr.Assert _
+  | SynExpr.ComputationExpr _
   | SynExpr.Const _
   | SynExpr.DotGet _
   | SynExpr.DotIndexedGet _
@@ -121,10 +131,11 @@ and checkExpression src = function
   | SynExpr.Null _
   | SynExpr.ObjExpr _
   | SynExpr.Record _
-  | SynExpr.Sequential _
   | SynExpr.Set _
   | SynExpr.TypeApp _
-  | SynExpr.Upcast _ ->
+  | SynExpr.Upcast _
+  | SynExpr.YieldOrReturn _
+  | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
@@ -216,8 +227,7 @@ and checkDeclarations src decls =
     | SynModuleDecl.Let (_, bindings, _range) ->
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr (expr = expr) ->
-      checkArrayOrList src expr
-      checkExpression src expr
+      checkExpression src false expr
     | SynModuleDecl.Types (typeDefns, _range) ->
       for typeDefn in typeDefns do checkTypeDefn src typeDefn
     | SynModuleDecl.Exception (SynExceptionDefn (exnRepr = repr), _) ->
@@ -243,8 +253,7 @@ and checkBinding src case binding =
   let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false pat
-  checkArrayOrList src body
-  checkExpression src body
+  checkExpression src false body
 
 and checkBindings src case bindings =
   for binding in bindings do

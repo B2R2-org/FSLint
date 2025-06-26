@@ -136,6 +136,18 @@ let bad = [
   3(* Bad *) ]
 """
 
+  let goodListSpaceInfixTest = """
+[ this.Address + uint64 this.Length + this.Name ]
+"""
+
+  let badListSpaceInfixTest = """
+[ this.Address +  uint64 this.Length + this.Name ]
+"""
+
+  let goodListSpaceFunAppTest = """[ fn 1 2 3 x ]"""
+
+  let badListSpaceFunAppTest = """[ fn  1 2 3 x ]"""
+
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodEmptyTest
@@ -244,6 +256,20 @@ let bad = [
     linterForFs.Lint Constants.FakeFsPath goodOpeningBracketInlineWithLetTest
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badOpeningBracketInlineWithLetTest
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List Space Before and After Infix Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodListSpaceInfixTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badListSpaceInfixTest
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List Space Fununction Application Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodListSpaceFunAppTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badListSpaceFunAppTest
     ) |> ignore
 
   [<TestMethod>]

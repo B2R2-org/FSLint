@@ -91,8 +91,11 @@ let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
   else ()
 
 let private ensureInfixSpacing src subFuncRange subArgRange argRange =
+  let spaceBetweenFuncAndArg =
+    (subFuncRange: range).EndColumn - subFuncRange.StartColumn + 1
   (* Check before operator spacing. *)
-  if (subFuncRange: range).EndColumn - (subArgRange: range).EndColumn <> 2 then
+  if subFuncRange.EndColumn - (subArgRange: range).EndColumn
+    <> spaceBetweenFuncAndArg then
     reportInfixError src subFuncRange
   else ()
   (* Check after operator spacing. *)

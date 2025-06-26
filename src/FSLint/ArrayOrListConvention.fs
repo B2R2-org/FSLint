@@ -82,7 +82,7 @@ let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
   else ()
 
 /// Checks proper placement of opening bracket after `let` keyword.
-let checkOpeningBracketInlineWithLet (src: ISourceText) (range: range) =
+let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
   if src.GetLineString(range.StartLine - 1).TrimStart().StartsWith "let" then
     reportError src range "Misplaced bracket after binding keyword"
   else ()
@@ -98,11 +98,19 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
   )
 
 /// Checks proper bracket-element alignment in multi-line list/array literals.
-let checkElemInlineWithBracket src (range: range) (elemRange: range) =
-  if elemRange.StartLine <> range.StartLine
-    || elemRange.EndLine <> range.EndLine then
-    reportError src elemRange "Bracket-edge element must be inline"
-  else ()
+let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
+  let distFstElemToOpeningBracket = if isArray then 3 else 2
+  let isOnlyCommentInlineWithBracket =
+    (src: ISourceText).GetLineString(range.StartLine - 1).IndexOf "(*"
+    - distFstElemToOpeningBracket = range.StartColumn
+  if isOnlyCommentInlineWithBracket then elemRange.EndLine - 1
+  else elemRange.EndLine
+  |> fun endLineOfElem ->
+    if (elemRange.StartLine <> range.StartLine
+      && not isOnlyCommentInlineWithBracket)
+      || endLineOfElem <> range.EndLine then
+      reportError src elemRange "Bracket-edge element must be inline"
+    else ()
 
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.
@@ -123,28 +131,23 @@ let checkTrailingSeparator src distFstElemToOpeningBracket (range: range) =
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
 let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
-  let startLineDiff = range.StartLine - expr.Range.StartLine
-  let endLineString =
-    if range.StartLine <> range.EndLine then
-      src.GetLineString (range.EndLine - 1)
-    else src.GetSubTextFromRange range
-  let openCommentIndexAtEndLine = endLineString.IndexOf "(*"
-  let closeCommentIndexAtEndLine =
-    endLineString.IndexOf "*)" |> fun idx -> if idx = -1 then idx else idx + 2
-  let elemRangeAdjusted =
-    if startLineDiff <> 0 then
-      expr.Range
-      |> Range.shiftStart startLineDiff 0
-      |> Range.shiftEnd startLineDiff 0
-    else expr.Range
-  let fullRangeAdjusted =
+  range.StartLine - expr.Range.StartLine
+  |> fun startLineDiff ->
     if startLineDiff <> 0 then Range.shiftEnd startLineDiff 0 range else range
-    |> fun range ->
-      if openCommentIndexAtEndLine <> -1 then
-        let amt = openCommentIndexAtEndLine - closeCommentIndexAtEndLine - 1
-        Range.shiftEnd 0 amt range
-      else range
-  elemRangeAdjusted, fullRangeAdjusted
+    |> fun rangeAdjusted ->
+      let endLineString =
+        if range.StartLine <> range.EndLine then
+          src.GetLineString (range.EndLine - 1)
+        else src.GetSubTextFromRange range
+      endLineString.IndexOf "(*"
+      |> fun openCommentIdxAtEndLine ->
+        if openCommentIdxAtEndLine <> -1 then
+          let closeCommentIdxAtEndLine =
+            endLineString.IndexOf "*)"
+            |> fun idx -> if idx = -1 then idx else idx + 2
+          openCommentIdxAtEndLine - closeCommentIdxAtEndLine - 1
+          |> fun amt -> Range.shiftEnd 0 amt rangeAdjusted
+        else rangeAdjusted
 
 let checkSingleLine src = function
   | SynExpr.Sequential _ as expr ->
@@ -157,24 +160,23 @@ let checkSingleLine src = function
   | SynExpr.Ident _ -> ()
   | expr -> warn $"TODO: {expr}"
 
-let checkMultiLine src elemRange range = function
+let checkMultiLine src isArray range = function
   | SynExpr.Sequential _ as expr ->
-    checkOpeningBracketInlineWithLet src range
+    checkOpeningBracketIsInlineWithLet src range
     collectElementAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
-    checkElemInlineWithBracket src range elemRange
+    checkElemIsInlineWithBracket src isArray range expr.Range
   | expr -> warn $"TODO: {expr}"
 
-let checkCommon src isArray (elemRange, fullRange) =
+let checkCommon src isArray fullRange (expr: SynExpr) =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
   checkTrailingSeparator src distFstElemToOpeningBracket fullRange
-  checkBracketSpacing src distFstElemToOpeningBracket elemRange fullRange
+  checkBracketSpacing src distFstElemToOpeningBracket expr.Range fullRange
 
-let check src isArray (range: range) expr =
-  adjustRangeByComment src range expr
-  |> fun (elemRange, fullRange) ->
-    checkCommon src isArray (elemRange, fullRange)
-    if range.StartLine = range.EndLine then
-      checkSingleLine src expr
-    else
-      checkMultiLine src elemRange fullRange expr
+let check src isArray (range: Range) expr =
+  let rangeAdjusted = adjustRangeByComment src range expr
+  checkCommon src isArray rangeAdjusted expr
+  if range.StartLine = range.EndLine then
+    checkSingleLine src expr
+  else
+    checkMultiLine src isArray rangeAdjusted expr

@@ -60,6 +60,7 @@ and checkSimplePattern src case = function
 
 and checkMatchClause (src: ISourceText) clause =
   let SynMatchClause (pat = pat; resultExpr = expr) = clause
+  ArrayOrListConvention.checkPattern src pat
   checkExpression src expr
 
 and checkExpression src = function

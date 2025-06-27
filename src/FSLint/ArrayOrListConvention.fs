@@ -16,13 +16,35 @@ let private reportInfixError src range =
 let private reportSingleElementPerLineError src range =
   reportError src range "Only one element per line allowed"
 
-let rec collectElementAndOptionalSeparatorRanges acc = function
+let rec collectElemAndOptionalSeparatorRanges acc = function
   | SynExpr.Sequential (expr1 = expr1; expr2 = expr2; trivia = trivia) ->
     trivia.SeparatorRange
     |> Option.map (fun sep -> sep :: expr1.Range :: acc)
     |> Option.defaultValue (expr1.Range :: acc)
-    |> fun acc -> collectElementAndOptionalSeparatorRanges acc expr2
+    |> fun acc -> collectElemAndOptionalSeparatorRanges acc expr2
   | expr -> expr.Range :: acc |> List.rev
+
+let collectElemAndOptionalSeparatorRangesInPat (src: ISourceText) elementPats =
+  let separatorRanges =
+    (elementPats: SynPat list)
+    |> List.map (fun pat -> pat.Range)
+    |> List.pairwise
+    |> List.map (fun (fstRange, sndRange) ->
+      let betweenElementsRange = Range.mkRange "" fstRange.End sndRange.Start
+      let betweenElementsText = src.GetSubTextFromRange betweenElementsRange
+      let semicolonIndex = betweenElementsText.IndexOf ";" + fstRange.EndColumn
+      let startPos = Position.mkPos fstRange.StartLine semicolonIndex
+      let endPos = Position.mkPos fstRange.StartLine (semicolonIndex + 1)
+      Range.mkRange "" startPos endPos)
+  let elementRanges = List.map (fun (pat: SynPat) -> pat.Range) elementPats
+  let rec interleave elements separators acc =
+    match elements, separators with
+    | [], [] -> List.rev acc
+    | [elem], [] -> List.rev (elem :: acc)
+    | elem :: restElems, sep :: restSeps ->
+      interleave restElems restSeps (sep :: elem :: acc)
+    | _ -> reportError src elementPats.Head.Range "Pattern ParsingFailure"
+  interleave elementRanges separatorRanges []
 
 /// Checks proper spacing after semicolons between list/array elements.
 /// Ensures exactly one space after each semicolon (e.g., "1; 2; 3").
@@ -175,8 +197,8 @@ let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
 
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.
-let checkTrailingSeparator src distFstElemToOpeningBracket (range: range) =
-  if range.StartLine <> range.EndLine then
+let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
+  if (range: range).StartLine <> range.EndLine then
     for line in range.StartLine .. range.EndLine - 1 do
       let lineString = (src: ISourceText).GetLineString line
       if lineString.LastIndexOf ";" + 1 = lineString.Length then
@@ -184,10 +206,20 @@ let checkTrailingSeparator src distFstElemToOpeningBracket (range: range) =
       else ()
   else
     let distClosingBracketToLastSeparator =
-      range.EndColumn - src.GetSubTextFromRange(range).LastIndexOf ";"
+      let lastIdxOfSeparator =
+        src.GetSubTextFromRange(range).LastIndexOf ";"
+        |> fun idx -> if isPat then idx + range.StartColumn else idx
+      range.EndColumn - lastIdxOfSeparator
     if distClosingBracketToLastSeparator < distFstElemToOpeningBracket + 1 then
       reportError src range "Contains Invalid Separator"
     else ()
+
+/// Checks cons operator in the context is properly surrounded by single spaces.
+let checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
+  if (lhsRange: range).EndColumn + 1 <> colonRange.StartColumn
+    || (rhsRange: range).StartColumn - 1 <>  colonRange.EndColumn then
+      reportError src colonRange "Cons must be surrounded by single spaces"
+  else ()
 
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
@@ -212,7 +244,7 @@ let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
 
 let checkSingleLine src = function
   | SynExpr.Sequential _ as expr ->
-    collectElementAndOptionalSeparatorRanges [] expr |> checkElementSpacing src
+    collectElemAndOptionalSeparatorRanges [] expr |> checkElementSpacing src
   | SynExpr.IndexRange (expr1 = exprOfFirstElement
                         opm = opm
                         range2 = rangeOfSecondElement) ->
@@ -226,19 +258,39 @@ let checkSingleLine src = function
 let checkMultiLine src isArray range = function
   | SynExpr.Sequential _ as expr ->
     checkOpeningBracketIsInlineWithLet src range
-    collectElementAndOptionalSeparatorRanges [] expr
+    collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
     checkElemIsInlineWithBracket src isArray range expr.Range
   | expr -> warn $"TODO: {expr}"
 
-let checkCommon src isArray fullRange (expr: SynExpr) =
+let checkCommon src isArray fullRange elemRange =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
-  checkTrailingSeparator src distFstElemToOpeningBracket fullRange
-  checkBracketSpacing src distFstElemToOpeningBracket expr.Range fullRange
+  checkTrailingSeparator src false distFstElemToOpeningBracket fullRange
+  checkBracketSpacing src distFstElemToOpeningBracket elemRange fullRange
+
+let rec checkPattern (src: ISourceText) = function
+  | SynPat.ArrayOrList (isArray, elementPats, range) ->
+    if elementPats.IsEmpty then
+      let enclosureWidth = if isArray then 4 else 2
+      if range.EndColumn - range.StartColumn <> enclosureWidth then
+        reportError src range "Contains Invalid Whitespace"
+      else ()
+    else
+      elementPats
+      |> List.map (fun pat -> pat.Range)
+      |> List.reduce Range.unionRanges
+      |> checkCommon src isArray range
+      collectElemAndOptionalSeparatorRangesInPat src elementPats
+      |> checkElementSpacing src
+  | SynPat.ListCons (lhsPat = lhsPat; rhsPat = rhsPat; trivia = triv) ->
+    checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange
+    checkPattern src lhsPat
+    checkPattern src rhsPat
+  | _ -> () (* no need to check this *)
 
 let check src isArray (range: Range) expr =
   let rangeAdjusted = adjustRangeByComment src range expr
-  checkCommon src isArray rangeAdjusted expr
+  checkCommon src isArray rangeAdjusted expr.Range
   if range.StartLine = range.EndLine then
     checkSingleLine src expr
   else

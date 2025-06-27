@@ -148,6 +148,36 @@ let bad = [
 
   let badListSpaceFunAppTest = """[ fn  1 2 3 x ]"""
 
+  let goodPatternBracketSpacingTest = """
+match good with
+| [ 1; 2; 3 ] -> 1
+| _ -> 2
+"""
+
+  let badPatternBracketSpacingTest = """
+match bad with
+| [1; 2; 3] -> 1
+| _ -> 2
+"""
+
+  let badPatternElementSpacingTest = """
+match bad with
+| [1; 2;3 ] -> 1
+| _ -> 2
+"""
+
+  let goodPatternConsOperatorTest = """
+match good with
+| x :: xs -> 1
+| _ -> 2
+"""
+
+  let badPatternConsOperatorTest = """
+match bad with
+| x ::xs -> 1
+| _ -> 2
+"""
+
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodEmptyTest
@@ -291,4 +321,24 @@ let bad = [
     linterForFs.Lint Constants.FakeFsPath goodMultiLineCommentPositionTest
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badMultiLineCommentPositionTest
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List In Pattern Bracket Spacing Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodPatternBracketSpacingTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badPatternBracketSpacingTest
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List In Pattern Element Spacing Test`` () =
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badPatternElementSpacingTest
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] List In Pattern Cons Operator Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodPatternConsOperatorTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badPatternConsOperatorTest
      ) |> ignore

@@ -55,8 +55,9 @@ and checkSimplePattern src case = function
   | pat ->
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
-and checkMatchClause src isAtomic clause =
-  let SynMatchClause (resultExpr = expr) = clause
+and checkMatchClause (src: ISourceText) isAtomic clause =
+  let SynMatchClause (pat = pat; resultExpr = expr) = clause
+  ArrayOrListConvention.checkPattern src pat
   checkExpression src isAtomic expr
 
 and checkExpression src isAtomic = function

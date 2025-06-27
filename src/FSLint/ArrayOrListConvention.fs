@@ -105,13 +105,19 @@ let private ensureInfixSpacing src subFuncRange subArgRange argRange =
 
 /// Check proper infix spacing in list/array literals.
 /// Ensures single space before and after infix (e.g., "a + b" not "a+b").
-let rec checkInfixSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
+let rec checkInfixSpacing src isInfix (funcExpr: SynExpr) (argExpr: SynExpr) =
   match funcExpr with
-  | SynExpr.App (funcExpr = subFuncExpr; argExpr = subArgExpr)->
-    ensureInfixSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
+  | SynExpr.App (isInfix = isInfix
+                 funcExpr = subFuncExpr
+                 argExpr = subArgExpr) ->
+    if isInfix then
+      ensureInfixSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
+    else ()
     match subArgExpr with
-    | SynExpr.App (funcExpr = subSubFuncExpr; argExpr = subSubArgExpr) ->
-      checkInfixSpacing src subSubFuncExpr subSubArgExpr
+    | SynExpr.App (isInfix = isInfix
+                   funcExpr = subSubFuncExpr
+                   argExpr = subSubArgExpr) ->
+      checkInfixSpacing src isInfix subSubFuncExpr subSubArgExpr
     | _ -> () (* Skip further checks if not a function application. *)
   | _ -> warn $"[checkInfixSpacing]TODO: {funcExpr}"
 
@@ -135,10 +141,11 @@ let rec checkFuncAppSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
 let checkFuncApp src flag (funcExpr: SynExpr) (argExpr: SynExpr) =
   match funcExpr with
   | SynExpr.App (isInfix = isInfix) ->
-    if isInfix then checkInfixSpacing src funcExpr argExpr
+    if isInfix then checkInfixSpacing src true funcExpr argExpr
     else checkFuncAppSpacing src funcExpr argExpr
-  | SynExpr.Ident _ -> checkFuncAppSpacing src funcExpr argExpr
-  | SynExpr.LongIdent _ when flag = ExprAtomicFlag.Atomic -> ()
+  | SynExpr.Ident _ | SynExpr.LongIdent _ when flag <> ExprAtomicFlag.Atomic ->
+    checkFuncAppSpacing src funcExpr argExpr
+  | SynExpr.LongIdent _ -> () (* TODO: func[ index ] *)
   | expr -> warn $"[checkFuncApp]TODO: {expr}"
 
 /// Checks proper one element per line in multi-line list/array literals.

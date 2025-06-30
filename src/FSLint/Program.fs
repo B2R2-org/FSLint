@@ -80,13 +80,18 @@ and checkExpression src = function
   | SynExpr.ForEach (bodyExpr = expr)
   | SynExpr.While (doExpr = expr) ->
     checkExpression src expr
-  | SynExpr.IfThenElse (thenExpr = thenExpr; elseExpr = elseExpr) ->
+  | SynExpr.IfThenElse (ifExpr = ifExpr
+                        thenExpr = thenExpr
+                        elseExpr = elseExpr) ->
+    checkExpression src ifExpr
     checkExpression src thenExpr
     if Option.isSome elseExpr then
       checkExpression src (Option.get elseExpr)
     else ()
-  | SynExpr.MatchLambda (matchClauses = clauses)
-  | SynExpr.Match (clauses = clauses) ->
+  | SynExpr.Match (expr = expr; clauses = clauses) ->
+    checkExpression src expr
+    for clause in clauses do checkMatchClause src clause
+  | SynExpr.MatchLambda (matchClauses = clauses) ->
     for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple (exprs = exprs) ->
     for expr in exprs do checkExpression src expr

@@ -136,10 +136,10 @@ let private ensureInfixSpacing src subFuncRange subArgRange argRange =
 /// Ensures single space before and after infix (e.g., "a + b" not "a+b").
 let rec checkInfixSpacing src isInfix (funcExpr: SynExpr) (argExpr: SynExpr) =
   match funcExpr with
-  | SynExpr.App (isInfix = isInfix
+  | SynExpr.App (isInfix = isInfixOfInner
                  funcExpr = subFuncExpr
                  argExpr = subArgExpr) ->
-    if isInfix then
+    if isInfix || isInfixOfInner then
       ensureInfixSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
     else ()
     match subArgExpr with
@@ -148,6 +148,7 @@ let rec checkInfixSpacing src isInfix (funcExpr: SynExpr) (argExpr: SynExpr) =
                    argExpr = subSubArgExpr) ->
       checkInfixSpacing src isInfix subSubFuncExpr subSubArgExpr
     | _ -> () (* Skip further checks if not a function application. *)
+  | SynExpr.LongIdent _ -> () (* Normally, does not affect overall behavior. *)
   | _ -> warn $"[checkInfixSpacing]TODO: {funcExpr}"
 
 let private ensureFunAppSpacing src (funcRange: range) (argRange: range) =
@@ -276,27 +277,6 @@ let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
           |> fun amt -> Range.shiftEnd 0 amt rangeAdjusted
         else rangeAdjusted
 
-let checkSingleLine src = function
-  | SynExpr.Sequential _ as expr ->
-    collectElemAndOptionalSeparatorRanges [] expr |> checkElementSpacing src
-  | SynExpr.IndexRange (expr1 = exprOfFirstElement
-                        opm = opm
-                        range2 = rangeOfSecondElement) ->
-    checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
-  | SynExpr.App (flag = flag; funcExpr = funExpr; argExpr = argExpr) ->
-    checkFuncApp src flag funExpr argExpr
-  | SynExpr.Const _
-  | SynExpr.Ident _ -> ()
-  | expr -> warn $"TODO: {expr}"
-
-let checkMultiLine src isArray range = function
-  | SynExpr.Sequential (expr1 = expr1; expr2 = expr2) as expr ->
-    checkOpeningBracketIsInlineWithLet src range
-    collectElemAndOptionalSeparatorRanges [] expr
-    |> checkSingleElementPerLine src
-    checkElemIsInlineWithBracket src isArray range expr.Range
-  | expr -> warn $"TODO: {expr}"
-
 let checkCommon src isArray fullRange elemRange =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
   checkTrailingSeparator src false distFstElemToOpeningBracket fullRange
@@ -321,6 +301,41 @@ let rec checkPattern (src: ISourceText) = function
     checkPattern src lhsPat
     checkPattern src rhsPat
   | _ -> () (* no need to check this *)
+
+let rec checkSingleLine src = function
+  | SynExpr.Sequential _ as expr ->
+    collectElemAndOptionalSeparatorRanges [] expr |> checkElementSpacing src
+  | SynExpr.IndexRange (expr1 = exprOfFirstElement
+                        opm = opm
+                        range2 = rangeOfSecondElement) ->
+    checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
+  | SynExpr.App (flag = flag; funcExpr = funExpr; argExpr = argExpr) ->
+    checkFuncApp src flag funExpr argExpr
+  | SynExpr.YieldOrReturn (expr = expr)
+  | SynExpr.YieldOrReturnFrom (expr = expr) ->
+    checkSingleLine src expr
+  | SynExpr.ForEach (pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
+    checkPattern src pat
+    checkSingleLine src enumExpr
+    checkSingleLine src bodyExpr
+  | SynExpr.Paren (expr = expr) -> checkSingleLine src expr
+  | SynExpr.InterpolatedString _ (* No need to check string here *)
+  | SynExpr.Const _
+  | SynExpr.Ident _
+  | SynExpr.LongIdent _ -> ()
+  | expr -> warn $"[checkSingleLine]TODO: {expr}"
+
+let checkMultiLine src isArray range = function
+  | SynExpr.Sequential _ as expr ->
+    checkOpeningBracketIsInlineWithLet src range
+    collectElemAndOptionalSeparatorRanges [] expr
+    |> checkSingleElementPerLine src
+    checkElemIsInlineWithBracket src isArray range expr.Range
+  | SynExpr.ForEach (pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
+    checkPattern src pat
+    checkSingleLine src enumExpr
+    checkSingleLine src bodyExpr
+  | expr -> warn $"[checkMultiLine]TODO: {expr}"
 
 let check src isArray (range: Range) expr =
   let rangeAdjusted = adjustRangeByComment src range expr

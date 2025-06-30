@@ -103,29 +103,30 @@ and checkExpression src = function
     let enclosureWidth = if isArray then 4 else 2
     ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
     for expr in exprs do checkExpression src expr
-  | SynExpr.App (flag = flag; funcExpr = funcExpr; argExpr = argExpr) ->
-    let funcIsIndexer =
-      funcExpr.IsParen || flag = ExprAtomicFlag.Atomic ||
-      match funcExpr with
-      | SynExpr.App (flag = ExprAtomicFlag.Atomic) when funcExpr.IsApp -> true
-      | _ -> false
-    if funcIsIndexer && argExpr.IsArrayOrListComputed then
-      () (* TODO: Indexer of App *)
-    else
+  | SynExpr.App (flag = flag; funcExpr = funcExpr; argExpr = argExpr) as expr ->
+    match funcExpr, flag, argExpr.IsArrayOrListComputed with
+    | _, ExprAtomicFlag.Atomic, true
+    | SynExpr.Paren _, _, true
+    | SynExpr.App (flag = ExprAtomicFlag.Atomic), _, true ->
+      ArrayOrListConvention.checkSpacingInIndexedProperty src expr
+    | _ ->
       checkExpression src funcExpr
       checkExpression src argExpr
   | SynExpr.Sequential (expr1 = expr1; expr2 = expr2) ->
     checkExpression src expr1
     checkExpression src expr2
+  | SynExpr.DotSet (targetExpr = targetExpr; rhsExpr = rhsExpr) ->
+    checkExpression src targetExpr
+    checkExpression src rhsExpr
+  | SynExpr.DotGet (expr = expr) ->
+    checkExpression src expr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.ComputationExpr _
   | SynExpr.Const _
-  | SynExpr.DotGet _
   | SynExpr.DotIndexedGet _
   | SynExpr.DotIndexedSet _
   | SynExpr.DotNamedIndexedPropertySet _
-  | SynExpr.DotSet _
   | SynExpr.Downcast _
   | SynExpr.Fixed _
   | SynExpr.Ident _
@@ -223,6 +224,26 @@ and checkTypeDefn src defn =
   checkTypeDefnRepr src repr
   checkMemberDefns src members
 
+and hasAttr attrName attrs =
+  attrs
+  |> List.exists (fun (lst: SynAttributeList) ->
+    lst.Attributes
+    |> List.exists (fun attr ->
+      let SynLongIdent (id = lid) = attr.TypeName
+      lid |> List.exists (fun id -> id.idText = attrName)
+    )
+  )
+
+and checkBinding src case binding =
+  let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
+  let case = if hasAttr "Literal" attrs then PascalCase else case
+  checkPattern src case false pat
+  checkExpression src body
+
+and checkBindings src case bindings =
+  for binding in bindings do
+    checkBinding src case binding
+
 and checkDeclarations src decls =
   for decl in decls do
     match decl with
@@ -246,26 +267,6 @@ and checkDeclarations src decls =
       () (* no need to check this *)
     | _ ->
       failwith $"{nameof checkDeclarations} TODO: {decl}"
-
-and hasAttr attrName attrs =
-  attrs
-  |> List.exists (fun (lst: SynAttributeList) ->
-    lst.Attributes
-    |> List.exists (fun attr ->
-      let SynLongIdent (id = lid) = attr.TypeName
-      lid |> List.exists (fun id -> id.idText = attrName)
-    )
-  )
-
-and checkBinding src case binding =
-  let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
-  let case = if hasAttr "Literal" attrs then PascalCase else case
-  checkPattern src case false pat
-  checkExpression src body
-
-and checkBindings src case bindings =
-  for binding in bindings do
-    checkBinding src case binding
 
 let checkWithAST src = function
   | ParsedInput.ImplFile (ParsedImplFileInput (contents=modules))->

@@ -40,11 +40,18 @@ let collectElemAndOptionalSeparatorRangesInPat (src: ISourceText) elementPats =
   let rec interleave elements separators acc =
     match elements, separators with
     | [], [] -> List.rev acc
-    | [elem], [] -> List.rev (elem :: acc)
+    | [ elem ], [] -> List.rev (elem :: acc)
     | elem :: restElems, sep :: restSeps ->
       interleave restElems restSeps (sep :: elem :: acc)
     | _ -> reportError src elementPats.Head.Range "Pattern ParsingFailure"
   interleave elementRanges separatorRanges []
+
+let rec collectBracketInfoInAppExpr = function
+  | SynExpr.App (funcExpr = funcExpr; argExpr = argExpr) ->
+    if argExpr.IsArrayOrListComputed
+    then argExpr :: collectBracketInfoInAppExpr funcExpr
+    else collectBracketInfoInAppExpr argExpr
+  | _ -> []
 
 /// Checks proper spacing after semicolons between list/array elements.
 /// Ensures exactly one space after each semicolon (e.g., "1; 2; 3").
@@ -167,7 +174,7 @@ let checkFuncApp src flag (funcExpr: SynExpr) (argExpr: SynExpr) =
     else checkFuncAppSpacing src funcExpr argExpr
   | SynExpr.Ident _ | SynExpr.LongIdent _ when flag <> ExprAtomicFlag.Atomic ->
     checkFuncAppSpacing src funcExpr argExpr
-  | SynExpr.LongIdent _ -> () (* TODO: func[ index ] *)
+  | SynExpr.LongIdent _ -> ()
   | expr -> warn $"[checkFuncApp]TODO: {expr}"
 
 /// Checks proper one element per line in multi-line list/array literals.
@@ -218,8 +225,35 @@ let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
 let checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   if (lhsRange: range).EndColumn + 1 <> colonRange.StartColumn
     || (rhsRange: range).StartColumn - 1 <>  colonRange.EndColumn then
-      reportError src colonRange "Cons must be surrounded by single spaces"
+    reportError src colonRange "Cons must be surrounded by single spaces"
   else ()
+
+/// Checks that there is no space between the bracket/element for indexers.
+/// Ensures no space between bracket and element in indexer expressions.
+let checkSpacingInIndexedProperty src expr =
+  collectBracketInfoInAppExpr expr
+  |> List.iter (fun computed ->
+    match computed with
+    | SynExpr.ArrayOrListComputed (expr = innerExpr; range = range) ->
+      if range.StartColumn + 1 <> innerExpr.Range.StartColumn
+        || range.EndColumn - 1 <> innerExpr.Range.EndColumn then
+        reportError src range "No space allowed in indexer"
+      else ()
+      match innerExpr with
+      | SynExpr.IndexRange (opm = opm; expr1 = expr1; expr2 = expr2) ->
+        match expr1, expr2 with
+        | Some e1, Some e2 when
+          e1.Range.EndColumn <> opm.StartColumn
+          || e2.Range.StartColumn <> opm.EndColumn ->
+          reportError src opm "No space allowed in indexer"
+        | Some e1, None when e1.Range.EndColumn <> opm.StartColumn ->
+          reportError src opm "No space allowed in indexer"
+        | None, Some e2 when e2.Range.StartColumn <> opm.EndColumn ->
+          reportError src opm "No space allowed in indexer"
+        | _ -> ()
+      | _ -> ()
+    | _ -> ()
+  )
 
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
@@ -256,7 +290,7 @@ let checkSingleLine src = function
   | expr -> warn $"TODO: {expr}"
 
 let checkMultiLine src isArray range = function
-  | SynExpr.Sequential _ as expr ->
+  | SynExpr.Sequential (expr1 = expr1; expr2 = expr2) as expr ->
     checkOpeningBracketIsInlineWithLet src range
     collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src

@@ -28,6 +28,9 @@ let rec checkPattern src case isArg = function
   | SynPat.Typed (pat = pat; targetType = typ; range = range) ->
     checkPattern src case isArg pat
     TypeAnnotation.check src pat typ range
+  | SynPat.ListCons (lhsPat = lhs; rhsPat = rhs) ->
+    checkPattern src case isArg lhs
+    checkPattern src case isArg rhs
   | SynPat.LongIdent (lid, _, _, SynArgPats.Pats args, _, range) ->
     let SynLongIdent (id = lid) = lid
     let name = (List.last lid).idText

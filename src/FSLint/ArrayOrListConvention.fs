@@ -53,6 +53,22 @@ let rec collectBracketInfoInAppExpr = function
     else collectBracketInfoInAppExpr argExpr
   | _ -> []
 
+let collectCastSymbolRangeFromSrc (src: ISourceText) expr =
+  match expr with
+  | SynExpr.Upcast (expr = innerExpr; targetType = targetType) ->
+    let symbWidthIncludeSpace =
+      targetType.Range.StartColumn - innerExpr.Range.EndColumn - 1
+    src.GetLineString(innerExpr.Range.StartLine - 1)
+      .Substring(innerExpr.Range.EndColumn + 1).Remove(symbWidthIncludeSpace)
+      .Trim ()
+    |> fun symbolStr ->
+      let symbolStart =
+        src.GetLineString(innerExpr.Range.StartLine - 1).IndexOf symbolStr
+      (Position.mkPos innerExpr.Range.StartLine symbolStart,
+      Position.mkPos innerExpr.Range.StartLine (symbolStart + symbolStr.Length))
+      ||> Range.mkRange ""
+  | _ -> Range.Zero
+
 /// Checks proper spacing after semicolons between list/array elements.
 /// Ensures exactly one space after each semicolon (e.g., "1; 2; 3").
 let checkElementSpacing src (elemAndSepRanges: Range list) =
@@ -256,6 +272,29 @@ let checkSpacingInIndexedProperty src expr =
     | _ -> ()
   )
 
+let checkCommaSpacingOfTuple src exprs commaRanges =
+  exprs
+  |> List.pairwise
+  |> List.zip commaRanges
+  |> List.iter (fun (commaRange, (fstElem, sndElem)) ->
+    if (fstElem: SynExpr).Range.EndColumn <> (commaRange: range).StartColumn
+    then
+      reportError src commaRange "No space allowed before comma"
+    elif sndElem.Range.StartColumn - 1 <> commaRange.EndColumn then
+      reportError src commaRange "Need to space after comma"
+    else ()
+  )
+
+/// Checks the spacing around the upcast operator (:>) in infix expressions.
+let checkInfixSpacingFromUpcast src (innerRange: range) targetType symbolRange =
+  match targetType with
+  | SynType.App (range = castRange) ->
+    if innerRange.EndColumn + 1 <> (symbolRange: range).StartColumn
+      || castRange.StartColumn - 1 <> symbolRange.EndColumn
+    then reportInfixError src symbolRange
+    else ()
+  | _ -> ()
+
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
 let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
@@ -319,6 +358,13 @@ let rec checkSingleLine src = function
     checkSingleLine src enumExpr
     checkSingleLine src bodyExpr
   | SynExpr.Paren (expr = expr) -> checkSingleLine src expr
+  | SynExpr.Tuple (exprs = exprs; commaRanges = commaRanges) ->
+    checkCommaSpacingOfTuple src exprs commaRanges
+    List.iter (checkSingleLine src) exprs
+  | SynExpr.Upcast (expr = innerExpr; targetType = targetType) as expr ->
+    collectCastSymbolRangeFromSrc src expr
+    |> checkInfixSpacingFromUpcast src innerExpr.Range targetType
+    checkSingleLine src innerExpr (* TODO: targetType *)
   | SynExpr.InterpolatedString _ (* No need to check string here *)
   | SynExpr.Const _
   | SynExpr.Ident _

@@ -233,6 +233,12 @@ match bad with
 [ [| 1;2 |]; [| 3; 4 |] ]
 """
 
+  let goodCommaSpacingTest = """[ 1, 2, 3 ]"""
+
+  let badSpacingAfterCommaTest = """[ 1,2, 3 ]"""
+
+  let badSpacingBeforeCommaTest = """[ 1 , 2, 3 ]"""
+
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodEmptyTest
@@ -449,4 +455,14 @@ match bad with
   member _.``[ArrayOrList] Nested Element Spacing In MultiLine Test`` () =
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badNestedElementSpacingMultiLineTest
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] Comma Spacing Test`` () =
+    linterForFs.Lint Constants.FakeFsPath goodCommaSpacingTest
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badSpacingBeforeCommaTest
+     ) |> ignore
+    Assert.ThrowsException<LintException> (fun () ->
+      linterForFs.Lint Constants.FakeFsPath badSpacingAfterCommaTest
      ) |> ignore

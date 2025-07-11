@@ -37,10 +37,12 @@ let rec checkPattern src case isArg = function
     let case = if not (List.isEmpty args) && isArg then PascalCase else case
     IdentifierConvention.check src case true name range
     for arg in args do checkPattern src LowerCamelCase true arg
-  | SynPat.LongIdent (lid, _, _, SynArgPats.NamePatPairs _, _, range) ->
+  | SynPat.LongIdent (lid, _, _, SynArgPats.NamePatPairs (pats = pat), _, range)
+    ->
     let SynLongIdent (id = lid) = lid
     let name = (List.last lid).idText
     IdentifierConvention.check src PascalCase true name range
+    AssignmentConvention.checkNamePatParis src pat
   | SynPat.Paren (pat = pat) ->
     checkPattern src case isArg pat
   | SynPat.Tuple (elementPats = pats) ->
@@ -59,13 +61,19 @@ and checkSimplePattern src case = function
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
 and checkMatchClause (src: ISourceText) clause =
-  let SynMatchClause (pat = pat; resultExpr = expr) = clause
-  ArrayOrListConvention.checkPattern src pat
+  let SynMatchClause (pat = pat; whenExpr = whenExpr; resultExpr = expr) = clause
+  PatternMatchingConvention.check src pat
+  match pat with
+  | SynPat.LongIdent (argPats = SynArgPats.NamePatPairs (pats = pats)) ->
+    AssignmentConvention.checkNamePatParis src pats
+  | _ -> ()
   checkExpression src expr
+  if whenExpr.IsSome then checkExpression src whenExpr.Value else ()
 
 and checkExpression src = function
-  | SynExpr.Paren (expr = expr) ->
-    checkExpression src expr
+  | SynExpr.Paren (expr = innerExpr) as expr ->
+    ParenConvention.check src expr
+    checkExpression src innerExpr
   | SynExpr.Typed (expr = expr) ->
     checkExpression src expr
   | SynExpr.Lambda (args = args; body = body) ->
@@ -75,9 +83,12 @@ and checkExpression src = function
   | SynExpr.LetOrUse (_, _, bindings, body, _, _) ->
     checkBindings src LowerCamelCase bindings
     checkExpression src body
+  | SynExpr.ForEach (pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
+    PatternMatchingConvention.check src pat
+    checkExpression src enumExpr
+    checkExpression src bodyExpr
   | SynExpr.Do (expr = expr)
   | SynExpr.For (doBody = expr)
-  | SynExpr.ForEach (bodyExpr = expr)
   | SynExpr.While (doExpr = expr) ->
     checkExpression src expr
   | SynExpr.IfThenElse (ifExpr = ifExpr
@@ -93,7 +104,8 @@ and checkExpression src = function
     for clause in clauses do checkMatchClause src clause
   | SynExpr.MatchLambda (matchClauses = clauses) ->
     for clause in clauses do checkMatchClause src clause
-  | SynExpr.Tuple (exprs = exprs) ->
+  | SynExpr.Tuple (exprs = exprs; commaRanges = commaRanges) ->
+    TupleConvention.check src exprs commaRanges
     for expr in exprs do checkExpression src expr
   | SynExpr.TryFinally (tryExpr = tryExpr; finallyExpr = finallyExpr) ->
     checkExpression src tryExpr
@@ -108,13 +120,15 @@ and checkExpression src = function
     let enclosureWidth = if isArray then 4 else 2
     ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
     for expr in exprs do checkExpression src expr
-  | SynExpr.App (flag = flag; funcExpr = funcExpr; argExpr = argExpr) as expr ->
+  | SynExpr.App (flag = flag; isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) as expr ->
     match funcExpr, flag, argExpr.IsArrayOrListComputed with
     | _, ExprAtomicFlag.Atomic, true
     | SynExpr.Paren _, _, true
     | SynExpr.App (flag = ExprAtomicFlag.Atomic), _, true ->
-      ArrayOrListConvention.checkSpacingInIndexedProperty src expr
+      IndexedPropertyConvention.check src expr
     | _ ->
+      FunctionCallConvention.check src expr
+      AppConvention.check src isInfix flag funcExpr argExpr
       checkExpression src funcExpr
       checkExpression src argExpr
   | SynExpr.Sequential (expr1 = expr1; expr2 = expr2) ->
@@ -124,15 +138,28 @@ and checkExpression src = function
     checkExpression src targetExpr
     checkExpression src rhsExpr
   | SynExpr.DotGet (expr = expr) ->
+    FunctionCallConvention.check src expr
+    checkExpression src expr
+  | SynExpr.YieldOrReturn (expr = expr)
+  | SynExpr.YieldOrReturnFrom (expr = expr) ->
+    checkExpression src expr
+  | SynExpr.Upcast (expr = expr; targetType = targetType)
+  | SynExpr.Downcast (expr = expr; targetType = targetType) ->
+    TypeCastConvention.check src expr targetType
+    checkExpression src expr
+  | SynExpr.Const _ as expr ->
+    ParenConvention.check src expr
+  | SynExpr.TypeApp (expr = expr
+                     typeArgs = typeArgs
+                     typeArgsRange = typeArgsRange) ->
+    GenericArgumentConvention.check src expr typeArgs typeArgsRange
     checkExpression src expr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.ComputationExpr _
-  | SynExpr.Const _
   | SynExpr.DotIndexedGet _
   | SynExpr.DotIndexedSet _
   | SynExpr.DotNamedIndexedPropertySet _
-  | SynExpr.Downcast _
   | SynExpr.Fixed _
   | SynExpr.Ident _
   | SynExpr.IndexRange _
@@ -146,8 +173,6 @@ and checkExpression src = function
   | SynExpr.ObjExpr _
   | SynExpr.Record _
   | SynExpr.Set _
-  | SynExpr.TypeApp _
-  | SynExpr.Upcast _
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)

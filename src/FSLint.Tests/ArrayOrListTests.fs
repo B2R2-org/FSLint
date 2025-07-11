@@ -136,64 +136,6 @@ let bad = [
   3(* Bad *) ]
 """
 
-  let goodListSpaceInfixTest = """
-[ this.Address + uint64 this.Length + this.Name ]
-"""
-
-  let badListSpaceInfixTest = """
-[ this.Address +  uint64 this.Length + this.Name ]
-"""
-
-  let goodListAppIndexerTest = """
-[ lifter.File.RawBytes[ptr.Offset] ]
-"""
-
-  let badListAppIndexerTest = """
-[ lifter.File.RawBytes[ ptr.Offset ] ]
-"""
-
-  let goodListAppIndexerInRangeTest = """
-good[1..]
-"""
-
-  let badListAppIndexerInRangeTest = """
-bad[ 1.. ]
-"""
-
-  let goodListSpaceFunAppTest = """[ fn 1 2 3 x ]"""
-
-  let badListSpaceFunAppTest = """[ fn  1 2 3 x ]"""
-
-  let goodPatternBracketSpacingTest = """
-match good with
-| [ 1; 2; 3 ] -> 1
-| _ -> 2
-"""
-
-  let badPatternBracketSpacingTest = """
-match bad with
-| [1; 2; 3] -> 1
-| _ -> 2
-"""
-
-  let badPatternElementSpacingTest = """
-match bad with
-| [1; 2;3 ] -> 1
-| _ -> 2
-"""
-
-  let goodPatternConsOperatorTest = """
-match good with
-| x :: xs -> 1
-| _ -> 2
-"""
-
-  let badPatternConsOperatorTest = """
-match bad with
-| x ::xs -> 1
-| _ -> 2
-"""
-
   let goodNestedBracketSpacingTest = """
 [ [ 1; 2 ]; [ 3; 4 ] ]
 """
@@ -232,12 +174,6 @@ match bad with
   let badNestedMixElementSpacingTest = """
 [ [| 1;2 |]; [| 3; 4 |] ]
 """
-
-  let goodCommaSpacingTest = """[ 1, 2, 3 ]"""
-
-  let badSpacingAfterCommaTest = """[ 1,2, 3 ]"""
-
-  let badSpacingBeforeCommaTest = """[ 1 , 2, 3 ]"""
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test`` () =
@@ -350,34 +286,6 @@ match bad with
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[ArrayOrList] List Space Before and After Infix Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodListSpaceInfixTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListSpaceInfixTest
-    ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List App Indexer Bracket Spacing Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodListAppIndexerTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListAppIndexerTest
-    ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List App Indexer Index Range Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodListAppIndexerInRangeTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListAppIndexerInRangeTest
-    ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List Space Fununction Application Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodListSpaceFunAppTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListSpaceFunAppTest
-    ) |> ignore
-
-  [<TestMethod>]
   member _.``[ArrayOrList] List Single Element Per Line Multiline Test`` () =
     linterForFs.Lint Constants.FakeFsPath goodSingleElementPerLineTest
     Assert.ThrowsException<LintException> (fun () ->
@@ -396,26 +304,6 @@ match bad with
     linterForFs.Lint Constants.FakeFsPath goodMultiLineCommentPositionTest
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badMultiLineCommentPositionTest
-     ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List In Pattern Bracket Spacing Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodPatternBracketSpacingTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badPatternBracketSpacingTest
-     ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List In Pattern Element Spacing Test`` () =
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badPatternElementSpacingTest
-     ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List In Pattern Cons Operator Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodPatternConsOperatorTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badPatternConsOperatorTest
      ) |> ignore
 
   [<TestMethod>]
@@ -455,14 +343,4 @@ match bad with
   member _.``[ArrayOrList] Nested Element Spacing In MultiLine Test`` () =
     Assert.ThrowsException<LintException> (fun () ->
       linterForFs.Lint Constants.FakeFsPath badNestedElementSpacingMultiLineTest
-     ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] Comma Spacing Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodCommaSpacingTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badSpacingBeforeCommaTest
-     ) |> ignore
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badSpacingAfterCommaTest
      ) |> ignore

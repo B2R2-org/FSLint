@@ -23,8 +23,17 @@
     <Compile Include="Utils.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />
-    <Compile Include="ArrayOrListConvention.fs" />
+    <Compile Include="AssignmentConvention.fs" />
+    <Compile Include="TupleConvention.fs" />
+    <Compile Include="ParenConvention.fs" />
+    <Compile Include="TypeCastConvention.fs" />
+    <Compile Include="GenericArgumentConvention.fs" />
     <Compile Include="TypeAnnotationConvention.fs" />
+    <Compile Include="IndexedPropertyConvention.fs" />
+    <Compile Include="FunctionCallConvention.fs" />
+    <Compile Include="ArrayOrListConvention.fs" />
+    <Compile Include="PatternMatchingConvention.fs" />
+    <Compile Include="AppConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

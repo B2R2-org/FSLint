@@ -20,10 +20,18 @@
   <ItemGroup>
     <Compile Include="MSTestSettings.fs" />
     <Compile Include="Constants.fs" />
-    <Compile Include="ArrayOrListTests.fs" />
-    <Compile Include="IdentifierTests.fs" />
     <Compile Include="LineTests.fs" />
+    <Compile Include="IdentifierTests.fs" />
+    <Compile Include="AssignmentTests.fs" />
+    <Compile Include="TupleTests.fs" />
+    <Compile Include="ParenTests.fs" />
+    <Compile Include="TypeCastTests.fs" />
+    <Compile Include="GenericArgumentTests.fs" />
     <Compile Include="TypeAnnotationTests.fs" />
+    <Compile Include="IndexedPropertyTests.fs" />
+    <Compile Include="ArrayOrListTests.fs" />
+    <Compile Include="PatternMatchingTests.fs" />
+    <Compile Include="AppTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

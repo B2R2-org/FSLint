@@ -13,7 +13,7 @@ let collectTypeArgsRange typeArgs =
   |> List.fold (fun acc synType ->
     match synType with
     | SynType.Tuple (path = path) ->
-      path 
+      path
       |> List.collect (fun innerPath ->
         if innerPath.IsStar || innerPath.IsSlash then
           (false, innerPath.Range) :: acc
@@ -63,7 +63,7 @@ let checkTypeElementSpacing src typeArgs =
         reportError src frontType "Need single space between type."
       else ()
   )
-  
+
 let check src expr (typeArgs: SynType list) typeArgsRange =
   checkFromExprToOpeningBracketSpacing src expr typeArgsRange
   match List.tryHead typeArgs with

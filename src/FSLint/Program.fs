@@ -6,14 +6,14 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
 let parseFile txt (path: string) =
-  let checker = FSharpChecker.Create ()
+  let checker = FSharpChecker.Create()
   let src = SourceText.ofString txt
   let projOptions, _ =
-    checker.GetProjectOptionsFromScript (path, src)
+    checker.GetProjectOptionsFromScript(path, src)
     |> Async.RunSynchronously
   let parsingOptions, _ =
     checker.GetParsingOptionsFromProjectOptions projOptions
-  checker.ParseFile (path, src, parsingOptions)
+  checker.ParseFile(path, src, parsingOptions)
   |> Async.RunSynchronously
   |> fun r -> src, r.ParseTree
 
@@ -61,7 +61,9 @@ and checkSimplePattern src case = function
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
 and checkMatchClause (src: ISourceText) clause =
-  let SynMatchClause (pat = pat; whenExpr = whenExpr; resultExpr = expr) = clause
+  let SynMatchClause (pat = pat
+                      whenExpr = whenExpr
+                      resultExpr = expr) = clause
   PatternMatchingConvention.check src pat
   match pat with
   | SynPat.LongIdent (argPats = SynArgPats.NamePatPairs (pats = pats)) ->
@@ -120,7 +122,10 @@ and checkExpression src = function
     let enclosureWidth = if isArray then 4 else 2
     ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
     for expr in exprs do checkExpression src expr
-  | SynExpr.App (flag = flag; isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) as expr ->
+  | SynExpr.App (flag = flag
+                 isInfix = isInfix
+                 funcExpr = funcExpr
+                 argExpr = argExpr) as expr ->
     match funcExpr, flag, argExpr.IsArrayOrListComputed with
     | _, ExprAtomicFlag.Atomic, true
     | SynExpr.Paren _, _, true
@@ -211,7 +216,7 @@ and checkMemberDefns src members =
       failwith $"{nameof checkMemberDefns} TODO: {memberDefn}"
 
 and checkTypeDefnSimpleRepr src = function
-  | SynTypeDefnSimpleRepr.Union (unionCases=cases) ->
+  | SynTypeDefnSimpleRepr.Union (unionCases = cases) ->
     for case in cases do
       let SynUnionCase (ident = SynIdent (ident = id); range = range) = case
       IdentifierConvention.check src PascalCase false id.idText range

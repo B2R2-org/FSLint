@@ -19,8 +19,8 @@ let warn (message: string) =
   Console.Error.WriteLine message
 
 let reportError (src: ISourceText) (range: range) message =
-  Console.Error.WriteLine (src.GetLineString (range.StartLine - 1))
-  Console.Error.WriteLine (String.replicate range.StartColumn " " + "^")
+  Console.Error.WriteLine(src.GetLineString(range.StartLine - 1))
+  Console.Error.WriteLine(String.replicate range.StartColumn " " + "^")
   raiseWithError $"{range.StartLine} {message}"
 
 let runOnEveryFsFile (path: string) (action: string -> unit) =

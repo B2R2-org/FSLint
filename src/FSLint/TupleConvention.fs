@@ -16,7 +16,7 @@ let adjustRangeByComment (src: ISourceText) rangeWithElems =
     let betweenElementsRange =
       Range.mkRange "" fstElem.Range.End sndElem.Range.Start
     let findPointer =
-      src.GetSubTextFromRange (Range.shiftStart 0 -1 sndElem.Range)
+      src.GetSubTextFromRange(Range.shiftStart 0 -1 sndElem.Range)
     let gapStr = src.GetSubTextFromRange betweenElementsRange
     if findPointer.Chars(0).Equals '?' then
       comRange, fstElem.Range, makeNewRangeAdjustedByGap sndElem.Range 1

@@ -3,6 +3,8 @@ module B2R2.FSLint.AssignmentConvention
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
+/// Checks if there is a required space around '=' in assignment patterns.
+/// Used to enforce spacing conventions in pattern assignments.
 let checkNamePatParis src (longIdents: list<Ident * option<range> * SynPat>) =
   longIdents
   |> List.iter (fun longIdent ->

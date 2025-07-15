@@ -140,7 +140,7 @@ let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
     |> fun rangeAdjusted ->
       let endLineString =
         if range.StartLine <> range.EndLine then
-          src.GetLineString (range.EndLine - 1)
+          src.GetLineString(range.EndLine - 1)
         else src.GetSubTextFromRange range
       endLineString.IndexOf "(*"
       |> fun openCommentIdxAtEndLine ->

@@ -29,7 +29,7 @@ let collectElemAndOptionalSeparatorRanges (src: ISourceText) elementPats =
 /// Checks cons operator in the context is properly surrounded by single spaces.
 let checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   if (lhsRange: range).EndColumn + 1 <> colonRange.StartColumn
-    || (rhsRange: range).StartColumn - 1 <>  colonRange.EndColumn then
+    || (rhsRange: range).StartColumn - 1 <> colonRange.EndColumn then
     reportError src colonRange "Cons must be surrounded by single spaces"
   else ()
 

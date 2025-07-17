@@ -5,9 +5,6 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open FunctionCallConvention
 
-let private reportBackticMethodError src range =
-  reportError src range "Backticks need a single space at end."
-
 /// Check the spacing around backtick-enclosed method names in F# source code.
 let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
   if (dotRanges: range list).Length = 1 then
@@ -19,8 +16,8 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
     |> fun str ->
       let lineStr = src.GetLineString(dotRange.StartLine - 1)
       if str = "``" then
-        if lineStr.LastIndexOf "``" + 3 <> parenRange.StartColumn then
-          reportBackticMethodError src dotRange
+        if lineStr.LastIndexOf "``" + 2 <> parenRange.StartColumn then
+          reportError src dotRange "Contains invalid whitespace"
         else ()
         false
       else true
@@ -35,23 +32,22 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
     match args with
     | [ SynPat.Paren (range = range) ] ->
       let lastId = List.last longId
-      let lastIdRange = lastId.idRange
-      let idEnd = lastIdRange.EndColumn
-      let parenStart = range.StartColumn
       if checkBackticMethodSpacing src dotRanges range then
         if (extraId: Ident Option).IsSome
           && isPascalCase extraId.Value.idText then
-          if extraId.Value.idRange.EndColumn <> parenStart then
+          if extraId.Value.idRange.EndColumn <> range.StartColumn then
             reportPascalCaseError src extraId.Value.idRange
           else ()
         elif (extraId: Ident Option).IsSome then
-          if extraId.Value.idRange.EndColumn + 1 <> parenStart then
+          if extraId.Value.idRange.EndColumn + 1 <> range.StartColumn then
             reportLowerCaseError src extraId.Value.idRange
           else ()
-        elif isPascalCase lastId.idText && idEnd <> parenStart then
-          reportPascalCaseError src lastIdRange
-        elif isPascalCase lastId.idText |> not && idEnd + 1 <> parenStart then
-          reportLowerCaseError src lastIdRange
+        elif isPascalCase lastId.idText
+          && lastId.idRange.EndColumn <> range.StartColumn
+          then reportPascalCaseError src lastId.idRange
+        elif isPascalCase lastId.idText |> not
+          && lastId.idRange.EndColumn + 1 <> range.StartColumn
+          then reportLowerCaseError src lastId.idRange
         else ()
       else ()
     | _ -> ()
@@ -64,6 +60,10 @@ let checkStaticMemberSpacing src (longId: LongIdent) args idTrivia =
   match longId with
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
+    | SynPat.Paren _ :: paren when paren.Length <> 0 ->
+      reportError src id.idRange "Static member must be followed by paren."
+    | SynPat.Named _ :: named when named.Length <> 0 ->
+      reportError src id.idRange "Static member must be followed by paren."
     | [ SynPat.Paren (range = range) ] ->
       if id.idRange.EndColumn <> range.StartColumn then
         reportPascalCaseError src id.idRange

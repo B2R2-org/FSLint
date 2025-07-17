@@ -40,7 +40,8 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     if trivia.LeadingKeyword.IsStaticMember then
       ClassMemberConvention.checkStaticMemberSpacing src lid args idTrivia
     else
-      ClassMemberConvention.checkMemberSpacing src lid extraId dotRanges args
+      ClassMemberConvention.checkMemberSpacing src lid extraId
+        dotRanges args
     for arg in args do checkPattern src LowerCamelCase true trivia arg
   | SynPat.LongIdent (lid, _, _, SynArgPats.NamePatPairs (pats = pat), _, range)
     ->

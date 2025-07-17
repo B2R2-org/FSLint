@@ -34,6 +34,7 @@
     <Compile Include="ArrayOrListConvention.fs" />
     <Compile Include="PatternMatchingConvention.fs" />
     <Compile Include="AppConvention.fs" />
+    <Compile Include="ClassMemberConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

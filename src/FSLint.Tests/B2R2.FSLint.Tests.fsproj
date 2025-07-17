@@ -32,6 +32,7 @@
     <Compile Include="ArrayOrListTests.fs" />
     <Compile Include="PatternMatchingTests.fs" />
     <Compile Include="FunctionCallTest.fs" />
+    <Compile Include="ClassMemberTests.fs" />
     <Compile Include="AppTests.fs" />
   </ItemGroup>
 

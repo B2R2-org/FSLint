@@ -13,17 +13,17 @@ type FunctionCallTests () =
 
   let badNonCurriedFuncSpacingTest = """Func(p1, p2, p3)"""
 
-  let goodCurriedFuncPascalCaseTest = """String.Replace()"""
+  let goodCurriedFuncPascalCaseTest = """str.Replace()"""
 
-  let badCurriedFuncPascalCaseTest = """String.Replace ()"""
+  let badCurriedFuncPascalCaseTest = """str.Replace ()"""
 
-  let goodCurriedFuncLowerCaseTest = """String.replace ()"""
+  let goodCurriedFuncLowerCaseTest = """str.replace ()"""
 
-  let badCurriedFuncLowerCaseTest = """String.replace()"""
+  let badCurriedFuncLowerCaseTest = """str.replace()"""
 
-  let goodCurriedFuncPascalCaseNestedTest = """String.replace().ToString()"""
+  let goodCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart()"""
 
-  let badCurriedFuncPascalCaseNestedTest = """String.replace().ToString ()"""
+  let badCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart ()"""
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function Bracket Spacing Test`` () =

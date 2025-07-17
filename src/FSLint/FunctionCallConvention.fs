@@ -4,39 +4,91 @@ open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
-/// Checks spacing for curried function calls in the given source text.
-/// Ensures proper formatting between arguments in curried functions.
-let checkCurriedFunctionSpacing (src: ISourceText) (expr: SynExpr) =
-  for line in expr.Range.StartLine - 1 .. expr.Range.EndLine - 1 do
-    let lineString = src.GetLineString line
-    try
-      let bracketIdx = lineString.LastIndexOf '('
-      let commaIdx = lineString.LastIndexOf '.'
-      if bracketIdx <> -1 && commaIdx <> -1 && commaIdx < bracketIdx then
-        let subString =
-          lineString.Substring(lineString.LastIndexOf('.', bracketIdx - 1) + 1)
-        let isPascalCase = Char.IsUpper subString[0]
-        let bracketIdx =
-          bracketIdx - lineString.LastIndexOf('.', bracketIdx - 1) - 1
-        if isPascalCase && subString.Chars(bracketIdx - 1) = ' ' then
-          reportError src expr.Range "No space between exprs"
-        elif not isPascalCase && subString.Chars(bracketIdx - 1) <> ' ' then
-          reportError src expr.Range "Need single space between expr"
-        else ()
-      else ()
-    with | _ -> warn $"[checkCurriedFunction]TODO: {expr}"
+let isPascalCase (methodName: string) =
+  methodName.Length > 0 && Char.IsUpper(methodName[0])
 
-let rec check (src: ISourceText) (expr: SynExpr) =
+let private getHeadMethodName (idents: Ident list) =
+  idents |> List.tryHead |> Option.map (fun ident -> ident.idText)
+
+let private getMethodName = function
+  | SynExpr.LongIdent (longDotId = SynLongIdent (id = id)) ->
+    id |> List.tryLast |> Option.map (fun ident -> ident.idText)
+  | SynExpr.DotGet (longDotId = SynLongIdent (id = id)) ->
+    getHeadMethodName id
+  | _ -> None
+
+let reportPascalCaseError src range =
+  reportError src range "No space between ident and paren"
+
+let reportLowerCaseError src range =
+  reportError src range "Need single space between ident and paren"
+
+let private isSymbolOrPunctuation c =
+  System.Char.IsSymbol c || System.Char.IsPunctuation c
+
+let private shouldContinueSpacingCheck (src: ISourceText) (range: range) =
+  try
+    (Position.mkPos range.EndLine range.EndColumn,
+     Position.mkPos range.EndLine (range.EndColumn + 3))
+    ||> Range.mkRange ""
+    |> src.GetSubTextFromRange
+    |> function
+      | str when str.Length >= 2 &&
+                 str[0] = ' ' && not (isSymbolOrPunctuation str[1]) ->
+        false
+      | _ -> true
+  with | _ ->
+    true
+
+let ensureMethodSpacing src flag funcExpr (expr: SynExpr) =
+  match getMethodName funcExpr with
+  | Some methodName when methodName.Length > 0 ->
+    if isPascalCase methodName && flag = ExprAtomicFlag.NonAtomic then
+      reportPascalCaseError src expr.Range
+    elif isPascalCase methodName |> not && flag = ExprAtomicFlag.Atomic
+    then reportLowerCaseError src expr.Range
+    else ()
+  | _ -> ()
+
+/// Checks spacing between method ident and paren based on naming convention.
+/// Ensures that PascalCase have no space before paren
+/// and lowerCase methods have a single space.
+let rec checkMethodParenSpacing src (expr: SynExpr) =
   match expr with
-  | SynExpr.App (flag = flag; funcExpr = funcExpr; argExpr = argExpr) ->
-    if funcExpr.IsApp then check src funcExpr
-    else
-      let argExprCondition =
-        match argExpr with
-        | SynExpr.Const (constant = constant) when constant.IsUnit -> true
-        | SynExpr.Paren (expr = expr) when not expr.IsLambda -> true
-        | _ -> false
-      if flag = ExprAtomicFlag.Atomic || argExprCondition then
-        checkCurriedFunctionSpacing src expr
-      else ()
+  | SynExpr.App (flag = flag
+                 funcExpr = funcExpr
+                 argExpr = SynExpr.Const (SynConst.Unit, _)) ->
+    ensureMethodSpacing src flag funcExpr expr
+    checkMethodParenSpacing src funcExpr
+  | SynExpr.App (flag = flag
+                 funcExpr = funcExpr
+                 argExpr = SynExpr.Paren (expr = expr; range = range)) ->
+    if shouldContinueSpacingCheck src range then
+      ensureMethodSpacing src flag funcExpr expr
+      checkMethodParenSpacing src funcExpr
+    else ()
+    checkMethodParenSpacing src expr
+  | SynExpr.DotGet (expr = expr; longDotId = SynLongIdent (id = id)) ->
+    let getPrevMethodName =
+      match expr with
+      | SynExpr.App (funcExpr = funcExpr
+                     argExpr = SynExpr.Const (SynConst.Unit, _)) ->
+        getMethodName funcExpr
+      | _ -> getMethodName expr
+    match expr with
+    | SynExpr.App (flag = flag; argExpr = SynExpr.Const (SynConst.Unit, _)) ->
+      match getPrevMethodName, getHeadMethodName id with
+      | Some prevMethod, Some currentMethod
+        when prevMethod.Length > 0 && currentMethod.Length > 0 ->
+        let prevIsPascalCase = isPascalCase prevMethod
+        let currentIsPascalCase = isPascalCase currentMethod
+        let isNonAtomic = flag = ExprAtomicFlag.NonAtomic
+        if not prevIsPascalCase && currentIsPascalCase && isNonAtomic then
+          reportPascalCaseError src expr.Range
+        elif prevIsPascalCase && not currentIsPascalCase && not isNonAtomic then
+          reportLowerCaseError src expr.Range
+        else ()
+      | _ -> ()
+    | _ -> ()
+    checkMethodParenSpacing src expr
   | _ -> ()

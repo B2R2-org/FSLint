@@ -4,6 +4,7 @@ open System.IO
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open FSharp.Compiler.SyntaxTrivia
 
 let parseFile txt (path: string) =
   let checker = FSharpChecker.Create()
@@ -17,7 +18,7 @@ let parseFile txt (path: string) =
   |> Async.RunSynchronously
   |> fun r -> src, r.ParseTree
 
-let rec checkPattern src case isArg = function
+let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.Attrib _
   | SynPat.Const _
   | SynPat.Record _
@@ -26,17 +27,21 @@ let rec checkPattern src case isArg = function
   | SynPat.Named (ident = SynIdent (ident = id); range = range) ->
     IdentifierConvention.check src case true id.idText range
   | SynPat.Typed (pat = pat; targetType = typ; range = range) ->
-    checkPattern src case isArg pat
+    checkPattern src case isArg trivia pat
     TypeAnnotation.check src pat typ range
   | SynPat.ListCons (lhsPat = lhs; rhsPat = rhs) ->
-    checkPattern src case isArg lhs
-    checkPattern src case isArg rhs
-  | SynPat.LongIdent (lid, _, _, SynArgPats.Pats args, _, range) ->
-    let SynLongIdent (id = lid) = lid
+    checkPattern src case isArg trivia lhs
+    checkPattern src case isArg trivia rhs
+  | SynPat.LongIdent (lid, extraId, _, SynArgPats.Pats args, _, range) ->
+    let SynLongIdent (id = lid; dotRanges = dotRanges; trivia = idTrivia) = lid
     let name = (List.last lid).idText
     let case = if not (List.isEmpty args) && isArg then PascalCase else case
     IdentifierConvention.check src case true name range
-    for arg in args do checkPattern src LowerCamelCase true arg
+    if trivia.LeadingKeyword.IsStaticMember then
+      ClassMemberConvention.checkStaticMemberSpacing src lid args idTrivia
+    else
+      ClassMemberConvention.checkMemberSpacing src lid extraId dotRanges args
+    for arg in args do checkPattern src LowerCamelCase true trivia arg
   | SynPat.LongIdent (lid, _, _, SynArgPats.NamePatPairs (pats = pat), _, range)
     ->
     let SynLongIdent (id = lid) = lid
@@ -44,9 +49,9 @@ let rec checkPattern src case isArg = function
     IdentifierConvention.check src PascalCase true name range
     AssignmentConvention.checkNamePatParis src pat
   | SynPat.Paren (pat = pat) ->
-    checkPattern src case isArg pat
+    checkPattern src case isArg trivia pat
   | SynPat.Tuple (elementPats = pats) ->
-    for pat in pats do checkPattern src case isArg pat
+    for pat in pats do checkPattern src case isArg trivia pat
   | SynPat.OptionalVal (ident = id) ->
     IdentifierConvention.check src LowerCamelCase true id.idText id.idRange
   | pat ->
@@ -108,7 +113,9 @@ and checkExpression src = function
     for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple (exprs = exprs; commaRanges = commaRanges) ->
     TupleConvention.check src exprs commaRanges
-    for expr in exprs do checkExpression src expr
+    for expr in exprs do
+      FunctionCallConvention.checkMethodParenSpacing src expr
+      checkExpression src expr
   | SynExpr.TryFinally (tryExpr = tryExpr; finallyExpr = finallyExpr) ->
     checkExpression src tryExpr
     checkExpression src finallyExpr
@@ -132,7 +139,7 @@ and checkExpression src = function
     | SynExpr.App (flag = ExprAtomicFlag.Atomic), _, true ->
       IndexedPropertyConvention.check src expr
     | _ ->
-      FunctionCallConvention.check src expr
+      FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix flag funcExpr argExpr
       checkExpression src funcExpr
       checkExpression src argExpr
@@ -143,7 +150,7 @@ and checkExpression src = function
     checkExpression src targetExpr
     checkExpression src rhsExpr
   | SynExpr.DotGet (expr = expr) ->
-    FunctionCallConvention.check src expr
+    FunctionCallConvention.checkMethodParenSpacing src expr
     checkExpression src expr
   | SynExpr.YieldOrReturn (expr = expr)
   | SynExpr.YieldOrReturnFrom (expr = expr) ->
@@ -270,9 +277,12 @@ and hasAttr attrName attrs =
   )
 
 and checkBinding src case binding =
-  let SynBinding (headPat = pat; expr = body; attributes = attrs) = binding
+  let SynBinding (headPat = pat
+                  expr = body
+                  attributes = attrs
+                  trivia = trivia) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
-  checkPattern src case false pat
+  checkPattern src case false trivia pat
   checkExpression src body
 
 and checkBindings src case bindings =
@@ -304,7 +314,7 @@ and checkDeclarations src decls =
       failwith $"{nameof checkDeclarations} TODO: {decl}"
 
 let checkWithAST src = function
-  | ParsedInput.ImplFile (ParsedImplFileInput (contents=modules))->
+  | ParsedInput.ImplFile (ParsedImplFileInput (contents=modules)) ->
     for m in modules do
       let SynModuleOrNamespace (longId = lid; decls = decls) = m
       for id in lid do

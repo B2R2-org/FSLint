@@ -76,6 +76,24 @@ let findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
   with
   | _ -> None
 
+let shouldCheckFuncSpacing src funcExpr (argExpr: SynExpr) =
+  let rec check = function
+    | SynExpr.DotGet _ -> false
+    | SynExpr.App (funcExpr = SynExpr.DotGet _) -> false
+    | SynExpr.Ident _ -> true
+    | SynExpr.LongIdent (longDotId = SynLongIdent (id = first :: rest)) ->
+      let names = first.idText :: List.map (fun (id: Ident) -> id.idText) rest
+      if rest.Length > 0 then
+        false
+      else
+        match names with
+        | firstName :: _ when firstName.Length > 0 &&
+                              System.Char.IsLower(firstName[0]) -> false
+        | _ -> true
+    | SynExpr.App (funcExpr = innerFunc) -> check innerFunc
+    | _ -> false
+  not argExpr.IsArrayOrListComputed && check funcExpr
+
 let ensureInfixSpacing src (subFuncRange: range) (subArgRange: range) argRange =
   if (argRange: range).StartLine = subFuncRange.StartLine then
     if argRange.StartColumn <> subFuncRange.EndColumn + 1 then
@@ -88,11 +106,17 @@ let ensureInfixSpacing src (subFuncRange: range) (subArgRange: range) argRange =
     else ()
   else ()
 
+let ensureAddressOfSpacing src (exprRange: range) (opRange: range) =
+  if opRange.StartLine = exprRange.StartLine then
+    if opRange.EndColumn <> exprRange.StartColumn then
+      reportInfixError src opRange
+    else ()
+  else ()
+
 let ensureFuncSpacing src (funcRange: range) (argRange: range) =
-  (* TODO: Cannot detect multi line *)
   if (argRange.StartColumn - funcRange.EndColumn <> 1
-     && funcRange.StartLine = argRange.StartLine)
-     && isUnaryOperator src funcRange |> not
+    && funcRange.StartLine = argRange.StartLine)
+    && isUnaryOperator src funcRange |> not
   then reportError src argRange "Func app must be separated by a single space."
   else ()
 
@@ -136,7 +160,7 @@ let rec checkInfixSpacing src isInfix funcExpr (argExpr: SynExpr) =
     checkInfixSpacing src (isInfixInner || isOperator src subFuncExpr)
       subFuncExpr subArgExpr
   | SynExpr.AddressOf (expr = expr; opRange = opRange) ->
-    ensureInfixSpacing src opRange funcExpr.Range expr.Range
+    ensureAddressOfSpacing src expr.Range opRange
   | _ -> ()
 
 /// Check proper spacing in function applications.
@@ -186,7 +210,8 @@ let checkIdentWithParenSpacing src flag (ident: Ident) argExpr check =
 
 let checkInfixOrFuncSpacing src isInfix funcExpr argExpr =
   if isInfix then checkInfixSpacing src isInfix funcExpr argExpr
-  elif isOperator src funcExpr then checkFuncSpacing src funcExpr argExpr
+  elif isOperator src funcExpr || shouldCheckFuncSpacing src funcExpr argExpr
+  then checkFuncSpacing src funcExpr argExpr
   else ()
 
 let rec check src isInfix flag funcExpr (argExpr: SynExpr) =

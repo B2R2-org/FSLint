@@ -202,10 +202,9 @@ let checkIdentWithParenSpacing src flag (ident: Ident) argExpr check =
     match innerExpr with
     | SynExpr.App (isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
       check src isInfix flag funcExpr argExpr
+    | SynExpr.LongIdent _ when flag = ExprAtomicFlag.Atomic ->
+      failwithf "Unexpected LongIdent in atomic expression: %A" innerExpr
     | _ -> ()
-  | SynExpr.LongIdent _ when flag = ExprAtomicFlag.Atomic ->
-    if argExpr.IsArrayOrListComputed then ()
-    else reportIdentWithParenError src argExpr.Range
   | _ -> ()
 
 let checkInfixOrFuncSpacing src isInfix funcExpr argExpr =

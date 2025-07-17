@@ -64,6 +64,16 @@ let checkTypeElementSpacing src typeArgs =
       else ()
   )
 
+let checkTypeAppParenSpacing src = function
+  | SynExpr.App (flag = flag
+                 funcExpr = SynExpr.TypeApp (range = typeRange)
+                 argExpr = SynExpr.Paren (leftParenRange = leftParenRange)) ->
+    if flag = ExprAtomicFlag.Atomic
+      || typeRange.EndColumn + 1 <> leftParenRange.StartColumn then
+      reportError src leftParenRange "TypeApp and Paren need a single space."
+    else ()
+  | _ -> ()
+
 let check src expr (typeArgs: SynType list) typeArgsRange =
   checkFromExprToOpeningBracketSpacing src expr typeArgsRange
   match List.tryHead typeArgs with

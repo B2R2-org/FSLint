@@ -139,6 +139,7 @@ and checkExpression src = function
     | SynExpr.App (flag = ExprAtomicFlag.Atomic), _, true ->
       IndexedPropertyConvention.check src expr
     | _ ->
+      GenericArgumentConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix flag funcExpr argExpr
       checkExpression src funcExpr

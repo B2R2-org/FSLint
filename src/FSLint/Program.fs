@@ -91,6 +91,10 @@ and checkExpression src = function
   | SynExpr.LetOrUse (_, _, bindings, body, _, _) ->
     checkBindings src LowerCamelCase bindings
     checkExpression src body
+  | SynExpr.LetOrUseBang (rhs = rhs; body = body) ->
+    (* TODO: checkPattern for LetOrUseBang *)
+    checkExpression src rhs
+    checkExpression src body
   | SynExpr.ForEach (pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
     PatternMatchingConvention.check src pat
     checkExpression src enumExpr
@@ -168,9 +172,13 @@ and checkExpression src = function
                      typeArgsRange = typeArgsRange) ->
     GenericArgumentConvention.check src expr typeArgs typeArgsRange
     checkExpression src expr
+  | SynExpr.ObjExpr (bindings = bindings; members = members) ->
+    checkBindings src LowerCamelCase bindings
+    checkMemberDefns src members
+  | SynExpr.ComputationExpr (expr = expr) ->
+    checkExpression src expr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
-  | SynExpr.ComputationExpr _
   | SynExpr.DotIndexedGet _
   | SynExpr.DotIndexedSet _
   | SynExpr.DotNamedIndexedPropertySet _
@@ -296,10 +304,11 @@ and checkDeclarations src decls =
     match decl with
     | SynModuleDecl.ModuleAbbrev (ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule (moduleInfo = info) ->
+    | SynModuleDecl.NestedModule (moduleInfo = info; decls = decls) ->
       let SynComponentInfo (longId = lid) = info
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
+      checkDeclarations src decls
     | SynModuleDecl.Let (_, bindings, _range) ->
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr (expr = expr) ->

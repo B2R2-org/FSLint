@@ -18,21 +18,21 @@ type IndexedPropertyTests () =
   let badIndexedPropertyHasOpmTest = """src[expr1 .. opm .. expr2]"""
 
   [<TestMethod>]
-  member _.``[IndexedProperty] Indexed Property Spacing From App Test`` () =
+  member _.``[IndexedProperty] Indexed Property Spacing From App Test``() =
     linterForFs.Lint Constants.FakeFsPath goodIndexedPropertyTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badIndexedPropertySpacingFromAppTest
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[IndexedProperty] Indexed Property Bracket Spacing Test`` () =
-    Assert.ThrowsException<LintException> (fun () ->
+  member _.``[IndexedProperty] Indexed Property Bracket Spacing Test``() =
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badIndexedPropertyBracketSpacingTest
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[IndexedProperty] Indexed Property Range Operator Test`` () =
+  member _.``[IndexedProperty] Indexed Property Range Operator Test``() =
     linterForFs.Lint Constants.FakeFsPath goodIndexedPropertyHasOpmTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badIndexedPropertyHasOpmTest
     ) |> ignore

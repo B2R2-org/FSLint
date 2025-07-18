@@ -16,15 +16,15 @@ type TypeCastTests () =
   let badDowncastSpacingTest = """source:?>target"""
 
   [<TestMethod>]
-  member _.``[TypeCast] Upcast Spacing Test`` () =
+  member _.``[TypeCast] Upcast Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodUpcastSpacingTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badUpcastSpacingTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[TypeCast] Downcast Spacing Test`` () =
+  member _.``[TypeCast] Downcast Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodDowncastSpacingTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badDowncastSpacingTest
      ) |> ignore

@@ -14,11 +14,11 @@ type TupleTests () =
   let badSpacingBeforeCommaTest = """[ 1 , 2, 3 ]"""
 
   [<TestMethod>]
-  member _.``[Tuple] Comma Spacing Test`` () =
+  member _.``[Tuple] Comma Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodCommaSpacingTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badSpacingBeforeCommaTest
      ) |> ignore
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badSpacingAfterCommaTest
      ) |> ignore

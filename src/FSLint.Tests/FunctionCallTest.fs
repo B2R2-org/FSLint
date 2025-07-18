@@ -26,35 +26,35 @@ type FunctionCallTests () =
   let badCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart ()"""
 
   [<TestMethod>]
-  member _.``[FunctionCall] Non Curried Function Bracket Spacing Test`` () =
+  member _.``[FunctionCall] Non Curried Function Bracket Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodNonCurriedFuncTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badNonCurriedFuncBracketSpacingTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[FunctionCall] Non Curried Function App Spacing Test`` () =
-    Assert.ThrowsException<LintException> (fun () ->
+  member _.``[FunctionCall] Non Curried Function App Spacing Test``() =
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badNonCurriedFuncSpacingTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[FunctionCall] Curried Function PascalCase Spacing Test`` () =
+  member _.``[FunctionCall] Curried Function PascalCase Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodCurriedFuncPascalCaseTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badCurriedFuncPascalCaseTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[FunctionCall] Curried Function LowerCase Spacing Test`` () =
+  member _.``[FunctionCall] Curried Function LowerCase Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodCurriedFuncLowerCaseTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badCurriedFuncLowerCaseTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[FunctionCall] Curried Function Nested Spacing Test`` () =
+  member _.``[FunctionCall] Curried Function Nested Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodCurriedFuncPascalCaseNestedTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badCurriedFuncPascalCaseNestedTest
      ) |> ignore

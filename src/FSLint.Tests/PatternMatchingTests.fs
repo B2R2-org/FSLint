@@ -38,21 +38,21 @@ match bad with
 """
 
   [<TestMethod>]
-  member _.``[PatternMatching] List In Pattern Bracket Spacing Test`` () =
+  member _.``[PatternMatching] List In Pattern Bracket Spacing Test``() =
     linterForFs.Lint Constants.FakeFsPath goodPatternBracketSpacingTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badPatternBracketSpacingTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[PatternMatching] List In Pattern Element Spacing Test`` () =
-    Assert.ThrowsException<LintException> (fun () ->
+  member _.``[PatternMatching] List In Pattern Element Spacing Test``() =
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badPatternElementSpacingTest
      ) |> ignore
 
   [<TestMethod>]
-  member _.``[PatternMatching] List In Pattern Cons Operator Test`` () =
+  member _.``[PatternMatching] List In Pattern Cons Operator Test``() =
     linterForFs.Lint Constants.FakeFsPath goodPatternConsOperatorTest
-    Assert.ThrowsException<LintException> (fun () ->
+    Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint Constants.FakeFsPath badPatternConsOperatorTest
      ) |> ignore

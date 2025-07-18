@@ -296,10 +296,11 @@ and checkDeclarations src decls =
     match decl with
     | SynModuleDecl.ModuleAbbrev (ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule (moduleInfo = info) ->
+    | SynModuleDecl.NestedModule (moduleInfo = info; decls = decls) ->
       let SynComponentInfo (longId = lid) = info
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
+      checkDeclarations src decls
     | SynModuleDecl.Let (_, bindings, _range) ->
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr (expr = expr) ->

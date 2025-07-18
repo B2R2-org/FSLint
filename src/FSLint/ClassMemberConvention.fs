@@ -30,6 +30,8 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
   match (longId: LongIdent) with
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
+    | SynPat.Paren _ :: paren when paren.Length <> 0 ->
+      reportError src id.idRange "Member must be followed by paren."
     | [ SynPat.Paren (range = range) ] ->
       let lastId = List.last longId
       if checkBackticMethodSpacing src dotRanges range then

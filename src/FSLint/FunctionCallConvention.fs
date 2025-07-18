@@ -34,7 +34,9 @@ let private shouldContinueSpacingCheck (src: ISourceText) (range: range) =
     |> src.GetSubTextFromRange
     |> function
       | str when str.Length >= 2 &&
-                 str[0] = ' ' && not (isSymbolOrPunctuation str[1]) ->
+                 str[0] = ' ' &&
+                 not (isSymbolOrPunctuation str[1]) &&
+                 str <> " wi" (* This is using in pattern matching *) ->
         false
       | _ -> true
   with | _ ->

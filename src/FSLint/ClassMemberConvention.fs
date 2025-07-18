@@ -30,7 +30,11 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
   match (longId: LongIdent) with
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
+    | SynPat.Wild _ :: wild when wild.Length <> 0 ->
+      reportError src id.idRange "Member must be followed by paren."
     | SynPat.Paren _ :: paren when paren.Length <> 0 ->
+      reportError src id.idRange "Member must be followed by paren."
+    | SynPat.Named _ :: named when named.Length <> 0 ->
       reportError src id.idRange "Member must be followed by paren."
     | [ SynPat.Paren (range = range) ] ->
       let lastId = List.last longId
@@ -62,6 +66,8 @@ let checkStaticMemberSpacing src (longId: LongIdent) args idTrivia =
   match longId with
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
+    | SynPat.Wild _ :: wild when wild.Length <> 0 ->
+      reportError src id.idRange "Static member must be followed by paren."
     | SynPat.Paren _ :: paren when paren.Length <> 0 ->
       reportError src id.idRange "Static member must be followed by paren."
     | SynPat.Named _ :: named when named.Length <> 0 ->

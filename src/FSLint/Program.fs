@@ -76,8 +76,11 @@ and checkMatchClause (src: ISourceText) clause =
     FunctionCallConvention.checkMethodParenSpacing src expr
     AssignmentConvention.checkNamePatParis src pats
   | _ -> ()
+  if whenExpr.IsSome then
+    FunctionCallConvention.checkMethodParenSpacing src whenExpr.Value
+    checkExpression src whenExpr.Value
+  else ()
   checkExpression src expr
-  if whenExpr.IsSome then checkExpression src whenExpr.Value else ()
 
 and checkExpression src = function
   | SynExpr.Paren (expr = innerExpr) as expr ->
@@ -189,6 +192,11 @@ and checkExpression src = function
     checkExpression src objectExpr
     checkExpression src indexArgs
     checkExpression src valueExpr
+  | SynExpr.Record (recordFields = recordFields) ->
+    for recordField in recordFields do
+      let SynExprRecordField(expr = expr) = recordField
+      if expr.IsSome then checkExpression src expr.Value
+      else ()
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.DotIndexedGet _
@@ -202,7 +210,6 @@ and checkExpression src = function
   | SynExpr.NamedIndexedPropertySet _
   | SynExpr.Null _
   | SynExpr.ObjExpr _
-  | SynExpr.Record _
   | SynExpr.Set _
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _ ->

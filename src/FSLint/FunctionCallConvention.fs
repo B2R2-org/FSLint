@@ -97,9 +97,16 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       elif argExpr.Range.StartColumn - 1 <> ident.idRange.EndColumn then
         reportLowerCaseError src argExpr.Range
       else ()
+    | SynExpr.Ident ident when argExpr.IsParen ->
+      if isPascalCase ident.idText then
+        if argExpr.Range.StartColumn <> ident.idRange.EndColumn then
+          reportPascalCaseError src argExpr.Range
+        else ()
+      else
+        if argExpr.Range.StartColumn - 1 <> ident.idRange.EndColumn then
+          reportLowerCaseError src argExpr.Range
+        else ()
     | _ -> ()
-  | _ -> ()
-  match expr with
   | SynExpr.App (flag = flag
                  funcExpr = funcExpr
                  argExpr = SynExpr.Const (SynConst.Unit, _)) ->
@@ -136,4 +143,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       | _ -> ()
     | _ -> ()
     checkMethodParenSpacing src expr
+  | SynExpr.Paren (expr = expr) ->
+    checkMethodParenSpacing src expr
+  | SynExpr.Tuple (exprs = exprs) ->
+    exprs |> List.iter (checkMethodParenSpacing src)
   | _ -> ()

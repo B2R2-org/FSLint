@@ -67,4 +67,12 @@ let rec check (src: ISourceText) = function
     | [ id ] when FunctionCallConvention.isPascalCase id.idText ->
       checkFuncSpacing src id.idRange argPats
     | _ -> ()
+    match argPats with
+    | SynArgPats.Pats (pats = pats) ->
+      pats |> List.iter (check src)
+    | _ -> ()
+  | SynPat.Paren (pat = pat) ->
+    check src pat
+  | SynPat.Tuple (elementPats = elementPats) ->
+    elementPats |> List.iter (check src)
   | _ -> () (* no need to check this *)

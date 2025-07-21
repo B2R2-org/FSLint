@@ -183,22 +183,12 @@ let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
     checkFuncSpacing src innerFunc innerArg
   | _ -> ()
 
-let isNotFrontDotGet (src: ISourceText) (range: range) =
-  src.GetLineString(range.StartLine - 1).Substring(range.EndColumn)
-    .StartsWith "."
-  |> not
-
 /// Validates spacing between identifiers and parentheses.
 /// Ensures exactly one space between identifier and opening parenthesis.
 /// Handles atomic expressions and nested applications appropriately.
 let checkIdentWithParenSpacing src flag (ident: Ident) argExpr check =
   match argExpr with
   | SynExpr.Paren (expr = innerExpr) ->
-    if argExpr.Range.StartColumn - 1 <> ident.idRange.EndColumn
-      && argExpr.Range.StartLine = ident.idRange.StartLine
-      && isNotFrontDotGet src argExpr.Range
-    then reportIdentWithParenError src argExpr.Range
-    else ()
     match innerExpr with
     | SynExpr.App (isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
       check src isInfix flag funcExpr argExpr

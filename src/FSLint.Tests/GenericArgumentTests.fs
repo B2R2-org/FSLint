@@ -21,21 +21,21 @@ type GenericArgumentTests () =
 
   [<TestMethod>]
   member _.``[GenericArgument] Generic Argument Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodGenericArguSpacingTest
+    linterForFs.Lint(Constants.FakeFsPath, goodGenericArguSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badGenericArguSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badGenericArguSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[GenericArgument] Generic Argument Comma Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodGenericArguCommaTest
+    linterForFs.Lint(Constants.FakeFsPath, goodGenericArguCommaTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badGenericArguCommaTest
+      linterForFs.Lint(Constants.FakeFsPath, badGenericArguCommaTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[GenericArgument] Generic Argument Star Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodGenericArguStarTest
+    linterForFs.Lint(Constants.FakeFsPath, goodGenericArguStarTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badGenericArguStarTest
+      linterForFs.Lint(Constants.FakeFsPath, badGenericArguStarTest)
      ) |> ignore

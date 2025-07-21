@@ -37,28 +37,28 @@ bad[ 1.. ]
 
   [<TestMethod>]
   member _.``[App] List Space Before and After Infix Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodListSpaceInfixTest
+    linterForFs.Lint(Constants.FakeFsPath, goodListSpaceInfixTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListSpaceInfixTest
+      linterForFs.Lint(Constants.FakeFsPath, badListSpaceInfixTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[App] List App Indexer Bracket Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodListAppIndexerTest
+    linterForFs.Lint(Constants.FakeFsPath, goodListAppIndexerTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListAppIndexerTest
+      linterForFs.Lint(Constants.FakeFsPath, badListAppIndexerTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[App] List App Indexer Index Range Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodListAppIndexerInRangeTest
+    linterForFs.Lint(Constants.FakeFsPath, goodListAppIndexerInRangeTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListAppIndexerInRangeTest
+      linterForFs.Lint(Constants.FakeFsPath, badListAppIndexerInRangeTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[App] List Space Fununction Application Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodListSpaceFunAppTest
+    linterForFs.Lint(Constants.FakeFsPath, goodListSpaceFunAppTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badListSpaceFunAppTest
+      linterForFs.Lint(Constants.FakeFsPath, badListSpaceFunAppTest)
     ) |> ignore

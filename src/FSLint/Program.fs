@@ -177,10 +177,17 @@ and checkExpression src = function
     checkMemberDefns src members
   | SynExpr.ComputationExpr (expr = expr) ->
     checkExpression src expr
+  | SynExpr.LongIdentSet (expr = expr) ->
+    checkExpression src expr
+  | SynExpr.DotIndexedSet (objectExpr = objectExpr
+                           indexArgs = indexArgs
+                           valueExpr = valueExpr) ->
+    checkExpression src objectExpr
+    checkExpression src indexArgs
+    checkExpression src valueExpr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.DotIndexedGet _
-  | SynExpr.DotIndexedSet _
   | SynExpr.DotNamedIndexedPropertySet _
   | SynExpr.Fixed _
   | SynExpr.Ident _
@@ -188,7 +195,6 @@ and checkExpression src = function
   | SynExpr.InterpolatedString _
   | SynExpr.Lazy _
   | SynExpr.LongIdent _
-  | SynExpr.LongIdentSet _
   | SynExpr.NamedIndexedPropertySet _
   | SynExpr.New _
   | SynExpr.Null _
@@ -345,7 +351,7 @@ let lintFile (linter: ILintable) (path: string) =
   else printfn $"Linting file: {path}"
   let bytes = File.ReadAllBytes path |> ensureNoBOM
   let txt = System.Text.Encoding.UTF8.GetString bytes
-  linter.Lint path txt
+  linter.Lint(path, txt)
 
 let runLinter linter (path: string) =
   try lintFile linter path
@@ -355,13 +361,13 @@ let runLinter linter (path: string) =
 
 let linterForFs =
   { new ILintable with
-      member _.Lint path txt =
+      member _.Lint(path, txt) =
         LineConvention.check txt
         parseFile txt path ||> checkWithAST }
 
 let linterForProjSln =
   { new ILintable with
-      member _.Lint _path txt =
+      member _.Lint(_path, txt) =
         LineConvention.checkWindowsLineEndings txt }
 
 [<EntryPoint>]

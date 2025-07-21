@@ -29,14 +29,14 @@ type TestClass () =
 
   [<TestMethod>]
   member _.``[ClassMember] Between Infix and Paren Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodSpacingInfixParenTest
+    linterForFs.Lint(Constants.FakeFsPath, goodSpacingInfixParenTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badSpacingInfixParenTest
+      linterForFs.Lint(Constants.FakeFsPath, badSpacingInfixParenTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassMember] Between Function and Paren Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodSpacingFunctionParenTest
+    linterForFs.Lint(Constants.FakeFsPath, goodSpacingFunctionParenTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badSpacingFunctionParenTest
+      linterForFs.Lint(Constants.FakeFsPath, badSpacingFunctionParenTest)
      ) |> ignore

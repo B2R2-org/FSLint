@@ -39,20 +39,20 @@ match bad with
 
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Bracket Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodPatternBracketSpacingTest
+    linterForFs.Lint(Constants.FakeFsPath, goodPatternBracketSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badPatternBracketSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badPatternBracketSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Element Spacing Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badPatternElementSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badPatternElementSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Cons Operator Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodPatternConsOperatorTest
+    linterForFs.Lint(Constants.FakeFsPath, goodPatternConsOperatorTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badPatternConsOperatorTest
+      linterForFs.Lint(Constants.FakeFsPath, badPatternConsOperatorTest)
      ) |> ignore

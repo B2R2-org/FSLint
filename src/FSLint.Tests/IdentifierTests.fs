@@ -48,55 +48,35 @@ let age_ = 30
 
   [<TestMethod>]
   member _.``[ID] Binding Lowercase Test``() =
-    linterForFs.Lint
-      Constants.FakeFsPath
-      goodBindingLowercaseTest
+    linterForFs.Lint(Constants.FakeFsPath, goodBindingLowercaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint
-        Constants.FakeFsPath
-        badBindingLowercaseTest
+      linterForFs.Lint(Constants.FakeFsPath, badBindingLowercaseTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Binding PascalCase Test``() =
-    linterForFs.Lint
-      Constants.FakeFsPath
-      goodBindingPascalCaseTest
+    linterForFs.Lint(Constants.FakeFsPath, goodBindingPascalCaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint
-        Constants.FakeFsPath
-        badBindingPascalCaseTest
+      linterForFs.Lint(Constants.FakeFsPath, badBindingPascalCaseTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Record Definition PascalCase Test``() =
-    linterForFs.Lint
-      Constants.FakeFsPath
-      goodRecordDefPascalCaseTest
+    linterForFs.Lint(Constants.FakeFsPath, goodRecordDefPascalCaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint
-        Constants.FakeFsPath
-        badRecordDefPascalCaseTest
+      linterForFs.Lint(Constants.FakeFsPath, badRecordDefPascalCaseTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Record Field Name PascalCase Test``() =
-    linterForFs.Lint
-      Constants.FakeFsPath
-      goodRecordFieldNamePascalCaseTest
+    linterForFs.Lint(Constants.FakeFsPath, goodRecordFieldNamePascalCaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint
-        Constants.FakeFsPath
-        badRecordFieldNamePascalCaseTest
+      linterForFs.Lint(Constants.FakeFsPath, badRecordFieldNamePascalCaseTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ID] Binding Underscore Test``() =
-    linterForFs.Lint
-      Constants.FakeFsPath
-      goodBindingUnderscoreTest
+    linterForFs.Lint(Constants.FakeFsPath, goodBindingUnderscoreTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint
-        Constants.FakeFsPath
-        badBindingUnderscoreTest
+      linterForFs.Lint(Constants.FakeFsPath, badBindingUnderscoreTest)
     ) |> ignore

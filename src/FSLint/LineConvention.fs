@@ -26,15 +26,15 @@ module LineConvention =
 
   let check (txt: string) =
     checkWindowsLineEndings txt
-    txt.Split ([| "\n" |], StringSplitOptions.None)
+    txt.Split([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
       if line.Length > MaxLineLength then
         Console.WriteLine line
-        Console.WriteLine ("|" + String.replicate (MaxLineLength - 2) "-" + "|")
+        Console.WriteLine("|" + String.replicate (MaxLineLength - 2) "-" + "|")
         raiseWithError $"Line {i + 1} exceeds {MaxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         Console.WriteLine line
-        Console.WriteLine (String.replicate (line.Length - 1) " " + "^")
+        Console.WriteLine(String.replicate (line.Length - 1) " " + "^")
         raiseWithError $"Line {i + 1} contains trailing whitespace."
       else checkControlChar line
     )

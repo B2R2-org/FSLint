@@ -17,14 +17,14 @@ type TypeCastTests () =
 
   [<TestMethod>]
   member _.``[TypeCast] Upcast Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodUpcastSpacingTest
+    linterForFs.Lint(Constants.FakeFsPath, goodUpcastSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badUpcastSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badUpcastSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[TypeCast] Downcast Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodDowncastSpacingTest
+    linterForFs.Lint(Constants.FakeFsPath, goodDowncastSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badDowncastSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badDowncastSpacingTest)
      ) |> ignore

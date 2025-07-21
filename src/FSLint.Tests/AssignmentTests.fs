@@ -14,7 +14,7 @@ type AssignmentTests () =
 
   [<TestMethod>]
   member _.``[Assignment] Named Argument Assignment Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodNamedArgumentSpacingTest
+    linterForFs.Lint(Constants.FakeFsPath, goodNamedArgumentSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badNamedArgumentSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badNamedArgumentSpacingTest)
      ) |> ignore

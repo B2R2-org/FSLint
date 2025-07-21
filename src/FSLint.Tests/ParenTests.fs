@@ -17,14 +17,14 @@ type ParenTests () =
 
   [<TestMethod>]
   member _.``[Paren] Paren Empty Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodEmptyTest
+    linterForFs.Lint(Constants.FakeFsPath, goodEmptyTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badEmptyTest
+      linterForFs.Lint(Constants.FakeFsPath, badEmptyTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[Paren] Paren Bracket Spacing Test``() =
-    linterForFs.Lint Constants.FakeFsPath goodBracketSpacingTest
+    linterForFs.Lint(Constants.FakeFsPath, goodBracketSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint Constants.FakeFsPath badBracketSpacingTest
+      linterForFs.Lint(Constants.FakeFsPath, badBracketSpacingTest)
     ) |> ignore

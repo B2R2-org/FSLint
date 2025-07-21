@@ -23,6 +23,9 @@ let reportPascalCaseError src range =
 let reportLowerCaseError src range =
   reportError src range "Need single space between ident and paren"
 
+let reportFunctionCallError src range =
+  reportError src range "Function call with Dot must be followed by paren."
+
 let private isSymbolOrPunctuation c =
   System.Char.IsSymbol c || System.Char.IsPunctuation c
 
@@ -55,7 +58,45 @@ let ensureMethodSpacing src flag funcExpr (expr: SynExpr) =
 /// Checks spacing between method ident and paren based on naming convention.
 /// Ensures that PascalCase have no space before paren
 /// and lowerCase methods have a single space.
-let rec checkMethodParenSpacing src (expr: SynExpr) =
+let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
+  match expr with
+  | SynExpr.App (flag = ExprAtomicFlag.NonAtomic
+                 funcExpr = funcExpr
+                 argExpr = argExpr) ->
+    match funcExpr with
+    | SynExpr.App _ -> ()
+    | SynExpr.TypeApp (expr = expr; range = typeRange) ->
+      let line = src.GetLineString(argExpr.Range.EndLine - 1)
+      let afterArgExpr =
+        if argExpr.Range.EndColumn < line.Length then
+          line.Substring(argExpr.Range.EndColumn).TrimStart()
+        else ""
+      if afterArgExpr.StartsWith("(") then ()
+      else
+        match getMethodName expr, argExpr with
+        | Some name, SynExpr.Paren (range = range)
+        | Some name, SynExpr.Const (SynConst.Unit, range)
+          when isPascalCase name ->
+          if typeRange.EndColumn <> range.StartColumn then
+            reportPascalCaseError src range
+          else ()
+        | _ -> ()
+    | SynExpr.Ident ident when argExpr.IsParen ->
+      let line = src.GetLineString(argExpr.Range.EndLine - 1)
+      let afterArgExpr =
+        if argExpr.Range.EndColumn < line.Length then
+          line.Substring(argExpr.Range.EndColumn).TrimStart()
+        else ""
+      if afterArgExpr.StartsWith("(") then ()
+      elif isPascalCase ident.idText then
+        if argExpr.Range.StartColumn <> ident.idRange.EndColumn then
+          reportPascalCaseError src argExpr.Range
+        else ()
+      elif argExpr.Range.StartColumn - 1 <> ident.idRange.EndColumn then
+        reportLowerCaseError src argExpr.Range
+      else ()
+    | _ -> ()
+  | _ -> ()
   match expr with
   | SynExpr.App (flag = flag
                  funcExpr = funcExpr

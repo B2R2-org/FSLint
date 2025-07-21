@@ -33,6 +33,7 @@
     <Compile Include="PatternMatchingTests.fs" />
     <Compile Include="FunctionCallTest.fs" />
     <Compile Include="ClassMemberTests.fs" />
+    <Compile Include="TypeConstructorTests.fs" />
     <Compile Include="AppTests.fs" />
   </ItemGroup>
 

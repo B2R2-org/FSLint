@@ -4,6 +4,17 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 
+let private checkFuncSpacing src (idRange: range) = function
+  | SynArgPats.Pats (pats = [ SynPat.Paren (range = range) ]) ->
+    if idRange.EndColumn <> range.StartColumn then
+      reportError src range "Contains invalid whitespace"
+    else ()
+  | SynArgPats.NamePatPairs (trivia = trivia) ->
+    if idRange.EndColumn <> trivia.ParenRange.StartColumn then
+      reportError src trivia.ParenRange "Contains invalid whitespace"
+    else ()
+  | _ -> ()
+
 let collectElemAndOptionalSeparatorRanges (src: ISourceText) elementPats =
   let separatorRanges =
     (elementPats: SynPat list)
@@ -51,4 +62,9 @@ let rec check (src: ISourceText) = function
     checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange
     check src lhsPat
     check src rhsPat
+  | SynPat.LongIdent (longDotId = SynLongIdent (id = id); argPats = argPats) ->
+    match id with
+    | [ id ] when FunctionCallConvention.isPascalCase id.idText ->
+      checkFuncSpacing src id.idRange argPats
+    | _ -> ()
   | _ -> () (* no need to check this *)

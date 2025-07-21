@@ -12,7 +12,7 @@ let checkNamePatParis src (longIdents: list<Ident * option<range> * SynPat>) =
     if symbolRange.IsSome then
       if ident.idRange.EndColumn + 1 <> symbolRange.Value.StartColumn
         || lastPat.Range.StartColumn <> symbolRange.Value.EndColumn + 1
-      then reportError src symbolRange.Value "Contains invalid whitespace"
+      then reportError src symbolRange.Value "Need single space around '='"
       else ()
     else ()
   )

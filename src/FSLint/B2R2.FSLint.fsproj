@@ -35,6 +35,7 @@
     <Compile Include="PatternMatchingConvention.fs" />
     <Compile Include="AppConvention.fs" />
     <Compile Include="ClassMemberConvention.fs" />
+    <Compile Include="TypeConstructor.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

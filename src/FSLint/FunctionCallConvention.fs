@@ -15,6 +15,8 @@ let private getMethodName = function
     id |> List.tryLast |> Option.map (fun ident -> ident.idText)
   | SynExpr.DotGet (longDotId = SynLongIdent (id = id)) ->
     getHeadMethodName id
+  | SynExpr.Ident ident ->
+    Some ident.idText
   | _ -> None
 
 let reportPascalCaseError src range =

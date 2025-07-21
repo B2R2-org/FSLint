@@ -73,6 +73,7 @@ and checkMatchClause (src: ISourceText) clause =
   PatternMatchingConvention.check src pat
   match pat with
   | SynPat.LongIdent (argPats = SynArgPats.NamePatPairs (pats = pats)) ->
+    FunctionCallConvention.checkMethodParenSpacing src expr
     AssignmentConvention.checkNamePatParis src pats
   | _ -> ()
   checkExpression src expr
@@ -177,6 +178,9 @@ and checkExpression src = function
     checkMemberDefns src members
   | SynExpr.ComputationExpr (expr = expr) ->
     checkExpression src expr
+  | SynExpr.New (targetType = targetType; expr = expr) ->
+    TypeConstructor.checkConstructorSpacing src targetType expr
+    checkExpression src expr
   | SynExpr.LongIdentSet (expr = expr) ->
     checkExpression src expr
   | SynExpr.DotIndexedSet (objectExpr = objectExpr
@@ -196,7 +200,6 @@ and checkExpression src = function
   | SynExpr.Lazy _
   | SynExpr.LongIdent _
   | SynExpr.NamedIndexedPropertySet _
-  | SynExpr.New _
   | SynExpr.Null _
   | SynExpr.ObjExpr _
   | SynExpr.Record _

@@ -279,9 +279,9 @@ and checkTypeDefnRepr src repr =
 and checkTypeDefn src defn =
   let SynTypeDefn (typeInfo = info; typeRepr = repr; members = members) = defn
   let SynComponentInfo (longId = lid; range = range; attributes = attrs) = info
-  let case = if hasAttr "Measure" attrs then LowerCamelCase else PascalCase
   let name = (List.last lid).idText
-  IdentifierConvention.check src case true name range
+  if hasAttr "Measure" attrs then ()
+  else IdentifierConvention.check src PascalCase true name range
   checkTypeDefnRepr src repr
   checkMemberDefns src members
 

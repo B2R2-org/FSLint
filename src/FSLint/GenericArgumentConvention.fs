@@ -12,7 +12,7 @@ let collectTypeArgsRange typeArgs =
   typeArgs
   |> List.fold (fun acc synType ->
     match synType with
-    | SynType.Tuple (path = path) ->
+    | SynType.Tuple(path = path) ->
       path
       |> List.collect (fun innerPath ->
         if innerPath.IsStar || innerPath.IsSlash then
@@ -74,13 +74,13 @@ let checkTypeElementSpacing src typeArgs =
 /// Checks if there is an unwanted space before parentheses in type application,
 /// Ensures proper spacing in type application expressions.
 let checkTypeAppParenSpacing src = function
-  | SynExpr.App (flag = flag
-                 funcExpr = funcExpr
-                 argExpr = SynExpr.Paren (leftParenRange = parenRange)) ->
+  | SynExpr.App(flag = flag
+                funcExpr = funcExpr
+                argExpr = SynExpr.Paren(leftParenRange = parenRange)) ->
     match funcExpr with
-    | SynExpr.TypeApp (expr = SynExpr.LongIdent (longDotId = longDotId)
-                       range = typeRange) ->
-      let SynLongIdent (id = id) = longDotId
+    | SynExpr.TypeApp(expr = SynExpr.LongIdent(longDotId = longDotId)
+                      range = typeRange) ->
+      let SynLongIdent(id = id) = longDotId
       if id.Length <> 1 then
         if flag = ExprAtomicFlag.NonAtomic
           || typeRange.EndColumn <> parenRange.StartColumn then

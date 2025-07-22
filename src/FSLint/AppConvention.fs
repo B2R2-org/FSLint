@@ -23,34 +23,34 @@ let isUnaryOperator (src: ISourceText) (operatorRange: range) =
   | _ -> false
 
 let isOperator src = function
-  | SynExpr.LongIdent (longDotId = SynLongIdent (trivia = trivias)
-                       range = range) ->
+  | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = trivias)
+                      range = range) ->
     let isOperator =
       trivias
       |> List.exists (function
-        | Some (IdentTrivia.OriginalNotation "=") -> false
-        | Some (IdentTrivia.OriginalNotation _) -> true
+        | Some(IdentTrivia.OriginalNotation "=") -> false
+        | Some(IdentTrivia.OriginalNotation _) -> true
         | _ -> false
       )
     isOperator && isUnaryOperator src range
   | _ -> false
 
 let isEquality = function
-  | SynExpr.LongIdent (longDotId = SynLongIdent (trivia = trivias)) ->
+  | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = trivias)) ->
     trivias
     |> List.exists (function
-      | Some (IdentTrivia.OriginalNotation "=") -> true
+      | Some(IdentTrivia.OriginalNotation "=") -> true
       | _ -> false
     )
   | _ -> false
 
 let rec collectLastElementRange acc = function
-  | SynExpr.App (argExpr = argExpr) ->
+  | SynExpr.App(argExpr = argExpr) ->
     match argExpr with
     | SynExpr.App _ -> collectLastElementRange acc argExpr
-    | SynExpr.Tuple (exprs = exprs) -> (List.last exprs).Range
+    | SynExpr.Tuple(exprs = exprs) -> (List.last exprs).Range
     | _ -> argExpr.Range
-  | SynExpr.Tuple (exprs = exprs) -> (List.last exprs).Range
+  | SynExpr.Tuple(exprs = exprs) -> (List.last exprs).Range
   | expr -> expr.Range
 
 /// Retrieve the range of the element to the left of the operator from the given
@@ -79,9 +79,9 @@ let findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
 let shouldCheckFuncSpacing src funcExpr (argExpr: SynExpr) =
   let rec check = function
     | SynExpr.DotGet _ -> false
-    | SynExpr.App (funcExpr = SynExpr.DotGet _) -> false
+    | SynExpr.App(funcExpr = SynExpr.DotGet _) -> false
     | SynExpr.Ident _ -> true
-    | SynExpr.LongIdent (longDotId = SynLongIdent (id = first :: rest)) ->
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = first :: rest)) ->
       let names = first.idText :: List.map (fun (id: Ident) -> id.idText) rest
       if rest.Length > 0 then
         false
@@ -90,7 +90,7 @@ let shouldCheckFuncSpacing src funcExpr (argExpr: SynExpr) =
         | firstName :: _ when firstName.Length > 0 &&
                               System.Char.IsLower(firstName[0]) -> false
         | _ -> true
-    | SynExpr.App (funcExpr = innerFunc) -> check innerFunc
+    | SynExpr.App(funcExpr = innerFunc) -> check innerFunc
     | _ -> false
   not argExpr.IsArrayOrListComputed && check funcExpr
 
@@ -133,23 +133,23 @@ let checkAssignSpacing src (subFuncRange: range) (subArgRange: range) argRange =
 /// (e.g., "a + b", not "a+b").
 let rec checkInfixSpacing src isInfix funcExpr (argExpr: SynExpr) =
   match funcExpr with
-  | SynExpr.App (isInfix = isInfixInner
-                 funcExpr = subFuncExpr
-                 argExpr = subArgExpr) ->
+  | SynExpr.App(isInfix = isInfixInner
+                funcExpr = subFuncExpr
+                argExpr = subArgExpr) ->
     if (isInfix || isInfixInner) && isOperator src subFuncExpr then
       ensureInfixSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
     elif isEquality subFuncExpr then
       checkAssignSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
     else ()
     match subArgExpr with
-    | SynExpr.App (isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
+    | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
       checkInfixSpacing src isInfix funcExpr argExpr
     | _ -> ()
   | _ -> ()
   match argExpr with
-  | SynExpr.App (isInfix = isInfixInner
-                 funcExpr = subFuncExpr
-                 argExpr = subArgExpr) ->
+  | SynExpr.App(isInfix = isInfixInner
+                funcExpr = subFuncExpr
+                argExpr = subArgExpr) ->
     if isOperator src subFuncExpr then
       let leafArgRange = findLeftExprFromSource src subFuncExpr.Range
       if leafArgRange.IsSome then
@@ -159,7 +159,7 @@ let rec checkInfixSpacing src isInfix funcExpr (argExpr: SynExpr) =
     else ()
     checkInfixSpacing src (isInfixInner || isOperator src subFuncExpr)
       subFuncExpr subArgExpr
-  | SynExpr.AddressOf (expr = expr; opRange = opRange) ->
+  | SynExpr.AddressOf(expr = expr; opRange = opRange) ->
     ensureAddressOfSpacing src expr.Range opRange
   | _ -> ()
 
@@ -169,7 +169,7 @@ let rec checkInfixSpacing src isInfix funcExpr (argExpr: SynExpr) =
 let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
   if not argExpr.IsArrayOrListComputed || argExpr.IsParen then
     match funcExpr with
-    | SynExpr.App (funcExpr = subFuncExpr; argExpr = subArgExpr) ->
+    | SynExpr.App(funcExpr = subFuncExpr; argExpr = subArgExpr) ->
       ensureFuncSpacing src funcExpr.Range argExpr.Range
       checkFuncSpacing src subFuncExpr subArgExpr
     | SynExpr.Ident _ | SynExpr.LongIdent _ ->
@@ -179,7 +179,7 @@ let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
       warn $"[checkFuncAppSpacing]TODO: {funcExpr}"
   else ()
   match funcExpr with
-  | SynExpr.App (isInfix = false; funcExpr = innerFunc; argExpr = innerArg) ->
+  | SynExpr.App(isInfix = false; funcExpr = innerFunc; argExpr = innerArg) ->
     checkFuncSpacing src innerFunc innerArg
   | _ -> ()
 
@@ -188,12 +188,10 @@ let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
 /// Handles atomic expressions and nested applications appropriately.
 let checkIdentWithParenSpacing src flag (ident: Ident) argExpr check =
   match argExpr with
-  | SynExpr.Paren (expr = innerExpr) ->
+  | SynExpr.Paren(expr = innerExpr) ->
     match innerExpr with
-    | SynExpr.App (isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
+    | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
       check src isInfix flag funcExpr argExpr
-    | SynExpr.LongIdent _ when flag = ExprAtomicFlag.Atomic ->
-      failwithf "Unexpected LongIdent in atomic expression: %A" innerExpr
     | _ -> ()
   | _ -> ()
 
@@ -205,28 +203,28 @@ let checkInfixOrFuncSpacing src isInfix funcExpr argExpr =
 
 let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
   match funcExpr with
-  | SynExpr.App (isInfix = subIsInfix
-                 funcExpr = subFuncExpr
-                 argExpr = subArgExpr) ->
+  | SynExpr.App(isInfix = subIsInfix
+                funcExpr = subFuncExpr
+                argExpr = subArgExpr) ->
     checkInfixOrFuncSpacing src subIsInfix funcExpr argExpr
     check src subIsInfix flag subFuncExpr subArgExpr
   | SynExpr.LongIdent _ ->
     checkInfixOrFuncSpacing src isInfix funcExpr argExpr
-  | SynExpr.Paren (expr = innerExpr) ->
+  | SynExpr.Paren(expr = innerExpr) ->
     match innerExpr with
-    | SynExpr.App (flag = flag; funcExpr = subFuncExpr; argExpr = subArgExpr) ->
+    | SynExpr.App(flag = flag; funcExpr = subFuncExpr; argExpr = subArgExpr) ->
       check src isInfix flag subFuncExpr subArgExpr
     | _ -> ()
-  | SynExpr.Ident (ident = ident) ->
+  | SynExpr.Ident(ident = ident) ->
     checkIdentWithParenSpacing src flag ident argExpr check
   | SynExpr.TypeApp _ | SynExpr.DotGet _ -> ()
   | expr -> warn $"[AppConvention] TODO: {expr}"
   match argExpr with
-  | SynExpr.App (isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
+  | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
     check src (isInfix || isOperator src funcExpr) flag funcExpr argExpr
-  | SynExpr.Paren (expr = innerExpr) ->
+  | SynExpr.Paren(expr = innerExpr) ->
     match innerExpr with
-    | SynExpr.App (isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
+    | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
       check src isInfix flag funcExpr argExpr
     | _ -> ()
   | SynExpr.AddressOf _ ->

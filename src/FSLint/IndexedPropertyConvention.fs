@@ -4,7 +4,7 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
 let rec collectBracketInfoInAppExpr = function
-  | SynExpr.App (funcExpr = funcExpr; argExpr = argExpr) ->
+  | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
     if argExpr.IsArrayOrListComputed
     then argExpr :: collectBracketInfoInAppExpr funcExpr
     else collectBracketInfoInAppExpr argExpr
@@ -17,7 +17,7 @@ let checkBracketSpacing src (innerRange: range) (range: range) =
   else ()
 
 let checkIndexRangeSpacing src = function
-  | SynExpr.IndexRange (opm = opm; expr1 = expr1; expr2 = expr2) ->
+  | SynExpr.IndexRange(opm = opm; expr1 = expr1; expr2 = expr2) ->
     match expr1, expr2 with
     | Some e1, Some e2 when
       e1.Range.EndColumn <> opm.StartColumn
@@ -36,7 +36,7 @@ let check src expr =
   collectBracketInfoInAppExpr expr
   |> List.iter (fun computed ->
     match computed with
-    | SynExpr.ArrayOrListComputed (expr = innerExpr; range = range) ->
+    | SynExpr.ArrayOrListComputed(expr = innerExpr; range = range) ->
       checkBracketSpacing src innerExpr.Range range
       checkIndexRangeSpacing src innerExpr
     | _ -> ()

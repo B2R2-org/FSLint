@@ -36,7 +36,7 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
       reportError src id.idRange "Member must be followed by paren."
     | SynPat.Named _ :: named when named.Length <> 0 ->
       reportError src id.idRange "Member must be followed by paren."
-    | [ SynPat.Paren (range = range) ] ->
+    | [ SynPat.Paren(range = range) ] ->
       let lastId = List.last longId
       if checkBackticMethodSpacing src dotRanges range then
         if (extraId: Ident Option).IsSome
@@ -72,16 +72,16 @@ let checkStaticMemberSpacing src (longId: LongIdent) args idTrivia =
       reportError src id.idRange "Static member must be followed by paren."
     | SynPat.Named _ :: named when named.Length <> 0 ->
       reportError src id.idRange "Static member must be followed by paren."
-    | [ SynPat.Paren (range = range) ] ->
+    | [ SynPat.Paren(range = range) ] ->
       if id.idRange.EndColumn <> range.StartColumn then
         reportPascalCaseError src id.idRange
       else ()
     | _ -> ()
   | _ when (idTrivia: list<option<IdentTrivia>>).Head.IsSome ->
     match idTrivia.Head.Value with
-    | IdentTrivia.OriginalNotationWithParen (rightParenRange = range) ->
+    | IdentTrivia.OriginalNotationWithParen(rightParenRange = range) ->
       match args with
-      | [ SynPat.Paren (range = argRange) ] ->
+      | [ SynPat.Paren(range = argRange) ] ->
         if range.EndColumn + 1 <> argRange.StartColumn then
           reportError src argRange "Infix and Paren need a single space."
         else ()

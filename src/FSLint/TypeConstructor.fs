@@ -4,10 +4,10 @@ open FSharp.Compiler.Syntax
 
 /// Checks if there is incorrect spacing in constructor calls.
 let checkConstructorSpacing src targetType = function
-  | SynExpr.Const (SynConst.Unit, range)
-  | SynExpr.Paren (range = range) ->
+  | SynExpr.Const(SynConst.Unit, range)
+  | SynExpr.Paren(range = range) ->
     match targetType with
-    | SynType.LongIdent (longDotId = SynLongIdent (id = id)) ->
+    | SynType.LongIdent(longDotId = SynLongIdent(id = id)) ->
       match id with
       | [ id ] when FunctionCallConvention.isPascalCase id.idText ->
         if id.idRange.EndColumn <> range.StartColumn then

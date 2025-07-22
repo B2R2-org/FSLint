@@ -30,10 +30,10 @@ let checkBracketSpacing (src: ISourceText) (range: range) =
     else ()
 
 let rec check src = function
-  | SynExpr.Paren (rightParenRange = rightParenRange; range = range) ->
+  | SynExpr.Paren(rightParenRange = rightParenRange; range = range) ->
     if rightParenRange.IsSome then
       checkBracketSpacing src range
     else ()
-  | SynExpr.Const (constant, range) when constant.IsUnit ->
+  | SynExpr.Const(SynConst.Unit, range) ->
     checkEmptySpacing src range
   | _ -> ()

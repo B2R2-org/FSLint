@@ -14,7 +14,7 @@ let private reportSingleElementPerLineError src range =
   reportError src range "Only one element per line allowed"
 
 let rec collectElemAndOptionalSeparatorRanges acc = function
-  | SynExpr.Sequential (expr1 = expr1; expr2 = expr2; trivia = trivia) ->
+  | SynExpr.Sequential(expr1 = expr1; expr2 = expr2; trivia = trivia) ->
     trivia.SeparatorRange
     |> Option.map (fun sep -> sep :: expr1.Range :: acc)
     |> Option.defaultValue (expr1.Range :: acc)
@@ -52,7 +52,7 @@ let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
 /// Ensures single space before and after '..' (e.g., "1 .. 10" not "1..10").
 let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
   match fstElem with
-  | SynExpr.Const (range = rangeOfFirstElem) ->
+  | SynExpr.Const(range = rangeOfFirstElem) ->
     if opm.StartColumn = rangeOfFirstElem.EndColumn
       || opm.EndColumn = rangeOfSecondElem.StartColumn
     then reportRangeOperatorError src opm
@@ -62,9 +62,9 @@ let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
       || opm.EndColumn = rangeOfSecondElem.StartColumn
     then reportRangeOperatorError src opm
     else ()
-  | SynExpr.IndexRange (opm = stepOpm
-                        range1 = rangeOfFirstElem
-                        range2 = stepRange) ->
+  | SynExpr.IndexRange(opm = stepOpm
+                       range1 = rangeOfFirstElem
+                       range2 = stepRange) ->
     if stepOpm.StartColumn = rangeOfFirstElem.EndColumn
       || stepOpm.EndColumn = stepRange.StartColumn
     then reportRangeOperatorError src stepOpm
@@ -160,9 +160,9 @@ let checkCommon src isArray fullRange elemRange =
 let rec checkSingleLine src = function
   | SynExpr.Sequential _ as expr ->
     collectElemAndOptionalSeparatorRanges [] expr |> checkElementSpacing src
-  | SynExpr.IndexRange (expr1 = exprOfFirstElement
-                        opm = opm
-                        range2 = rangeOfSecondElement) ->
+  | SynExpr.IndexRange(expr1 = exprOfFirstElement
+                       opm = opm
+                       range2 = rangeOfSecondElement) ->
     checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _

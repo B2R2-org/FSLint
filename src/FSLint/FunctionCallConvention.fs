@@ -11,9 +11,9 @@ let private getHeadMethodName (idents: Ident list) =
   idents |> List.tryHead |> Option.map (fun ident -> ident.idText)
 
 let private getMethodName = function
-  | SynExpr.LongIdent (longDotId = SynLongIdent (id = id)) ->
+  | SynExpr.LongIdent(longDotId = SynLongIdent(id = id)) ->
     id |> List.tryLast |> Option.map (fun ident -> ident.idText)
-  | SynExpr.DotGet (longDotId = SynLongIdent (id = id)) ->
+  | SynExpr.DotGet(longDotId = SynLongIdent(id = id)) ->
     getHeadMethodName id
   | SynExpr.Ident ident ->
     Some ident.idText
@@ -62,12 +62,12 @@ let ensureMethodSpacing src flag funcExpr (expr: SynExpr) =
 /// and lowerCase methods have a single space.
 let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
   match expr with
-  | SynExpr.App (flag = ExprAtomicFlag.NonAtomic
-                 funcExpr = funcExpr
-                 argExpr = argExpr) ->
+  | SynExpr.App(flag = ExprAtomicFlag.NonAtomic
+                funcExpr = funcExpr
+                argExpr = argExpr) ->
     match funcExpr with
     | SynExpr.App _ -> ()
-    | SynExpr.TypeApp (expr = expr; range = typeRange) ->
+    | SynExpr.TypeApp(expr = expr; range = typeRange) ->
       let line = src.GetLineString(argExpr.Range.EndLine - 1)
       let afterArgExpr =
         if argExpr.Range.EndColumn < line.Length then
@@ -76,8 +76,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       if afterArgExpr.StartsWith("(") then ()
       else
         match getMethodName expr, argExpr with
-        | Some name, SynExpr.Paren (range = range)
-        | Some name, SynExpr.Const (SynConst.Unit, range)
+        | Some name, SynExpr.Paren(range = range)
+        | Some name, SynExpr.Const(SynConst.Unit, range)
           when isPascalCase name ->
           if typeRange.EndColumn <> range.StartColumn then
             reportPascalCaseError src range
@@ -97,38 +97,39 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       elif argExpr.Range.StartColumn - 1 <> ident.idRange.EndColumn then
         reportLowerCaseError src argExpr.Range
       else ()
-    | SynExpr.Ident ident when argExpr.IsParen ->
-      if isPascalCase ident.idText then
-        if argExpr.Range.StartColumn <> ident.idRange.EndColumn then
-          reportPascalCaseError src argExpr.Range
-        else ()
-      else
-        if argExpr.Range.StartColumn - 1 <> ident.idRange.EndColumn then
-          reportLowerCaseError src argExpr.Range
-        else ()
     | _ -> ()
-  | SynExpr.App (flag = flag
-                 funcExpr = funcExpr
-                 argExpr = SynExpr.Const (SynConst.Unit, _)) ->
+    match argExpr with
+    | SynExpr.Paren(range = range) ->
+      if shouldContinueSpacingCheck src range then
+        ensureMethodSpacing src ExprAtomicFlag.NonAtomic funcExpr expr
+      else ()
+      checkMethodParenSpacing src funcExpr
+    | SynExpr.Const(SynConst.Unit, _) ->
+      ensureMethodSpacing src ExprAtomicFlag.NonAtomic funcExpr expr
+      checkMethodParenSpacing src funcExpr
+    | _ -> ()
+  | SynExpr.App(flag = flag
+                funcExpr = funcExpr
+                argExpr = SynExpr.Const(SynConst.Unit, _)) ->
     ensureMethodSpacing src flag funcExpr expr
     checkMethodParenSpacing src funcExpr
-  | SynExpr.App (flag = flag
-                 funcExpr = funcExpr
-                 argExpr = SynExpr.Paren (expr = expr; range = range)) ->
+  | SynExpr.App(flag = flag
+                funcExpr = funcExpr
+                argExpr = SynExpr.Paren(expr = expr; range = range)) ->
     if shouldContinueSpacingCheck src range then
       ensureMethodSpacing src flag funcExpr expr
       checkMethodParenSpacing src funcExpr
     else ()
     checkMethodParenSpacing src expr
-  | SynExpr.DotGet (expr = expr; longDotId = SynLongIdent (id = id)) ->
+  | SynExpr.DotGet(expr = expr; longDotId = SynLongIdent(id = id)) ->
     let getPrevMethodName =
       match expr with
-      | SynExpr.App (funcExpr = funcExpr
-                     argExpr = SynExpr.Const (SynConst.Unit, _)) ->
+      | SynExpr.App(funcExpr = funcExpr
+                    argExpr = SynExpr.Const(SynConst.Unit, _)) ->
         getMethodName funcExpr
       | _ -> getMethodName expr
     match expr with
-    | SynExpr.App (flag = flag; argExpr = SynExpr.Const (SynConst.Unit, _)) ->
+    | SynExpr.App(flag = flag; argExpr = SynExpr.Const(SynConst.Unit, _)) ->
       match getPrevMethodName, getHeadMethodName id with
       | Some prevMethod, Some currentMethod
         when prevMethod.Length > 0 && currentMethod.Length > 0 ->
@@ -143,8 +144,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       | _ -> ()
     | _ -> ()
     checkMethodParenSpacing src expr
-  | SynExpr.Paren (expr = expr) ->
+  | SynExpr.Paren(expr = expr) ->
     checkMethodParenSpacing src expr
-  | SynExpr.Tuple (exprs = exprs) ->
+  | SynExpr.Tuple(exprs = exprs) ->
     exprs |> List.iter (checkMethodParenSpacing src)
   | _ -> ()

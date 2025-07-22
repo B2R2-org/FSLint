@@ -7,11 +7,11 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type FunctionCallTests () =
 
-  let goodNonCurriedFuncTest = """Func (p1, p2, p3)"""
+  let goodNonCurriedFuncTest = """Func(p1, p2, p3)"""
 
-  let badNonCurriedFuncBracketSpacingTest = """Func ( p1, p2, p3 )"""
+  let badNonCurriedFuncBracketSpacingTest = """Func( p1, p2, p3 )"""
 
-  let badNonCurriedFuncSpacingTest = """Func(p1, p2, p3)"""
+  let badNonCurriedFuncSpacingTest = """Func (p1, p2, p3)"""
 
   let goodCurriedFuncPascalCaseTest = """str.Replace()"""
 

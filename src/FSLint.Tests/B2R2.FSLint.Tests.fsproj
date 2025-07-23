@@ -35,6 +35,7 @@
     <Compile Include="ClassMemberTests.fs" />
     <Compile Include="TypeConstructorTests.fs" />
     <Compile Include="AppTests.fs" />
+    <Compile Include="RecordTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

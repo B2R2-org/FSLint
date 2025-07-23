@@ -32,7 +32,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
     checkPattern src case isArg trivia lhs
     checkPattern src case isArg trivia rhs
-  | SynPat.LongIdent(lid, extraId, _, SynArgPats.Pats args, _, range) ->
+  | SynPat.LongIdent(lid, extraId, _, SynArgPats.Pats args, _, range) as pat ->
     let SynLongIdent(id = lid; dotRanges = dotRanges; trivia = idTrivia) = lid
     let name = (List.last lid).idText
     let case = if not (List.isEmpty args) && isArg then PascalCase else case
@@ -42,6 +42,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     else
       ClassMemberConvention.checkMemberSpacing src lid extraId
         dotRanges args
+    PatternMatchingConvention.check src pat
     for arg in args do checkPattern src LowerCamelCase true trivia arg
   | SynPat.LongIdent(lid, _, _, SynArgPats.NamePatPairs(pats = pat), _, range)
     ->
@@ -190,7 +191,8 @@ and checkExpression src = function
     checkExpression src objectExpr
     checkExpression src indexArgs
     checkExpression src valueExpr
-  | SynExpr.Record (recordFields = recordFields) ->
+  | SynExpr.Record(recordFields = recordFields; range = range) ->
+    RecordConvention.checkConstructor src recordFields range
     for recordField in recordFields do
       let SynExprRecordField(expr = expr) = recordField
       if expr.IsSome then checkExpression src expr.Value
@@ -246,7 +248,7 @@ and checkMemberDefns src members =
     | _ ->
       failwith $"{nameof checkMemberDefns} TODO: {memberDefn}"
 
-and checkTypeDefnSimpleRepr src = function
+and checkTypeDefnSimpleRepr src trivia = function
   | SynTypeDefnSimpleRepr.Union(unionCases = cases) ->
     for case in cases do
       let SynUnionCase(ident = SynIdent(ident = id); range = range) = case
@@ -255,7 +257,8 @@ and checkTypeDefnSimpleRepr src = function
     for case in cases do
       let SynEnumCase(ident = SynIdent(ident = id); range = range) = case
       IdentifierConvention.check src PascalCase false id.idText range
-  | SynTypeDefnSimpleRepr.Record(recordFields = fields) ->
+  | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
+    RecordConvention.checkDefinition src fields range trivia
     for field in fields do
       let SynField(idOpt = idOpt) = field
       checkIdOpt src PascalCase idOpt
@@ -272,22 +275,25 @@ and checkExceptionDefnRepr src repr =
   let SynUnionCase(ident = SynIdent(ident = id); range = range) = caseName
   IdentifierConvention.check src PascalCase true id.idText range
 
-and checkTypeDefnRepr src repr =
+and checkTypeDefnRepr src repr trivia =
   match repr with
   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
     checkMemberDefns src members
   | SynTypeDefnRepr.Simple(repr, _) ->
-    checkTypeDefnSimpleRepr src repr
+    checkTypeDefnSimpleRepr src trivia repr
   | SynTypeDefnRepr.Exception repr ->
     checkExceptionDefnRepr src repr
 
 and checkTypeDefn src defn =
-  let SynTypeDefn(typeInfo = info; typeRepr = repr; members = members) = defn
+  let SynTypeDefn(typeInfo = info
+                  typeRepr = repr
+                  members = members
+                  trivia = trivia) = defn
   let SynComponentInfo(longId = lid; range = range; attributes = attrs) = info
   let name = (List.last lid).idText
   if hasAttr "Measure" attrs then ()
   else IdentifierConvention.check src PascalCase true name range
-  checkTypeDefnRepr src repr
+  checkTypeDefnRepr src repr trivia
   checkMemberDefns src members
 
 and hasAttr attrName attrs =

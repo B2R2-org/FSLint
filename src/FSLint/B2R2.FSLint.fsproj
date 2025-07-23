@@ -32,6 +32,7 @@
     <Compile Include="IndexedPropertyConvention.fs" />
     <Compile Include="FunctionCallConvention.fs" />
     <Compile Include="ArrayOrListConvention.fs" />
+    <Compile Include="RecordConvention.fs" />
     <Compile Include="PatternMatchingConvention.fs" />
     <Compile Include="AppConvention.fs" />
     <Compile Include="ClassMemberConvention.fs" />

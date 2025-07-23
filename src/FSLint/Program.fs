@@ -330,7 +330,8 @@ and checkDeclarations src decls =
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
       checkDeclarations src decls
-    | SynModuleDecl.Let(_, bindings, _range) ->
+    | SynModuleDecl.Let(_, bindings, range) ->
+      FunctionBodyConvention.checkEmptyNewLine src range bindings
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
       checkExpression src expr

@@ -191,6 +191,8 @@ and checkExpression src = function
     checkExpression src objectExpr
     checkExpression src indexArgs
     checkExpression src valueExpr
+  | SynExpr.DotLambda(expr = expr) ->
+    checkExpression src expr
   | SynExpr.Record(recordFields = recordFields; range = range) ->
     RecordConvention.checkConstructor src recordFields range
     for recordField in recordFields do
@@ -314,6 +316,7 @@ and checkBinding src case binding =
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false trivia pat
   PatternMatchingConvention.check src pat
+  ClassMemberConvention.checkSelfIdentifierUsage src pat body
   checkExpression src body
 
 and checkBindings src case bindings =

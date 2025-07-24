@@ -88,3 +88,81 @@ let checkStaticMemberSpacing src (longId: LongIdent) args idTrivia =
       | _ -> ()
     | _ -> warn $"[checkStaticMemberSpacing]TODO: {longId}"
   | _ -> ()
+
+/// Traverses elements to find the presence of a self identifier.
+/// Recursively searches through the given application structure,
+/// accumulating results as it matches the specified pattern identifier.
+let rec findSelfIdentifierInApp src patIdent acc = function
+  | SynExpr.LongIdent(longDotId = SynLongIdent(id = id))
+    when not id.IsEmpty && id.Head.idText = patIdent -> true
+  | SynExpr.For(ident = ident) when ident.idText = patIdent -> true
+  | SynExpr.Ident(ident = ident) when ident.idText = patIdent -> true
+  | SynExpr.Typed(expr = expr)
+  | SynExpr.Assert(expr = expr)
+  | SynExpr.Paren(expr = expr)
+  | SynExpr.Downcast(expr = expr)
+  | SynExpr.Upcast(expr = expr)
+  | SynExpr.DotGet(expr = expr)
+  | SynExpr.YieldOrReturn(expr = expr)
+  | SynExpr.YieldOrReturnFrom(expr = expr)
+  | SynExpr.ArrayOrListComputed(expr = expr) ->
+    findSelfIdentifierInApp src patIdent acc expr
+  | SynExpr.LetOrUseBang(rhs = expr1; body = expr2)
+  | SynExpr.Sequential(expr1 = expr1; expr2 = expr2)
+  | SynExpr.Set(targetExpr = expr1; rhsExpr = expr2)
+  | SynExpr.DotSet(targetExpr = expr1; rhsExpr = expr2)
+  | SynExpr.ForEach(enumExpr = expr1; bodyExpr = expr2)
+  | SynExpr.Lambda (body = expr1; parsedData = Some (_, expr2))
+  | SynExpr.App(funcExpr = expr1; argExpr = expr2) ->
+    findSelfIdentifierInApp src patIdent acc expr1 ||
+    findSelfIdentifierInApp src patIdent acc expr2
+  | SynExpr.For(identBody = expr1; toBody = expr2; doBody = expr3) ->
+    findSelfIdentifierInApp src patIdent acc expr1 ||
+    findSelfIdentifierInApp src patIdent acc expr2 ||
+    findSelfIdentifierInApp src patIdent acc expr3
+  | SynExpr.Tuple(exprs = exprs) ->
+    exprs |> List.exists (findSelfIdentifierInApp src patIdent acc)
+  | SynExpr.Match(expr = expr; clauses = clauses) ->
+    clauses
+    |> List.exists (fun (SynMatchClause(whenExpr = whenExpr
+                                        resultExpr = resultExpr)) ->
+      findSelfIdentifierInApp src patIdent acc expr ||
+      findSelfIdentifierInApp src patIdent acc resultExpr ||
+      if whenExpr.IsSome then
+        findSelfIdentifierInApp src patIdent acc whenExpr.Value
+      else false
+    )
+  | SynExpr.InterpolatedString(contents = contents)
+    when not contents.IsEmpty && contents.Head.IsString ->
+      contents
+      |> List.exists (function
+        | SynInterpolatedStringPart.FillExpr(expr, _) ->
+          findSelfIdentifierInApp src patIdent acc expr
+        | _ -> acc
+      )
+  | SynExpr.LetOrUse(bindings = bindings; body = body) ->
+    bindings
+    |> List.exists (fun (SynBinding(expr = expr)) ->
+      findSelfIdentifierInApp src patIdent acc expr
+    ) || findSelfIdentifierInApp src patIdent acc body
+  | SynExpr.IfThenElse(ifExpr = ifExpr
+                       thenExpr = thenExpr
+                       elseExpr = elseExpr) ->
+    findSelfIdentifierInApp src patIdent acc ifExpr ||
+    findSelfIdentifierInApp src patIdent acc thenExpr ||
+    if elseExpr.IsSome then
+      findSelfIdentifierInApp src patIdent acc elseExpr.Value
+    else false
+  | _ -> acc
+
+let checkSelfIdentifierUsage src pat body =
+  match pat with
+  | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
+    when not id.IsEmpty && id.Head.idText = "__" ->
+      reportError src id.Head.idRange "Avoid usage '__'"
+  | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
+    when not id.IsEmpty
+      && (id.Head.idText = "this" || id.Head.idText = "self") ->
+    if findSelfIdentifierInApp src id.Head.idText false body then ()
+    else reportError src id.Head.idRange "Remove unused self-identifier"
+  | _ -> ()

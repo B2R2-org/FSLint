@@ -217,7 +217,7 @@ let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
     | _ -> ()
   | SynExpr.Ident(ident = ident) ->
     checkIdentWithParenSpacing src flag ident argExpr check
-  | SynExpr.TypeApp _ | SynExpr.DotGet _ -> ()
+  | SynExpr.TypeApp _ | SynExpr.DotGet _ | SynExpr.DotLambda _ -> ()
   | expr -> warn $"[AppConvention] TODO: {expr}"
   match argExpr with
   | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->

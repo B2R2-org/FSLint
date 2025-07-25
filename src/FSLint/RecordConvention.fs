@@ -79,12 +79,12 @@ let rec checkOperatorSpacing src = function
   | field :: rest ->
     let SynExprRecordField(equalsRange = equalsRange; expr = expr) = field
     match getFieldRange field, equalsRange, expr with
-     | Some fieldRange, Some equalRange, Some exprRange ->
-       if fieldRange.EndColumn + 1 <> equalRange.StartColumn
-         || equalRange.EndColumn + 1 <> exprRange.Range.StartColumn
-       then reportError src fieldRange "Need single space around '='"
-       else ()
-     | _ -> ()
+    | Some fieldRange, Some equalRange, Some exprRange ->
+      if fieldRange.EndColumn + 1 <> equalRange.StartColumn
+        || equalRange.EndColumn + 1 <> exprRange.Range.StartColumn
+      then reportError src fieldRange "Need single space around '='"
+      else ()
+    | _ -> ()
     checkOperatorSpacing src rest
   | [] -> ()
 

@@ -12,28 +12,18 @@ let checkEmptySpacing src (range: range) =
 
 /// Checks proper spacing inside brackets for paren.
 /// Ensures single space after opening and before closing brackets.
-let checkBracketSpacing (src: ISourceText) (range: range) =
-  (* TODO: Cannot detect multi line *)
-  if range.StartLine <> range.EndLine then ()
-  else
-    let openRange =
-      (Position.mkPos range.StartLine range.StartColumn,
-      Position.mkPos range.StartLine (range.StartColumn + 2))
-      ||> Range.mkRange ""
-    let endRange =
-      (Position.mkPos range.StartLine (range.EndColumn - 2),
-      Position.mkPos range.StartLine range.EndColumn)
-      ||> Range.mkRange ""
-    if (src.GetSubTextFromRange openRange).Contains " "
-      || (src.GetSubTextFromRange endRange).Contains " "
-    then reportError src range "Contains invalid whitespace"
-    else ()
+let checkBracketSpacing src (exprRange: range) (range: range) =
+  if exprRange.StartLine <> range.StartLine
+    || exprRange.EndLine <> range.EndLine
+  then ()
+  elif exprRange.StartColumn - 1 <> range.StartColumn
+    || exprRange.EndColumn + 1 <> range.EndColumn
+  then reportError src range "Contains invalid whitespace"
+  else ()
 
 let rec check src = function
-  | SynExpr.Paren(rightParenRange = rightParenRange; range = range) ->
-    if rightParenRange.IsSome then
-      checkBracketSpacing src range
-    else ()
+  | SynExpr.Paren(expr = expr; range = range) ->
+    checkBracketSpacing src expr.Range range
   | SynExpr.Const(SynConst.Unit, range) ->
     checkEmptySpacing src range
   | _ -> ()

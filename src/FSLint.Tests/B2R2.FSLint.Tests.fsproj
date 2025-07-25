@@ -26,6 +26,7 @@
     <Compile Include="TupleTests.fs" />
     <Compile Include="ParenTests.fs" />
     <Compile Include="TypeCastTests.fs" />
+    <Compile Include="TypeDefinitionTests.fs" />
     <Compile Include="GenericArgumentTests.fs" />
     <Compile Include="TypeAnnotationTests.fs" />
     <Compile Include="IndexedPropertyTests.fs" />

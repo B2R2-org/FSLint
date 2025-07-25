@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type FunctionCallTests () =
+type FunctionCallTests() =
 
   let goodNonCurriedFuncTest = """Func(p1, p2, p3)"""
 

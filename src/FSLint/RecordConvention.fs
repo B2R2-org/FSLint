@@ -29,11 +29,24 @@ let checkFieldTypeSpacing (src: ISourceText) fields =
 /// Checks that the '=' and '{' in a record definition are on the same line.
 /// Ensures record definitions follow the convention: `type T = { ... }`
 let checkOpeningBracketPosition src (range: range) (trivia: SynTypeDefnTrivia) =
-  if trivia.EqualsRange.IsSome then
-    if trivia.EqualsRange.Value.StartLine <> range.StartLine then
+  if trivia.EqualsRange.IsSome && range.StartLine <> range.EndLine then
+    if trivia.EqualsRange.Value.StartLine = range.StartLine then
       reportError src range "Opening Bracket not inline with equal operator"
     else ()
   else ()
+
+let checkFieldIsInlineWithBracket src (range: range) fields =
+  fields
+  |> List.map (fun (SynField(range = range)) -> range)
+  |> List.reduce Range.unionRanges
+  |> fun innerRange ->
+    if range.StartLine <> innerRange.StartLine
+      || range.EndLine <> innerRange.EndLine
+    then reportError src innerRange "Field not inline with bracket."
+    elif range.StartColumn + 2 <> innerRange.StartColumn
+      || range.EndColumn - 2 <> innerRange.EndColumn
+    then reportError src range "Wrong spacing inside brackets"
+    else ()
 
 /// Checks for correct spacing and formatting in record field assignments,
 /// ensuring the format `{ field = expr }` is used instead of `{field = expr}`.
@@ -114,4 +127,5 @@ let checkConstructor src (fields: list<SynExprRecordField>) range =
 /// Checks a record definition for convention compliance.
 let checkDefinition src fields range trivia =
   checkOpeningBracketPosition src range trivia
+  checkFieldIsInlineWithBracket src range fields
   checkFieldTypeSpacing src fields

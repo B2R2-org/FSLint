@@ -4,6 +4,14 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 
+let private reportBarAndPatternError src range =
+  reportError src range "Need a single space between bar and pattern."
+
+let private reportBarAndMatchError src range =
+  reportError src range "Bar '|' not aligned with 'match' keyword."
+
+let private reportArrowError src range =
+  reportError src range "Need a single space around arrow."
 let rec private collectRecordEdgeRange acc = function
   | SynPat.Named(range = range)
   | SynPat.LongIdent(range = range) ->
@@ -159,7 +167,7 @@ let rec checkRecordPattern src (idRange: range) = function
   | _ :: _ -> warn $"[RecordPattern]TODO: Various Args"
   | [] -> ()
 
-let rec check (src: ISourceText) = function
+let rec checkBody (src: ISourceText) = function
   | SynPat.ArrayOrList(isArray, elementPats, range) ->
     if elementPats.IsEmpty then
       let enclosureWidth = if isArray then 4 else 2
@@ -173,11 +181,11 @@ let rec check (src: ISourceText) = function
       |> ArrayOrListConvention.checkCommon src isArray range
       collectElemAndOptionalSeparatorRanges src elementPats
       |> ArrayOrListConvention.checkElementSpacing src
-      elementPats |> List.iter (check src)
+      elementPats |> List.iter (checkBody src)
   | SynPat.ListCons(lhsPat = lhsPat; rhsPat = rhsPat; trivia = triv) ->
     checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange
-    check src lhsPat
-    check src rhsPat
+    checkBody src lhsPat
+    checkBody src rhsPat
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id); argPats = argPats) ->
     match id with
     | [ qualifier; method ]
@@ -199,14 +207,91 @@ let rec check (src: ISourceText) = function
     | _ -> ()
     match argPats with
     | SynArgPats.Pats(pats = pats) ->
-      pats |> List.iter (check src)
+      pats |> List.iter (checkBody src)
     | SynArgPats.NamePatPairs(pats = pats) ->
-      pats |> List.unzip3 |> fun (_, _, pats) -> pats |> List.iter (check src)
+      pats |> List.unzip3 |> fun (_, _, pats) ->
+        pats |> List.iter (checkBody src)
   | SynPat.Paren(pat = pat) ->
-    check src pat
+    checkBody src pat
   | SynPat.Tuple(elementPats = elementPats) ->
-    elementPats |> List.iter (check src)
+    elementPats |> List.iter (checkBody src)
   | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->
-    check src lhsPat
-    check src rhsPat
+    checkBody src lhsPat
+    checkBody src rhsPat
   | _ -> () (* no need to check this *)
+
+/// checks pattern cases with incorrect spacing or newlines.
+let checkPatternSpacing src clauses =
+  let rec check src pat outerTrivia =
+    match pat with
+    | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat; trivia = trivia) ->
+      check src lhsPat outerTrivia
+      check src rhsPat (Some trivia.BarRange)
+    | _ ->
+      match outerTrivia with
+      | Some range ->
+        if pat.Range.StartLine <> range.StartLine then
+          reportError src pat.Range "Bar is not inline with Pattern."
+        elif pat.Range.StartColumn - 2 <> range.StartColumn then
+          reportBarAndPatternError src range
+        else
+          ()
+      | None ->
+        ()
+  clauses
+  |> List.iter (fun (SynMatchClause(pat = pat; trivia = outerTrivia)) ->
+    check src pat outerTrivia.BarRange
+  )
+
+/// Checks for missing or extra spaces around '->' in match cases.
+let checkArrowSpacing src clauses =
+  clauses
+  |> List.iter (fun (SynMatchClause(pat = pat
+                                    whenExpr = whenExpr
+                                    resultExpr = resultExpr
+                                    trivia = trivia)) ->
+    match trivia.ArrowRange with
+    | Some arrowRange ->
+      let leftRange =
+        if whenExpr.IsSome then whenExpr.Value.Range else pat.Range
+      if leftRange.EndLine = arrowRange.StartLine
+        && leftRange.EndColumn + 1 <> arrowRange.StartColumn then
+          reportArrowError src arrowRange
+      else ()
+      if arrowRange.StartLine = resultExpr.Range.StartLine
+        && arrowRange.EndColumn + 1 <> resultExpr.Range.StartColumn then
+          reportArrowError src resultExpr.Range
+      else ()
+    | None -> ()
+  )
+
+/// Checks that '|' is vertically aligned with its 'match' keyword.
+let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
+  let rec collectBarsFromPattern currentPat acc =
+    match currentPat with
+    | SynPat.Or(lhsPat = lhs; rhsPat = rhs; trivia = innerTrivia) ->
+      collectBarsFromPattern rhs
+        (collectBarsFromPattern lhs (innerTrivia.BarRange :: acc))
+    | _ ->
+      acc
+  clauses
+  |> List.iter (fun (SynMatchClause(pat = pat; trivia = outerTrivia)) ->
+    match outerTrivia.BarRange with
+    | Some barRange -> barRange :: collectBarsFromPattern pat []
+    | _ -> collectBarsFromPattern pat []
+    |> List.groupBy (fun range -> range.StartLine)
+    |> List.map (fun (line, ranges) ->
+      ranges |> List.minBy (fun range -> range.StartColumn)
+    )
+    |> List.iter (fun barRange ->
+      if trivia.MatchKeyword.StartColumn <> barRange.StartColumn then
+        reportBarAndMatchError src barRange
+      else
+        ()
+    )
+  )
+
+let checkFormat src expr clauses trivia =
+  checkBarIsSameColWithMatch src clauses trivia
+  checkPatternSpacing src clauses
+  checkArrowSpacing src clauses

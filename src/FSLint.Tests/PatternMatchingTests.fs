@@ -37,6 +37,44 @@ match bad with
 | _ -> 2
 """
 
+  let goodBarAndPatternIsInlineTest = """
+match x with
+| Foo -> Some good
+| Bar -> None
+"""
+
+  let badBarAndPatternIsInlineTest = """
+match x with
+| Foo |
+  Bar -> Some bad
+"""
+
+  let badBarAndMatchNotSameColTest = """
+match x with
+  | Foo
+  | Bar -> Some good
+"""
+
+  let goodBarAndPatternSpacingTest = """
+match x with
+| Foo | Bar -> Some good
+"""
+
+  let badBarAndPatternSpacingTest = """
+match x with
+| Foo |Bar -> Some good
+"""
+
+  let badArrowSpacingTest = """
+match x with
+| Foo | Bar-> Some good
+"""
+
+  let badArrowSpacingWithWhenTest = """
+match x with
+| Foo | Bar when cond-> Some good
+"""
+
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Bracket Spacing Test``() =
     linterForFs.Lint(Constants.FakeFsPath, goodPatternBracketSpacingTest)
@@ -55,4 +93,33 @@ match bad with
     linterForFs.Lint(Constants.FakeFsPath, goodPatternConsOperatorTest)
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(Constants.FakeFsPath, badPatternConsOperatorTest)
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[PatternMatching] Pattern And Bar Is Not Inline Test``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodBarAndPatternIsInlineTest)
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badBarAndPatternIsInlineTest)
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[PatternMatching] Match Keyword and Bar Is Same Column Test``() =
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badBarAndMatchNotSameColTest)
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[PatternMatching] Pattern and Bar Spacing Test``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodBarAndPatternSpacingTest)
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badBarAndPatternSpacingTest)
+     ) |> ignore
+
+  [<TestMethod>]
+  member _.``[PatternMatching] Pattern Arrow Spacing Test``() =
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badArrowSpacingTest)
+     ) |> ignore
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badArrowSpacingWithWhenTest)
      ) |> ignore

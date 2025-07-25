@@ -42,7 +42,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     else
       ClassMemberConvention.checkMemberSpacing src lid extraId
         dotRanges args
-    PatternMatchingConvention.check src pat
+    PatternMatchingConvention.checkBody src pat
     for arg in args do checkPattern src LowerCamelCase true trivia arg
   | SynPat.LongIdent(lid, _, _, SynArgPats.NamePatPairs(pats = pat), _, range)
     ->
@@ -69,7 +69,7 @@ and checkSimplePattern src case = function
 
 and checkMatchClause (src: ISourceText) clause =
   let SynMatchClause(pat = pat; whenExpr = whenExpr; resultExpr = expr) = clause
-  PatternMatchingConvention.check src pat
+  PatternMatchingConvention.checkBody src pat
   match pat with
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
@@ -99,7 +99,7 @@ and checkExpression src = function
     checkExpression src rhs
     checkExpression src body
   | SynExpr.ForEach(pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
-    PatternMatchingConvention.check src pat
+    PatternMatchingConvention.checkBody src pat
     checkExpression src enumExpr
     checkExpression src bodyExpr
   | SynExpr.Do(expr = expr)
@@ -114,8 +114,9 @@ and checkExpression src = function
     if Option.isSome elseExpr then
       checkExpression src (Option.get elseExpr)
     else ()
-  | SynExpr.Match(expr = expr; clauses = clauses) ->
+  | SynExpr.Match(expr = expr; clauses = clauses; trivia = trivia) ->
     checkExpression src expr
+    PatternMatchingConvention.checkFormat src expr clauses trivia
     for clause in clauses do checkMatchClause src clause
   | SynExpr.MatchLambda(matchClauses = clauses) ->
     for clause in clauses do checkMatchClause src clause
@@ -316,7 +317,7 @@ and checkBinding src case binding =
                  trivia = trivia) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false trivia pat
-  PatternMatchingConvention.check src pat
+  PatternMatchingConvention.checkBody src pat
   ClassMemberConvention.checkSelfIdentifierUsage src pat body
   checkExpression src body
 

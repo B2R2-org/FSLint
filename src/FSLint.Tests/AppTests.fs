@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type AppTests () =
+type AppTests() =
 
   let goodListSpaceInfixTest = """
 [ this.Address + uint64 this.Length + this.Name ]

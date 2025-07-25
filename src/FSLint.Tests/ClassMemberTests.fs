@@ -5,45 +5,45 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type ClassMemberTests () =
+type ClassMemberTests() =
 
   let goodSpacingInfixParenTest = """
-type TestClass () =
+type TestClass() =
   static member inline (+) (param1, param2) = value
 """
 
   let badSpacingInfixParenTest = """
-type TestClass () =
+type TestClass() =
   static member inline (+)(param1, param2) = value
 """
 
   let goodSpacingFunctionParenTest = """
-type TestClass () =
+type TestClass() =
   member _.Create(param1, param2) = value
 """
 
   let badSpacingFunctionParenTest = """
-type TestClass () =
+type TestClass() =
   member _.Create (param1, param2) = value
 """
 
   let goodSelfIdentifierUnderscoreTest = """
-type Class () =
+type Class() =
   member _.A(p1, p2) = _.B()
 """
 
   let badSelfIdentifierUnderscoreTest = """
-type Class () =
+type Class() =
   member __.A(p1, p2) = __.B()
 """
 
   let goodSelfIdentifierUnusedTest = """
-type Class () =
+type Class() =
   member this.A(p1, p2) = this.B()
 """
 
   let badSelfIdentifierUnusedTest = """
-type Class () =
+type Class() =
   member this.A(p1, p2) = B()
 """
 

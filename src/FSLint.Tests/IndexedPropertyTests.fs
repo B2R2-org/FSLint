@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type IndexedPropertyTests () =
+type IndexedPropertyTests() =
 
   let goodIndexedPropertyTest = """src[1]"""
 

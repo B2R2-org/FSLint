@@ -277,9 +277,10 @@ and checkExceptionDefnRepr src repr =
   let SynUnionCase(ident = SynIdent(ident = id); range = range) = caseName
   IdentifierConvention.check src PascalCase true id.idText range
 
-and checkTypeDefnRepr src repr trivia =
+and checkTypeDefnRepr src lid repr trivia =
   match repr with
   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
+    TypeDefinition.checkIdentifierWithParen src lid members
     checkMemberDefns src members
   | SynTypeDefnRepr.Simple(repr, _) ->
     checkTypeDefnSimpleRepr src trivia repr
@@ -295,7 +296,7 @@ and checkTypeDefn src defn =
   let name = (List.last lid).idText
   if hasAttr "Measure" attrs then ()
   else IdentifierConvention.check src PascalCase true name range
-  checkTypeDefnRepr src repr trivia
+  checkTypeDefnRepr src lid repr trivia
   checkMemberDefns src members
 
 and hasAttr attrName attrs =
@@ -325,6 +326,8 @@ and checkBindings src case bindings =
 
 and checkDeclarations src decls =
   for decl in decls do
+    FunctionBodyConvention.check src decl
+    TypeDefinition.check src decl
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
@@ -334,7 +337,7 @@ and checkDeclarations src decls =
         IdentifierConvention.check src PascalCase true id.idText id.idRange
       checkDeclarations src decls
     | SynModuleDecl.Let(_, bindings, range) ->
-      FunctionBodyConvention.checkEmptyNewLine src range bindings
+      FunctionBodyConvention.checkBindings src range bindings
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
       checkExpression src expr

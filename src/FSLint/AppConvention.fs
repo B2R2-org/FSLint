@@ -7,9 +7,6 @@ open FSharp.Compiler.SyntaxTrivia
 let private reportInfixError src range =
   reportError src range "There must be a space before and after the infix"
 
-let private reportIdentWithParenError src range =
-  reportError src range "Need whitespace between ident and paren"
-
 let isUnaryOperator (src: ISourceText) (operatorRange: range) =
   try
     let line = src.GetLineString(operatorRange.StartLine - 1)
@@ -183,18 +180,6 @@ let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
     checkFuncSpacing src innerFunc innerArg
   | _ -> ()
 
-/// Validates spacing between identifiers and parentheses.
-/// Ensures exactly one space between identifier and opening parenthesis.
-/// Handles atomic expressions and nested applications appropriately.
-let checkIdentWithParenSpacing src flag (ident: Ident) argExpr check =
-  match argExpr with
-  | SynExpr.Paren(expr = innerExpr) ->
-    match innerExpr with
-    | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
-      check src isInfix flag funcExpr argExpr
-    | _ -> ()
-  | _ -> ()
-
 let checkInfixOrFuncSpacing src isInfix funcExpr argExpr =
   if isInfix then checkInfixSpacing src isInfix funcExpr argExpr
   elif isOperator src funcExpr || shouldCheckFuncSpacing src funcExpr argExpr
@@ -215,8 +200,16 @@ let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
     | SynExpr.App(flag = flag; funcExpr = subFuncExpr; argExpr = subArgExpr) ->
       check src isInfix flag subFuncExpr subArgExpr
     | _ -> ()
-  | SynExpr.Ident(ident = ident) ->
-    checkIdentWithParenSpacing src flag ident argExpr check
+  | SynExpr.Ident _ ->
+    match argExpr with
+    | SynExpr.Paren(expr = innerExpr) ->
+      match innerExpr with
+      | SynExpr.App(isInfix = isInfix
+                    funcExpr = funcExpr
+                    argExpr = argExpr) ->
+        check src isInfix flag funcExpr argExpr
+      | _ -> ()
+    | _ -> ()
   | SynExpr.TypeApp _ | SynExpr.DotGet _ | SynExpr.DotLambda _ -> ()
   | expr -> warn $"[AppConvention] TODO: {expr}"
   match argExpr with

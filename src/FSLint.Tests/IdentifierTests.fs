@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type IdentifierTests () =
+type IdentifierTests() =
   let goodBindingLowercaseTest = """
 let age = 30
 """

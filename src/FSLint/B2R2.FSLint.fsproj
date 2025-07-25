@@ -27,6 +27,7 @@
     <Compile Include="TupleConvention.fs" />
     <Compile Include="ParenConvention.fs" />
     <Compile Include="TypeCastConvention.fs" />
+    <Compile Include="TypeDefinitionConvention.fs" />
     <Compile Include="GenericArgumentConvention.fs" />
     <Compile Include="TypeAnnotationConvention.fs" />
     <Compile Include="IndexedPropertyConvention.fs" />

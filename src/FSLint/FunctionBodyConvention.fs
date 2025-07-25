@@ -3,8 +3,10 @@ module B2R2.FSLint.FunctionBodyConvention
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
-/// Checks if there is incorrect spacing in constructor calls.
-let checkEmptyNewLine (src: ISourceText) (range: range) bindings =
+/// Checks whether each binding within the given range in the source text
+/// contains a newline within its scope. This helps enforce the convention
+/// that function bodies should be multi-line if they exceed 80 columns.
+let checkBindings (src: ISourceText) (range: range) bindings =
   let recurseIdxs =
     bindings
     |> List.skip 1
@@ -13,10 +15,19 @@ let checkEmptyNewLine (src: ISourceText) (range: range) bindings =
     )
   for recurseIdx in recurseIdxs do
     if src.GetLineString(recurseIdx - 1) <> "" then
-      reportError src range "Missing newline in outer binding."
+      reportError src range "Nested should be separated by exactly one space."
     else ()
   for lineIdx in range.StartLine .. range.EndLine - 1 do
-    if List.contains (lineIdx + 1) recurseIdxs then ()
+    if List.contains (lineIdx + 1) recurseIdxs then
+      ()
     elif src.GetLineString lineIdx = "" then
       reportError src range "Remove empty line in function body."
     else ()
+
+let rec check src = function
+  | SynModuleDecl.NestedModule(decls = decls) ->
+    for decl in decls do check src decl
+  | SynModuleDecl.Let(_, bindings, range) ->
+    checkBindings src range bindings
+  | _ ->
+    ()

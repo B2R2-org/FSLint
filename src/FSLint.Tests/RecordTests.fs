@@ -5,15 +5,14 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type RecordTests () =
+type RecordTests() =
 
   let goodBracketPositionTest = """
-type InsSize = {
-  MemSize: MemorySize
-  RegSize: RegType
-  OperationSize: RegType
-  SizeCond: OperandsSizeCondition
-}
+type InsSize =
+  { MemSize: MemorySize
+    RegSize: RegType
+    OperationSize: RegType
+    SizeCond: OperandsSizeCondition }
 """
 
   let badBracketPositionTest = """
@@ -26,13 +25,21 @@ type InsSize =
   }
 """
 
-  let badFieldTypeSpacingTest = """
+  let badBracketPositionWithEqualTest = """
 type InsSize = {
-  MemSize:  MemorySize
-  RegSize:  RegType
-  OperationSize:  RegType
-  SizeCond:  OperandsSizeCondition
-}
+  MemSize: MemorySize
+  RegSize: RegType
+  OperationSize: RegType
+  SizeCond: OperandsSizeCondition
+  }
+"""
+
+  let badFieldTypeSpacingTest = """
+type InsSize =
+  { MemSize:  MemorySize
+    RegSize:  RegType
+    OperationSize:  RegType
+    SizeCond:  OperandsSizeCondition }
 """
 
   let goodBracketSpacingTest = """
@@ -64,6 +71,12 @@ type InsSize = {
     linterForFs.Lint(Constants.FakeFsPath, goodBracketPositionTest)
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(Constants.FakeFsPath, badBracketPositionTest)
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[Record] Bracket Position Inline With Equal Test``() =
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badBracketPositionWithEqualTest)
     ) |> ignore
 
   [<TestMethod>]

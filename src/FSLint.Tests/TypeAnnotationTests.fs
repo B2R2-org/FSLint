@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type TypeAnnotationTest () =
+type TypeAnnotationTest() =
   let goodTypeAnnotationIntTest = """
 let fn (p: int) = 10
 """

@@ -7,7 +7,7 @@ open B2R2.FSLint.Program
 /// In ArrayOrListConvention, tests unrelated to array/list differences use only
 /// lists for clarity, as not all cases require checking both types.
 [<TestClass>]
-type ArrayOrListTests () =
+type ArrayOrListTests() =
 
   let goodEmptyTest = """[]"""
 

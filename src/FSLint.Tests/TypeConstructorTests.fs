@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type TypeConstructorTests () =
+type TypeConstructorTests() =
 
   let goodConstructorSpacingTest = """new TestClass(param1, param2)"""
 

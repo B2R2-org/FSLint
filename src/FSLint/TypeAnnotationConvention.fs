@@ -21,28 +21,28 @@ let private checkColonSpace src (patRange: range) typeLen (range: range) =
 let check src pat typ range =
   let patRange =
     match pat with
-    | SynPat.Named (range = patRange) -> patRange
-    | SynPat.Wild (range = patRange) -> patRange
+    | SynPat.Named(range = patRange) -> patRange
+    | SynPat.Wild(range = patRange) -> patRange
     | _ -> failwith $"Invalid Pattern: {pat}"
   match typ with
-  | SynType.LongIdent (SynLongIdent([id], _, _)) ->
+  | SynType.LongIdent(SynLongIdent([ id ], _, _)) ->
     checkColonSpace src patRange id.idText.Length range
-  | SynType.LongIdent (SynLongIdent([id1; id2], _, _)) ->
+  | SynType.LongIdent(SynLongIdent([ id1; id2 ], _, _)) ->
     let typeLen = id1.idText.Length + Dot + id2.idText.Length
     checkColonSpace src patRange typeLen range
-  | SynType.App (_, _, _, _, _, _, typRange) ->
+  | SynType.App(_, _, _, _, _, _, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
     checkColonSpace src patRange typeLen range
-  | SynType.Array (_, _, typRange) ->
+  | SynType.Array(_, _, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
     checkColonSpace src patRange typeLen range
-  | SynType.Var (_, typRange) ->
+  | SynType.Var(_, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
     checkColonSpace src patRange typeLen range
-  | SynType.Fun (_, _, typRange, _) ->
+  | SynType.Fun(_, _, typRange, _) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
     checkColonSpace src patRange typeLen range
-  | SynType.HashConstraint (_, typRange) ->
+  | SynType.HashConstraint(_, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
     checkColonSpace src patRange typeLen range
   | _ -> warn $"TODO: [Type Annotation] {typ}"

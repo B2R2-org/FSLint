@@ -45,7 +45,7 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
             reportPascalCaseError src extraId.Value.idRange
           else ()
         elif (extraId: Ident Option).IsSome then
-          if extraId.Value.idRange.EndColumn + 1 <> range.StartColumn then
+          if extraId.Value.idRange.EndColumn <> range.StartColumn then
             reportLowerCaseError src extraId.Value.idRange
           else ()
         elif isPascalCase lastId.idText

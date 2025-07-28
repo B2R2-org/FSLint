@@ -6,12 +6,44 @@ open FSharp.Compiler.Text
 let reportPascalCaseError src range =
   reportError src range "No space between ident and paren"
 
-let checkIdentifierWithParen src (lid: LongIdent) members =
+let reportLowerCaseError src range =
+  reportError src range "Need single space between ident and paren"
+
+let getActualEndColumn (src: ISourceText) (idRange: range) (ctorRange: range) =
+  if idRange.EndLine <> ctorRange.StartLine then
+    idRange.EndColumn
+  else
+    try
+      let hasGenericArgu =
+        (Position.mkPos idRange.EndLine idRange.EndColumn,
+         Position.mkPos ctorRange.StartLine ctorRange.StartColumn)
+        ||> Range.mkRange ""
+        |> src.GetSubTextFromRange
+      if hasGenericArgu.Contains("<") && hasGenericArgu.Contains(">") then
+        idRange.EndColumn + hasGenericArgu.LastIndexOf('>') + 1
+      else
+        idRange.EndColumn
+    with _ ->
+      idRange.EndColumn
+
+let checkIdentifierWithParen (src: ISourceText) (lid: LongIdent) members =
   members
   |> List.iter (fun memberDefn ->
     match memberDefn with
-    | SynMemberDefn.ImplicitCtor(ctorArgs = ctorArgs) ->
-      if (List.last lid).idRange.EndColumn <> ctorArgs.Range.StartColumn then
+    | SynMemberDefn.ImplicitCtor(accessibility = accessibility
+                                 ctorArgs = ctorArgs) ->
+      let idRange =
+        match accessibility with
+        | Some(SynAccess.Internal idRange)
+        | Some(SynAccess.Public idRange)
+        | Some(SynAccess.Private idRange)
+          when idRange.EndLine = ctorArgs.Range.EndLine ->
+            idRange
+        | _ -> (List.last lid).idRange
+      let effectiveEndColumn = getActualEndColumn src idRange ctorArgs.Range
+      if idRange.EndLine <> ctorArgs.Range.StartLine then
+        ()
+      elif effectiveEndColumn <> ctorArgs.Range.StartColumn then
         reportPascalCaseError src ctorArgs.Range
       else
         ()

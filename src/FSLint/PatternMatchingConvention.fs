@@ -210,6 +210,10 @@ let rec checkBody (src: ISourceText) = function
       match argPats.Patterns.Head with
       | SynPat.Record _ -> checkRecordPattern src id.idRange argPats.Patterns
       | _ -> checkFuncSpacing src typarDecls id.idRange argPats
+    | [ id ]
+      when id.idText = "new" && argPats.Patterns.Head.IsParen
+        && id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
+      reportError src argPats.Patterns.Head.Range "Contains invalid whitespace."
     | _ -> ()
     match argPats with
     | SynArgPats.Pats(pats = pats) ->

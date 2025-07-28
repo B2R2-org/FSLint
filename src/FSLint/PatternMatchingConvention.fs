@@ -24,8 +24,12 @@ let rec private collectRecordEdgeRange acc = function
     collectRecordEdgeRange ((Some id.idRange, None, recordRange) :: acc) pat
   | _ -> None, None, None
 
-let private checkFuncSpacing src (idRange: range) = function
+let private checkFuncSpacing src typarDecls (idRange: range) = function
   | SynArgPats.Pats(pats = [ SynPat.Paren(range = range) ]) ->
+    let idRange =
+      match (typarDecls: option<SynValTyparDecls>) with
+      | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
+      | _ -> idRange
     if idRange.EndColumn <> range.StartColumn then
       reportError src range "Contains invalid whitespace"
     else ()
@@ -186,12 +190,14 @@ let rec checkBody (src: ISourceText) = function
     checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange
     checkBody src lhsPat
     checkBody src rhsPat
-  | SynPat.LongIdent(longDotId = SynLongIdent(id = id); argPats = argPats) ->
+  | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
+                     typarDecls = typarDecls
+                     argPats = argPats) ->
     match id with
     | [ qualifier; method ]
       when FunctionCallConvention.isPascalCase method.idText
         && qualifier.idText <> "_" && qualifier.idText <> "this" ->
-      checkFuncSpacing src method.idRange argPats
+      checkFuncSpacing src typarDecls method.idRange argPats
     | [ id ]
       when FunctionCallConvention.isPascalCase id.idText
         && not argPats.Patterns.IsEmpty
@@ -203,7 +209,7 @@ let rec checkBody (src: ISourceText) = function
       && argPats.Patterns.Head.IsParen ->
       match argPats.Patterns.Head with
       | SynPat.Record _ -> checkRecordPattern src id.idRange argPats.Patterns
-      | _ -> checkFuncSpacing src id.idRange argPats
+      | _ -> checkFuncSpacing src typarDecls id.idRange argPats
     | _ -> ()
     match argPats with
     | SynArgPats.Pats(pats = pats) ->

@@ -62,7 +62,7 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
 /// Checks spacing between static member identifiers and parentheses in F# code.
 /// For PascalCase members, ensures no space before the parenthesis.
 /// For infix notation with parentheses.
-let checkStaticMemberSpacing src (longId: LongIdent) args idTrivia =
+let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
   match longId with
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
@@ -73,7 +73,11 @@ let checkStaticMemberSpacing src (longId: LongIdent) args idTrivia =
     | SynPat.Named _ :: named when named.Length <> 0 ->
       reportError src id.idRange "Static member must be followed by paren."
     | [ SynPat.Paren(range = range) ] ->
-      if id.idRange.EndColumn <> range.StartColumn then
+      let idRange =
+        match typarDecls with
+        | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
+        | _ -> id.idRange
+      if idRange.EndColumn <> range.StartColumn then
         reportPascalCaseError src id.idRange
       else ()
     | _ -> ()
@@ -112,7 +116,7 @@ let rec findSelfIdentifierInApp src patIdent acc = function
   | SynExpr.Set(targetExpr = expr1; rhsExpr = expr2)
   | SynExpr.DotSet(targetExpr = expr1; rhsExpr = expr2)
   | SynExpr.ForEach(enumExpr = expr1; bodyExpr = expr2)
-  | SynExpr.Lambda (body = expr1; parsedData = Some (_, expr2))
+  | SynExpr.Lambda(body = expr1; parsedData = Some(_, expr2))
   | SynExpr.App(funcExpr = expr1; argExpr = expr2) ->
     findSelfIdentifierInApp src patIdent acc expr1 ||
     findSelfIdentifierInApp src patIdent acc expr2

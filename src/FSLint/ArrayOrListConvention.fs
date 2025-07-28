@@ -184,6 +184,7 @@ let checkMultiLine src isArray range = function
     collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
     checkElemIsInlineWithBracket src isArray range expr.Range
+  | SynExpr.ArrayOrListComputed _ | SynExpr.Record _
   | SynExpr.App _ | SynExpr.ForEach _ -> () (* No need to check string here *)
   | expr -> warn $"[checkMultiLine]TODO: {expr}"
 

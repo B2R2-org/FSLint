@@ -51,10 +51,14 @@ let checkFieldIsInlineWithBracket src (range: range) fields =
 /// Checks for correct spacing and formatting in record field assignments,
 /// ensuring the format `{ field = expr }` is used instead of `{field = expr}`.
 /// Also validates bracket positioning and formatting in multi-line records.
-let checkBracketSpacingAndFormat src fields (range: range) =
+let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
   if range.StartLine = range.EndLine && not (List.isEmpty fields) then
     match getFieldRange (List.head fields), getExprRange (List.last fields) with
     | Some fieldRange, Some exprRange ->
+      let fieldRange =
+        match (copyInfo: option<SynExpr * _>) with
+        | Some(expr, _) -> expr.Range
+        | _ -> fieldRange
       if fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
       then reportError src range "Wrong spacing inside brackets"
@@ -62,8 +66,12 @@ let checkBracketSpacingAndFormat src fields (range: range) =
   elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
     match getFieldRange (List.head fields), getExprRange (List.last fields) with
     | Some fieldRange, Some exprRange ->
+      let fieldRange =
+        match (copyInfo: option<SynExpr * _>) with
+        | Some(expr, _) -> expr.Range
+        | _ -> fieldRange
       if fieldRange.StartLine <> range.StartLine
-        || exprRange.StartLine <> range.EndLine
+        || exprRange.EndLine <> range.EndLine
       then reportError src range "Bracket should inline with record field."
       elif fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
@@ -119,8 +127,8 @@ let checkSeparatorSpacing src fields =
 
 /// Checks the format of record constructors.
 /// Ensures that the record fields conform to formatting conventions.
-let checkConstructor src (fields: list<SynExprRecordField>) range =
-  checkBracketSpacingAndFormat src fields range
+let checkConstructor src copyInfo (fields: list<SynExprRecordField>) range =
+  checkBracketSpacingAndFormat src copyInfo fields range
   checkOperatorSpacing src fields
   checkSeparatorSpacing src fields
 

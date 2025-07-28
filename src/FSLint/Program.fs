@@ -32,13 +32,15 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
     checkPattern src case isArg trivia lhs
     checkPattern src case isArg trivia rhs
-  | SynPat.LongIdent(lid, extraId, _, SynArgPats.Pats args, _, range) as pat ->
+  | SynPat.LongIdent(lid, extraId, typarDecls, SynArgPats.Pats args,
+                     _, range) as pat ->
     let SynLongIdent(id = lid; dotRanges = dotRanges; trivia = idTrivia) = lid
     let name = (List.last lid).idText
     let case = if not (List.isEmpty args) && isArg then PascalCase else case
     IdentifierConvention.check src case true name range
     if trivia.LeadingKeyword.IsStaticMember then
-      ClassMemberConvention.checkStaticMemberSpacing src lid args idTrivia
+      ClassMemberConvention.checkStaticMemberSpacing src lid typarDecls
+        args idTrivia
     else
       ClassMemberConvention.checkMemberSpacing src lid extraId
         dotRanges args
@@ -194,8 +196,10 @@ and checkExpression src = function
     checkExpression src valueExpr
   | SynExpr.DotLambda(expr = expr) ->
     checkExpression src expr
-  | SynExpr.Record(recordFields = recordFields; range = range) ->
-    RecordConvention.checkConstructor src recordFields range
+  | SynExpr.Record(copyInfo = copyInfo
+                   recordFields = recordFields
+                   range = range) ->
+    RecordConvention.checkConstructor src copyInfo recordFields range
     for recordField in recordFields do
       let SynExprRecordField(expr = expr) = recordField
       if expr.IsSome then checkExpression src expr.Value

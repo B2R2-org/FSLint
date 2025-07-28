@@ -122,7 +122,7 @@ let ensureFuncSpacing src (funcRange: range) (argRange: range) =
 let checkAssignSpacing src (subFuncRange: range) (subArgRange: range) argRange =
   if subFuncRange.StartColumn <> subArgRange.EndColumn + 1
     || subFuncRange.EndColumn <> (argRange: range).StartColumn - 1
-  then reportError src subFuncRange "Contains invalid whitespace"
+  then reportError src subFuncRange "Need a single space around eqaul operator."
   else ()
 
 /// Check proper spacing in infix applications.

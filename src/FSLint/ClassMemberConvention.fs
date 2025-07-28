@@ -122,6 +122,15 @@ let rec findSelfIdentifierInApp src patIdent acc = function
     findSelfIdentifierInApp src patIdent acc expr3
   | SynExpr.Tuple(exprs = exprs) ->
     exprs |> List.exists (findSelfIdentifierInApp src patIdent acc)
+  | SynExpr.MatchLambda(matchClauses = matchClauses) ->
+    matchClauses
+    |> List.exists (fun (SynMatchClause(whenExpr = whenExpr
+                                        resultExpr = resultExpr)) ->
+      findSelfIdentifierInApp src patIdent acc resultExpr ||
+      if whenExpr.IsSome then
+        findSelfIdentifierInApp src patIdent acc whenExpr.Value
+      else false
+    )
   | SynExpr.Match(expr = expr; clauses = clauses) ->
     clauses
     |> List.exists (fun (SynMatchClause(whenExpr = whenExpr

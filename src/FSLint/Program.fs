@@ -271,7 +271,8 @@ and checkTypeDefnSimpleRepr src trivia = function
       checkIdOpt src PascalCase idOpt
   | SynTypeDefnSimpleRepr.Exception repr ->
     checkExceptionDefnRepr src repr
-  | SynTypeDefnSimpleRepr.TypeAbbrev _
+  | SynTypeDefnSimpleRepr.TypeAbbrev(rhsType = rhsType) ->
+    GenericArgumentConvention.checkTypeAbbrev src rhsType
   | SynTypeDefnSimpleRepr.None _ ->
     () (* no need to check this *)
   | repr ->

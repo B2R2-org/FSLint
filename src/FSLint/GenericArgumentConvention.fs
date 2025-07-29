@@ -45,10 +45,13 @@ let checkBracketSpacing src typeArgsRange edgeRange =
   else ()
 
 let subStringBetweenTypeArg (src: ISourceText) frontType (endType: range) =
-  (Position.mkPos (frontType: range).StartLine frontType.EndColumn,
-  Position.mkPos frontType.StartLine endType.StartColumn)
-  ||> Range.mkRange ""
-  |> src.GetSubTextFromRange
+  if (frontType: range).StartLine = endType.StartLine then
+    let startPos = Position.mkPos frontType.StartLine frontType.EndColumn
+    let endPos = Position.mkPos endType.StartLine endType.StartColumn
+    let range = Range.mkRange "" startPos endPos
+    src.GetSubTextFromRange range
+  else
+    ""
 
 /// Checks whether the spacing between elements in the given type argument list
 /// is formatted correctly, distinguishing between ',' and '*' separators.
@@ -60,7 +63,8 @@ let checkTypeElementSpacing src typeArgs =
     (endIsNormal, endType: range)) ->
     if frontIsNormal && endIsNormal then
       let subStr = subStringBetweenTypeArg src frontType endType
-      if subStr.Length <> 2 then
+      if subStr = "" then () (* TODO: MultiLine *)
+      elif subStr.Length <> 2 then
         reportError src frontType "Need single space between type."
       elif subStr.EndsWith "," then
         reportError src frontType "No space allowed before comma"
@@ -88,6 +92,45 @@ let checkTypeAppParenSpacing src = function
         else ()
       else () (* This handle Type Reference convention *)
     | _ -> ()
+  | _ -> ()
+
+let checkTypeAbbrev src (rhsType: SynType) =
+  match rhsType with
+  | SynType.App(lessRange = lessRange
+                typeArgs = typeArgs
+                greaterRange = greaterRange) ->
+    let innerRange = collectRangeOfFirstAndLastType typeArgs
+    match lessRange, greaterRange with
+    | Some lessRange, None ->
+      if innerRange.StartColumn <> lessRange.EndColumn then
+        reportError src lessRange "Contains invalid whitespace"
+      else ()
+    | None, Some greaterRange ->
+      if innerRange.EndColumn <> greaterRange.StartColumn then
+        reportError src greaterRange "Contains invalid whitespace"
+      else ()
+    | Some lessRange, Some greaterRange ->
+      let range = Range.unionRanges lessRange greaterRange
+      checkBracketSpacing src range innerRange
+    | _ -> ()
+    typeArgs
+    |> List.iter (fun typeArg ->
+      match typeArg with
+      | SynType.LongIdent(SynLongIdent(id = id)) ->
+        if id.Length < 2 then
+          ()
+        else
+          id
+          |> List.map (_.idRange)  // member access shorthand
+          |> List.pairwise
+          |> List.iter (fun (front, back) ->
+            if front.EndColumn + 1 <> back.StartColumn then
+              reportError src back "Contains invalid whitespace"
+            else ()
+          )
+      | _ -> ()
+    )
+    checkTypeElementSpacing src typeArgs
   | _ -> ()
 
 let check src expr (typeArgs: SynType list) typeArgsRange =

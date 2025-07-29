@@ -58,6 +58,9 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     for pat in pats do checkPattern src case isArg trivia pat
   | SynPat.OptionalVal(ident = id) ->
     IdentifierConvention.check src LowerCamelCase true id.idText id.idRange
+  | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat) ->
+    checkPattern src case isArg trivia lhsPat
+    checkPattern src case isArg trivia rhsPat
   | pat ->
     failwith $"{nameof checkPattern} TODO: {pat}"
 
@@ -248,8 +251,9 @@ and checkMemberDefns src members =
       checkIdOpt src PascalCase idOpt
     | SynMemberDefn.AutoProperty(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
+    | SynMemberDefn.ImplicitInherit(inheritArgs = inheritArgs) ->
+      checkExpression src inheritArgs
     | SynMemberDefn.ImplicitCtor _
-    | SynMemberDefn.ImplicitInherit _
     | SynMemberDefn.Inherit _ ->
       () (* no need to check this *)
     | _ ->

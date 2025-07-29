@@ -6,9 +6,6 @@ open FSharp.Compiler.Text
 let reportPascalCaseError src range =
   reportError src range "No space between ident and paren"
 
-let reportLowerCaseError src range =
-  reportError src range "Need single space between ident and paren"
-
 let getActualEndColumn (src: ISourceText) (idRange: range) (ctorRange: range) =
   if idRange.EndLine <> ctorRange.StartLine then
     idRange.EndColumn

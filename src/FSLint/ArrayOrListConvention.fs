@@ -175,6 +175,7 @@ let rec checkSingleLine src = function
   | SynExpr.Paren _
   | SynExpr.Tuple _
   | SynExpr.IfThenElse _
+  | SynExpr.Record _
   | SynExpr.LongIdent _ -> () (* No need to check string here *)
   | expr -> warn $"[checkSingleLine]TODO: {expr}"
 

@@ -46,7 +46,7 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
           else ()
         elif (extraId: Ident Option).IsSome then
           if extraId.Value.idRange.EndColumn <> range.StartColumn then
-            reportLowerCaseError src extraId.Value.idRange
+            reportPascalCaseError src extraId.Value.idRange
           else ()
         elif isPascalCase lastId.idText
           && lastId.idRange.EndColumn <> range.StartColumn
@@ -101,6 +101,7 @@ let rec findSelfIdentifierInApp src patIdent acc = function
     when not id.IsEmpty && id.Head.idText = patIdent -> true
   | SynExpr.For(ident = ident) when ident.idText = patIdent -> true
   | SynExpr.Ident(ident = ident) when ident.idText = patIdent -> true
+  | SynExpr.LongIdentSet(expr = expr)
   | SynExpr.Typed(expr = expr)
   | SynExpr.Assert(expr = expr)
   | SynExpr.Paren(expr = expr)
@@ -135,6 +136,7 @@ let rec findSelfIdentifierInApp src patIdent acc = function
         findSelfIdentifierInApp src patIdent acc whenExpr.Value
       else false
     )
+  | SynExpr.TryWith(tryExpr = expr; withCases = clauses)
   | SynExpr.Match(expr = expr; clauses = clauses) ->
     clauses
     |> List.exists (fun (SynMatchClause(whenExpr = whenExpr
@@ -166,6 +168,13 @@ let rec findSelfIdentifierInApp src patIdent acc = function
     if elseExpr.IsSome then
       findSelfIdentifierInApp src patIdent acc elseExpr.Value
     else false
+  | SynExpr.Record(recordFields = recordFields) ->
+    recordFields
+    |> List.exists (fun field ->
+      let SynExprRecordField(expr = expr) = field
+      if expr.IsSome then findSelfIdentifierInApp src patIdent acc expr.Value
+      else acc
+    )
   | _ -> acc
 
 let checkSelfIdentifierUsage src pat body =

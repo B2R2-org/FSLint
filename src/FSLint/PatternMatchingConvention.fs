@@ -12,6 +12,7 @@ let private reportBarAndMatchError src range =
 
 let private reportArrowError src range =
   reportError src range "Need a single space around arrow."
+
 let rec private collectRecordEdgeRange acc = function
   | SynPat.Named(range = range)
   | SynPat.LongIdent(range = range) ->
@@ -225,6 +226,7 @@ let rec checkBody (src: ISourceText) = function
     checkBody src pat
   | SynPat.Tuple(elementPats = elementPats) ->
     elementPats |> List.iter (checkBody src)
+  | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat)
   | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->
     checkBody src lhsPat
     checkBody src rhsPat
@@ -253,6 +255,22 @@ let checkPatternSpacing src clauses =
     check src pat outerTrivia.BarRange
   )
 
+let private getActualEndColumn (src: ISourceText) (patRange: range) arrowRange =
+  try
+    let lastPat =
+      src.GetSubTextFromRange(patRange).Split('\n') |> Array.last
+    let line =
+      src.GetLineString((arrowRange: range).StartLine - 1)
+        .Substring(lastPat.IndexOf(lastPat[0]), arrowRange.StartColumn - 1)
+    if line.Contains("(*") && line.Contains("*)")
+      && not (patRange.StartColumn > line.IndexOf("*)"))
+    then
+      line.IndexOf("*)") + 2
+    else
+      patRange.EndColumn
+  with
+  | _ -> patRange.EndColumn
+
 /// Checks for missing or extra spaces around '->' in match cases.
 let checkArrowSpacing src clauses =
   clauses
@@ -264,13 +282,14 @@ let checkArrowSpacing src clauses =
     | Some arrowRange ->
       let leftRange =
         if whenExpr.IsSome then whenExpr.Value.Range else pat.Range
+      let effectiveEndColumn = getActualEndColumn src leftRange arrowRange
       if leftRange.EndLine = arrowRange.StartLine
-        && leftRange.EndColumn + 1 <> arrowRange.StartColumn then
-          reportArrowError src arrowRange
+        && effectiveEndColumn + 1 <> arrowRange.StartColumn then
+        reportArrowError src arrowRange
       else ()
       if arrowRange.StartLine = resultExpr.Range.StartLine
         && arrowRange.EndColumn + 1 <> resultExpr.Range.StartColumn then
-          reportArrowError src resultExpr.Range
+        reportArrowError src resultExpr.Range
       else ()
     | None -> ()
   )

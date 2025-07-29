@@ -90,7 +90,9 @@ let rec checkOperatorSpacing src = function
     | Some fieldRange, Some equalRange, Some exprRange ->
       if fieldRange.EndColumn + 1 <> equalRange.StartColumn
         || equalRange.EndColumn + 1 <> exprRange.Range.StartColumn
-      then reportError src fieldRange "Need single space around '='"
+        && fieldRange.StartLine = exprRange.Range.StartLine
+      then
+        reportError src fieldRange "Need single space around '='"
       else ()
     | _ -> ()
     checkOperatorSpacing src rest

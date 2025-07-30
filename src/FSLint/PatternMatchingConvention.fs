@@ -255,42 +255,19 @@ let checkPatternSpacing src clauses =
     check src pat outerTrivia.BarRange
   )
 
-let private getActualEndColumn (src: ISourceText) (patRange: range) arrowRange =
-  try
-    let lastPat =
-      src.GetSubTextFromRange(patRange).Split('\n') |> Array.last
-    let line =
-      src.GetLineString((arrowRange: range).StartLine - 1)
-        .Substring(lastPat.IndexOf(lastPat[0]), arrowRange.StartColumn - 1)
-    if line.Contains("(*") && line.Contains("*)")
-      && not (patRange.StartColumn > line.IndexOf("*)"))
-    then
-      line.IndexOf("*)") + 2
-    else
-      patRange.EndColumn
-  with
-  | _ -> patRange.EndColumn
+let private checkArrowBySrc (src: ISourceText) arrowRange isInline =
+  let checker = if isInline then " -> " else " ->"
+  let line = src.GetLineString((arrowRange: range).StartLine - 1)
+  if line.Contains checker then () else reportArrowError src arrowRange
 
 /// Checks for missing or extra spaces around '->' in match cases.
 let checkArrowSpacing src clauses =
   clauses
-  |> List.iter (fun (SynMatchClause(pat = pat
-                                    whenExpr = whenExpr
-                                    resultExpr = resultExpr
-                                    trivia = trivia)) ->
+  |> List.iter (fun (SynMatchClause(resultExpr = expr; trivia = trivia)) ->
     match trivia.ArrowRange with
     | Some arrowRange ->
-      let leftRange =
-        if whenExpr.IsSome then whenExpr.Value.Range else pat.Range
-      let effectiveEndColumn = getActualEndColumn src leftRange arrowRange
-      if leftRange.EndLine = arrowRange.StartLine
-        && effectiveEndColumn + 1 <> arrowRange.StartColumn then
-        reportArrowError src arrowRange
-      else ()
-      if arrowRange.StartLine = resultExpr.Range.StartLine
-        && arrowRange.EndColumn + 1 <> resultExpr.Range.StartColumn then
-        reportArrowError src resultExpr.Range
-      else ()
+      checkArrowBySrc src arrowRange
+        (arrowRange.StartLine = expr.Range.StartLine)
     | None -> ()
   )
 

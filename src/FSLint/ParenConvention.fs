@@ -12,14 +12,24 @@ let checkEmptySpacing src (range: range) =
 
 /// Checks proper spacing inside brackets for paren.
 /// Ensures single space after opening and before closing brackets.
-let checkBracketSpacing src (exprRange: range) (range: range) =
+let checkBracketSpacing (src: ISourceText) (exprRange: range) (range: range) =
   if exprRange.StartLine <> range.StartLine
     || exprRange.EndLine <> range.EndLine
-  then ()
-  elif exprRange.StartColumn - 1 <> range.StartColumn
-    || exprRange.EndColumn + 1 <> range.EndColumn
-  then reportError src range "Contains invalid whitespace"
-  else ()
+  then
+    ()
+  else
+    (src.GetSubTextFromRange range).Split '\n'
+    |> fun subStr ->
+      if subStr.Length = 1 then
+        if subStr[0].StartsWith "( " || subStr[0].EndsWith " )" then
+          reportError src range "Contains invalid whitespace"
+        else ()
+      else
+        if (Array.head subStr).StartsWith "( "
+          || ((Array.last subStr).EndsWith " )"
+          && (Array.last subStr).TrimStart() <> ")") then
+          reportError src range "Contains invalid whitespace"
+        else ()
 
 let rec check src = function
   | SynExpr.Paren(expr = expr; range = range) ->

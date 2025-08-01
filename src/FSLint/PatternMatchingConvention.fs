@@ -180,12 +180,16 @@ let rec checkBody (src: ISourceText) = function
         reportError src range "Contains Invalid Whitespace"
       else ()
     else
-      elementPats
-      |> List.map (fun pat -> pat.Range)
-      |> List.reduce Range.unionRanges
+      let totalRange =
+        elementPats
+        |> List.map (fun pat -> pat.Range)
+        |> List.reduce Range.unionRanges
+      totalRange
       |> ArrayOrListConvention.checkCommon src isArray range
-      collectElemAndOptionalSeparatorRanges src elementPats
-      |> ArrayOrListConvention.checkElementSpacing src
+      if totalRange.StartLine <> totalRange.EndLine then ()
+      else
+        collectElemAndOptionalSeparatorRanges src elementPats
+        |> ArrayOrListConvention.checkElementSpacing src
       elementPats |> List.iter (checkBody src)
   | SynPat.ListCons(lhsPat = lhsPat; rhsPat = rhsPat; trivia = triv) ->
     checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange

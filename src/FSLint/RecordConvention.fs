@@ -8,6 +8,10 @@ let private getFieldRange (SynExprRecordField(fieldName = fieldName)) =
   match fst fieldName with
   | SynLongIdent(id = id) -> Some id.Head.idRange
 
+let private getFieldLastRange (SynExprRecordField(fieldName = fieldName)) =
+  match fst fieldName with
+  | SynLongIdent(id = id) -> Some <| (List.last id).idRange
+
 let private getExprRange (SynExprRecordField(expr = expr)) =
   expr |> Option.map (fun e -> e.Range)
 
@@ -86,7 +90,7 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
 let rec checkOperatorSpacing src = function
   | field :: rest ->
     let SynExprRecordField(equalsRange = equalsRange; expr = expr) = field
-    match getFieldRange field, equalsRange, expr with
+    match getFieldLastRange field, equalsRange, expr with
     | Some fieldRange, Some equalRange, Some exprRange ->
       if fieldRange.EndColumn + 1 <> equalRange.StartColumn
         || equalRange.EndColumn + 1 <> exprRange.Range.StartColumn

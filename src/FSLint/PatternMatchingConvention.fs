@@ -301,7 +301,6 @@ let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
     )
   )
 
-let checkFormat src expr clauses trivia =
-  checkBarIsSameColWithMatch src clauses trivia
+let checkFormat src clauses =
   checkPatternSpacing src clauses
   checkArrowSpacing src clauses

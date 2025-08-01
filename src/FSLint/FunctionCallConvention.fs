@@ -40,7 +40,8 @@ let private checkSpacingOrNot (src: ISourceText) (range: range) =
       | str when str.Length >= 2 &&
                  str[0] = ' ' &&
                  not (isSymbolOrPunctuation str[1]) &&
-                 str <> " wi" (* This is using in pattern matching *) ->
+                 str <> " wi" (* This is using in pattern matching *) &&
+                 str <> " th"  ->
         false
       | _ -> true
   with | _ ->

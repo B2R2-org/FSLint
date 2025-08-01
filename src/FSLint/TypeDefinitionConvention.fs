@@ -29,21 +29,18 @@ let checkIdentifierWithParen (src: ISourceText) (lid: LongIdent) members =
     match memberDefn with
     | SynMemberDefn.ImplicitCtor(accessibility = accessibility
                                  ctorArgs = ctorArgs) ->
-      let idRange =
-        match accessibility with
-        | Some(SynAccess.Internal idRange)
-        | Some(SynAccess.Public idRange)
-        | Some(SynAccess.Private idRange)
-          when idRange.EndLine = ctorArgs.Range.EndLine ->
-            idRange
-        | _ -> (List.last lid).idRange
-      let effectiveEndColumn = getActualEndColumn src idRange ctorArgs.Range
-      if idRange.EndLine <> ctorArgs.Range.StartLine then
-        ()
-      elif effectiveEndColumn <> ctorArgs.Range.StartColumn then
-        reportPascalCaseError src ctorArgs.Range
-      else
-        ()
+      match accessibility with
+      | Some(SynAccess.Internal idRange)
+      | Some(SynAccess.Public idRange)
+      | Some(SynAccess.Private idRange) ->
+        if idRange.EndColumn <> ctorArgs.Range.StartColumn then
+          reportPascalCaseError src ctorArgs.Range
+        else ()
+      | _ when (List.last lid).idRange.EndLine = ctorArgs.Range.StartLine
+        && (getActualEndColumn src (List.last lid).idRange ctorArgs.Range
+        <> ctorArgs.Range.StartColumn) ->
+            reportPascalCaseError src ctorArgs.Range
+      | _ -> ()
     | SynMemberDefn.ImplicitInherit(inheritType = inheritType
                                     inheritArgs = inheritArgs) ->
       if inheritType.Range.EndColumn <> inheritArgs.Range.StartColumn then

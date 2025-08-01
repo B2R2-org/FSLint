@@ -108,9 +108,11 @@ and checkExpression src = function
     checkExpression src enumExpr
     checkExpression src bodyExpr
   | SynExpr.Do(expr = expr)
-  | SynExpr.For(doBody = expr)
-  | SynExpr.While(doExpr = expr) ->
+  | SynExpr.For(doBody = expr) ->
     checkExpression src expr
+  | SynExpr.While(whileExpr = whileExpr; doExpr = doExpr) ->
+    checkExpression src whileExpr
+    checkExpression src doExpr
   | SynExpr.IfThenElse(ifExpr = ifExpr
                        thenExpr = thenExpr
                        elseExpr = elseExpr) ->
@@ -119,9 +121,13 @@ and checkExpression src = function
     if Option.isSome elseExpr then
       checkExpression src (Option.get elseExpr)
     else ()
+  | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
+    checkExpression src expr
+    PatternMatchingConvention.checkFormat src clauses
   | SynExpr.Match(expr = expr; clauses = clauses; trivia = trivia) ->
     checkExpression src expr
-    PatternMatchingConvention.checkFormat src expr clauses trivia
+    PatternMatchingConvention.checkBarIsSameColWithMatch src clauses trivia
+    PatternMatchingConvention.checkFormat src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.MatchLambda(matchClauses = clauses) ->
     for clause in clauses do checkMatchClause src clause
@@ -207,6 +213,8 @@ and checkExpression src = function
       let SynExprRecordField(expr = expr) = recordField
       if expr.IsSome then checkExpression src expr.Value
       else ()
+  | SynExpr.Lazy (expr = expr) ->
+    checkExpression src expr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.DotIndexedGet _
@@ -215,7 +223,6 @@ and checkExpression src = function
   | SynExpr.Ident _
   | SynExpr.IndexRange _
   | SynExpr.InterpolatedString _
-  | SynExpr.Lazy _
   | SynExpr.LongIdent _
   | SynExpr.NamedIndexedPropertySet _
   | SynExpr.Null _
@@ -301,11 +308,16 @@ and checkTypeDefn src defn =
   let SynTypeDefn(typeInfo = info
                   typeRepr = repr
                   members = members
+                  implicitConstructor = implicitConstructor
                   trivia = trivia) = defn
   let SynComponentInfo(longId = lid; range = range; attributes = attrs) = info
   let name = (List.last lid).idText
   if hasAttr "Measure" attrs then ()
   else IdentifierConvention.check src PascalCase true name range
+  if implicitConstructor.IsSome then
+    [ implicitConstructor.Value ]
+    |> TypeDefinition.checkIdentifierWithParen src lid
+  else ()
   checkTypeDefnRepr src lid repr trivia
   checkMemberDefns src members
 

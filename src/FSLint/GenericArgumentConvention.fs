@@ -44,34 +44,30 @@ let checkBracketSpacing src typeArgsRange edgeRange =
   then reportError src edgeRange "Contains invalid whitespace"
   else ()
 
-let subStringBetweenTypeArg (src: ISourceText) frontType (endType: range) =
-  if (frontType: range).StartLine = endType.StartLine then
-    let startPos = Position.mkPos frontType.StartLine frontType.EndColumn
-    let endPos = Position.mkPos endType.StartLine endType.StartColumn
-    let range = Range.mkRange "" startPos endPos
-    src.GetSubTextFromRange range
-  else
-    ""
-
 /// Checks whether the spacing between elements in the given type argument list
 /// is formatted correctly, distinguishing between ',' and '*' separators.
-let checkTypeElementSpacing src typeArgs =
+let checkTypeElementSpacing (src: ISourceText) (typeArgs: SynType list) =
   typeArgs
-  |> collectTypeArgsRange
-  |> List.pairwise
-  |> List.iter (fun ((frontIsNormal, frontType: range),
-    (endIsNormal, endType: range)) ->
-    if frontIsNormal && endIsNormal then
-      let subStr = subStringBetweenTypeArg src frontType endType
-      if subStr = "" then () (* TODO: MultiLine *)
-      elif subStr.Length <> 2 then
-        reportError src frontType "Need single space between type."
-      elif subStr.EndsWith "," then
-        reportError src frontType "No space allowed before comma"
-      else ()
+  |> List.map (fun typeArg -> typeArg.Range)
+  |> List.iter (fun typeRange ->
+    let typeStr = src.GetSubTextFromRange typeRange
+    if typeStr.Contains '*' then
+      let star = typeStr.Split '*'
+      if (Array.head star).EndsWith " " && (Array.last star).StartsWith " " then
+        ()
+      else
+        reportError src typeRange "Need single space between type."
     else
-      if endType.StartColumn - 1 <> frontType.EndColumn then
-        reportError src frontType "Need single space between type."
+      let typeStr = src.GetLineString(typeRange.StartLine - 1)
+      if typeStr.IndexOf ',' <> -1
+        && typeStr.IndexOf ',' + 1 <> typeStr.Length then
+        let comma = typeStr.Split ','
+        if (Array.last comma)[0] = ' ' && (Array.last comma)[1] <> ' ' then ()
+        else reportError src typeRange "Need single space between type."
+        if (Array.head comma).EndsWith " " then
+          reportError src typeRange "No space allowed before comma."
+        else
+          ()
       else ()
   )
 
@@ -121,7 +117,7 @@ let checkTypeAbbrev src (rhsType: SynType) =
           ()
         else
           id
-          |> List.map (_.idRange)  // member access shorthand
+          |> List.map (_.idRange)
           |> List.pairwise
           |> List.iter (fun (front, back) ->
             if front.EndColumn + 1 <> back.StartColumn then

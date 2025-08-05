@@ -3,47 +3,36 @@ module B2R2.FSLint.TypeAnnotation
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
-let [<Literal>] private ColonSpace = 2
-
-let [<Literal>] private Dot = 1
-
 let private reportTypeError src range =
-  let message = "Type annotation does not follow the convention."
-  reportError src range message
+  reportError src range "Type annotation does not follow the convention."
 
 let private checkColonSpace src (patRange: range) typeLen (range: range) =
-  if range.EndColumn <> patRange.EndColumn + ColonSpace + typeLen then
+  if range.EndColumn <> patRange.EndColumn + typeLen + 2 then
     reportTypeError src range
   else
     let pat = src.GetSubTextFromRange range
     let colon = pat.Substring(patRange.EndColumn - patRange.StartColumn, 1)
     if colon <> ":" then reportTypeError src range else ()
 
-let check src pat typ range =
-  let patRange =
-    match pat with
-    | SynPat.Named(range = patRange) -> patRange
-    | SynPat.Wild(range = patRange) -> patRange
-    | _ -> failwith $"Invalid Pattern: {pat}"
-  match typ with
+let check src (pat: SynPat) range = function
   | SynType.LongIdent(SynLongIdent([ id ], _, _)) ->
-    checkColonSpace src patRange id.idText.Length range
+    checkColonSpace src pat.Range id.idText.Length range
   | SynType.LongIdent(SynLongIdent([ id1; id2 ], _, _)) ->
-    let typeLen = id1.idText.Length + Dot + id2.idText.Length
-    checkColonSpace src patRange typeLen range
+    let typeLen = id1.idText.Length + id2.idText.Length + 1
+    checkColonSpace src pat.Range typeLen range
   | SynType.App(_, _, _, _, _, _, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src patRange typeLen range
+    checkColonSpace src pat.Range typeLen range
   | SynType.Array(_, _, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src patRange typeLen range
+    checkColonSpace src pat.Range typeLen range
   | SynType.Var(_, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src patRange typeLen range
+    checkColonSpace src pat.Range typeLen range
   | SynType.Fun(_, _, typRange, _) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src patRange typeLen range
+    checkColonSpace src pat.Range typeLen range
   | SynType.HashConstraint(_, typRange) ->
     let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src patRange typeLen range
-  | _ -> warn $"TODO: [Type Annotation] {typ}"
+    checkColonSpace src pat.Range typeLen range
+  | typ -> warn $"TODO: [Type Annotation] {typ}"

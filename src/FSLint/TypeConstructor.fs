@@ -12,10 +12,12 @@ let checkConstructorSpacing src targetType = function
       if FunctionCallConvention.isPascalCase id.idText then
         if id.idRange.EndColumn <> range.StartColumn then
           reportError src range "Contains invalid whitespace"
-        else ()
+        else
+          ()
       elif id.idRange.EndColumn + 1 <> range.StartColumn then
         reportError src range "Contains invalid whitespace"
-      else ()
+      else
+        ()
     | SynType.Var _ as typ -> warn $"[Constructor]TODO: {typ}"
     | SynType.LongIdent(longDotId = SynLongIdent(id = id)) ->
       let id = List.last id

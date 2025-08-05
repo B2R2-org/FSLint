@@ -5,7 +5,7 @@ open FSharp.Compiler.Syntax
 
 /// Checks if there is a required space around '=' in assignment patterns.
 /// Used to enforce spacing conventions in pattern assignments.
-let checkNamePatParis src (longIdents: list<Ident * option<range> * SynPat>) =
+let checkNamePatPairs src (longIdents: list<Ident * option<range> * SynPat>) =
   longIdents
   |> List.iter (fun longIdent ->
     let ident, symbolRange, lastPat = longIdent

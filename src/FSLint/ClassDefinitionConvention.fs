@@ -1,4 +1,4 @@
-module B2R2.FSLint.TypeDefinition
+module B2R2.FSLint.ClassDefinition
 
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text
@@ -59,31 +59,3 @@ let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
     else
       ()
   )
-
-/// Checks whether discriminated union cases in the given type definitions
-/// are separated by newlines, enforcing a convention for formatting DU cases.
-let checkSimpleRepr (src: ISourceText) typeDefns =
-  typeDefns
-  |> List.iter (fun typeDefn ->
-    match typeDefn with
-    | SynTypeDefn(typeRepr = SynTypeDefnRepr.Simple(simpleRepr = simpleRepr)) ->
-      match simpleRepr with
-      | SynTypeDefnSimpleRepr.Record(range = range)
-      | SynTypeDefnSimpleRepr.Enum(range = range)
-      | SynTypeDefnSimpleRepr.Union(range = range) ->
-        for idx in range.StartLine - 1 .. range.EndLine - 1 do
-          if src.GetLineString idx = "" then
-            reportError src range "Remove empty line in type."
-      | _ -> ()
-    | _ -> ()
-  )
-
-let rec check src = function
-  | SynModuleDecl.NestedModule(decls = decls) ->
-    for decl in decls do check src decl
-  | SynModuleDecl.Types(typeDefns, range) when typeDefns.Length > 1 ->
-    checkNestedTypeDefns src range typeDefns
-  | SynModuleDecl.Types(typeDefns, _) ->
-    checkSimpleRepr src typeDefns
-  | _ ->
-    ()

@@ -90,7 +90,8 @@ let checkRecordFuncSpacing src = function
         | [ SynPat.Paren(range = range) ] ->
           if (List.last id).idRange.EndColumn <> range.StartColumn then
             reportError src range "No space between ident and paren"
-          else ()
+          else
+            ()
         | _ -> ()
       | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
                          argPats = SynArgPats.Pats pats) ->
@@ -98,7 +99,8 @@ let checkRecordFuncSpacing src = function
         | [ SynPat.Paren(range = range) ] ->
           if (List.last id).idRange.EndColumn + 1 <> range.StartColumn then
             reportError src range "Need single space between ident and paren"
-          else ()
+          else
+            ()
         | _ -> ()
       | _ -> ()
     )
@@ -149,12 +151,11 @@ let checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
         )
     | _ -> ()
 
-let rec checkRecordPattern src (idRange: range) = function
+let rec checkRecordInPattern src (idRange: range) = function
   | [ field: SynPat ] ->
     match field with
     | SynPat.Paren(pat = pat) ->
-      if pat.IsRecord then
-        checkRecordPattern src idRange [ pat ]
+      if pat.IsRecord then checkRecordInPattern src idRange [ pat ]
       else ()
     | _ ->
       match collectRecordEdgeRange [] field with
@@ -162,8 +163,7 @@ let rec checkRecordPattern src (idRange: range) = function
         Range.unionRanges startRange endRange
         |> checkRecordBracketSpacing src range
       | _ -> ()
-      if not field.IsParen && (idRange.EndColumn + 1
-        <> field.Range.StartColumn)
+      if not field.IsParen && (idRange.EndColumn + 1 <> field.Range.StartColumn)
       then reportError src field.Range "Only need a single space"
       else ()
       checkRecordFuncSpacing src field
@@ -172,69 +172,26 @@ let rec checkRecordPattern src (idRange: range) = function
   | _ :: _ -> warn $"[RecordPattern]TODO: Various Args"
   | [] -> ()
 
-let rec checkBody (src: ISourceText) = function
-  | SynPat.ArrayOrList(isArray, elementPats, range) ->
-    if elementPats.IsEmpty then
-      let enclosureWidth = if isArray then 4 else 2
-      if range.EndColumn - range.StartColumn <> enclosureWidth then
-        reportError src range "Contains Invalid Whitespace"
-      else ()
-    else
-      let totalRange =
-        elementPats
-        |> List.map (fun pat -> pat.Range)
-        |> List.reduce Range.unionRanges
-      totalRange
-      |> ArrayOrListConvention.checkCommon src isArray range
-      if totalRange.StartLine <> totalRange.EndLine then ()
-      else
-        collectElemAndOptionalSeparatorRanges src elementPats
-        |> ArrayOrListConvention.checkElementSpacing src
-      elementPats |> List.iter (checkBody src)
-  | SynPat.ListCons(lhsPat = lhsPat; rhsPat = rhsPat; trivia = triv) ->
-    checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange
-    checkBody src lhsPat
-    checkBody src rhsPat
-  | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
-                     typarDecls = typarDecls
-                     argPats = argPats) ->
-    match id with
-    | [ qualifier; method ]
-      when FunctionCallConvention.isPascalCase method.idText
-        && qualifier.idText <> "_" && qualifier.idText <> "this" ->
-      checkFuncSpacing src typarDecls method.idRange argPats
-    | [ id ]
-      when FunctionCallConvention.isPascalCase id.idText
-        && not argPats.Patterns.IsEmpty
-        && argPats.Patterns.Head.IsRecord ->
-      checkRecordPattern src id.idRange argPats.Patterns
-    | [ id ]
-      when FunctionCallConvention.isPascalCase id.idText
-      && not argPats.Patterns.IsEmpty
-      && argPats.Patterns.Head.IsParen ->
+and checkLongIdentPatternCase src typarDecls argPats = function
+  | [ qualifier; method: Ident ]
+    when FunctionCallConvention.isPascalCase method.idText &&
+         qualifier.idText <> "_" && qualifier.idText <> "this" ->
+    checkFuncSpacing src typarDecls method.idRange argPats
+  | [ id ] when FunctionCallConvention.isPascalCase id.idText &&
+                not argPats.Patterns.IsEmpty ->
+    if argPats.Patterns.Head.IsRecord then
+      checkRecordInPattern src id.idRange argPats.Patterns
+    elif argPats.Patterns.Head.IsParen then
       match argPats.Patterns.Head with
-      | SynPat.Record _ -> checkRecordPattern src id.idRange argPats.Patterns
+      | SynPat.Record _ -> checkRecordInPattern src id.idRange argPats.Patterns
       | _ -> checkFuncSpacing src typarDecls id.idRange argPats
-    | [ id ]
-      when id.idText = "new" && argPats.Patterns.Head.IsParen
-        && id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
-      reportError src argPats.Patterns.Head.Range "Contains invalid whitespace."
-    | _ -> ()
-    match argPats with
-    | SynArgPats.Pats(pats = pats) ->
-      pats |> List.iter (checkBody src)
-    | SynArgPats.NamePatPairs(pats = pats) ->
-      pats |> List.unzip3 |> fun (_, _, pats) ->
-        pats |> List.iter (checkBody src)
-  | SynPat.Paren(pat = pat) ->
-    checkBody src pat
-  | SynPat.Tuple(elementPats = elementPats) ->
-    elementPats |> List.iter (checkBody src)
-  | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat)
-  | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->
-    checkBody src lhsPat
-    checkBody src rhsPat
-  | _ -> () (* no need to check this *)
+    else
+      ()
+  | [ id ]
+    when id.idText = "new" && argPats.Patterns.Head.IsParen &&
+         id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
+    reportError src argPats.Patterns.Head.Range "Contains invalid whitespace."
+  | _ -> ()
 
 /// checks pattern cases with incorrect spacing or newlines.
 let checkPatternSpacing src clauses =
@@ -304,3 +261,50 @@ let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
 let checkFormat src clauses =
   checkPatternSpacing src clauses
   checkArrowSpacing src clauses
+
+let rec checkBody (src: ISourceText) = function
+  | SynPat.ArrayOrList(isArray, elementPats, range) ->
+    checkArrayOrList src isArray elementPats range
+  | SynPat.ListCons(lhsPat = lhsPat; rhsPat = rhsPat; trivia = triv) ->
+    checkConsOperatorSpacing src lhsPat.Range rhsPat.Range triv.ColonColonRange
+    checkBody src lhsPat
+    checkBody src rhsPat
+  | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
+                     typarDecls = typarDecls
+                     argPats = argPats) ->
+    checkLongIdentPatternCase src typarDecls argPats id
+    match argPats with
+    | SynArgPats.Pats(pats = pats) ->
+      pats |> List.iter (checkBody src)
+    | SynArgPats.NamePatPairs(pats = pats) ->
+      pats
+      |> List.unzip3 |> fun (_, _, pats) -> pats |> List.iter (checkBody src)
+  | SynPat.Paren(pat = pat) ->
+    checkBody src pat
+  | SynPat.Tuple(elementPats = elementPats) ->
+    elementPats |> List.iter (checkBody src)
+  | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat)
+  | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->
+    checkBody src lhsPat
+    checkBody src rhsPat
+  | _ -> () (* no need to check this *)
+
+and checkArrayOrList src isArray (elementPats: SynPat list) (range: range) =
+  if elementPats.IsEmpty then
+    let enclosureWidth = if isArray then 4 else 2
+    if range.EndColumn - range.StartColumn <> enclosureWidth then
+      reportError src range "Contains Invalid Whitespace"
+    else
+      ()
+  else
+    let totalRange =
+      elementPats
+      |> List.map (fun pat -> pat.Range)
+      |> List.reduce Range.unionRanges
+    ArrayOrListConvention.checkCommon src isArray range totalRange
+    if totalRange.StartLine = totalRange.EndLine then
+      collectElemAndOptionalSeparatorRanges src elementPats
+      |> ArrayOrListConvention.checkElementSpacing src
+    else
+      ()
+    elementPats |> List.iter (checkBody src)

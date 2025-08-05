@@ -36,7 +36,8 @@ let checkOpeningBracketPosition src (range: range) (trivia: SynTypeDefnTrivia) =
   if trivia.EqualsRange.IsSome && range.StartLine <> range.EndLine then
     if trivia.EqualsRange.Value.StartLine = range.StartLine then
       reportError src range "Opening Bracket not inline with equal operator"
-    else ()
+    else
+      ()
   else ()
 
 let checkFieldIsInlineWithBracket src (range: range) fields =
@@ -82,7 +83,8 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
       then reportError src range "Wrong spacing inside brackets"
       else ()
     | _ -> ()
-  else ()
+  else
+    ()
 
 /// Checks spacing around '=' operator in the given source code.
 /// Recursively analyzes the source for proper operator spacing.
@@ -92,42 +94,45 @@ let rec checkOperatorSpacing src = function
     let SynExprRecordField(equalsRange = equalsRange; expr = expr) = field
     match getFieldLastRange field, equalsRange, expr with
     | Some fieldRange, Some equalRange, Some exprRange ->
-      if fieldRange.EndColumn + 1 <> equalRange.StartColumn
-        || equalRange.EndColumn + 1 <> exprRange.Range.StartColumn
-        && fieldRange.StartLine = exprRange.Range.StartLine
+      if fieldRange.EndColumn + 1 <> equalRange.StartColumn ||
+        equalRange.EndColumn + 1 <> exprRange.Range.StartColumn &&
+        fieldRange.StartLine = exprRange.Range.StartLine
       then
         reportError src fieldRange "Need single space around '='"
-      else ()
-    | _ -> ()
-    checkOperatorSpacing src rest
+      else
+        checkOperatorSpacing src rest
+    | _ -> checkOperatorSpacing src rest
   | [] -> ()
 
+let collectFieldsInfo fields =
+  fields
+  |> List.choose (fun field ->
+    let SynExprRecordField(fieldName = fieldName; expr = expr
+                           blockSeparator = blockSeparator) = field
+    let SynLongIdent(id = id), _ = fieldName
+    if expr.IsSome then
+      Some(id.Head.idRange, expr.Value.Range, blockSeparator)
+    else
+      None
+  )
+
 let checkSeparatorSpacing src fields =
-  let infos =
-    fields
-    |> List.choose (fun field ->
-      let SynExprRecordField(fieldName = fieldName
-                             expr = expr
-                             blockSeparator = blockSeparator) = field
-      let SynLongIdent(id = id), _ = fieldName
-      if expr.IsSome then
-        Some(id.Head.idRange, expr.Value.Range, blockSeparator)
-      else
-        None
-    )
-  infos
+  collectFieldsInfo fields
   |> List.iteri (fun i (_, exprRange, separatorInfo) ->
     match separatorInfo with
     | Some(separatorRange, Some _) ->
       if exprRange.EndColumn < separatorRange.StartColumn then
         reportError src exprRange "No space before semicolon"
-      elif i < infos.Length - 1 then
-        let fieldRange, _, _ = infos[i + 1]
+      elif i < (collectFieldsInfo fields).Length - 1 then
+        let fieldRange, _, _ = (collectFieldsInfo fields)[i + 1]
         let spaceAfterSemicolon =
           fieldRange.StartColumn - separatorRange.EndColumn
         if spaceAfterSemicolon <> 1 then
           reportError src separatorRange "Need single space after separator."
-      else ()
+        else
+          ()
+      else
+        ()
     | _ -> ()
   )
 

@@ -5,6 +5,7 @@ open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
+open type IdentifierConvention.CaseStyle
 
 let parseFile txt (path: string) =
   let checker = FSharpChecker.Create()
@@ -28,7 +29,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     IdentifierConvention.check src case true id.idText range
   | SynPat.Typed(pat = pat; targetType = typ; range = range) ->
     checkPattern src case isArg trivia pat
-    TypeAnnotation.check src pat typ range
+    TypeAnnotation.check src pat range typ
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
     checkPattern src case isArg trivia lhs
     checkPattern src case isArg trivia rhs
@@ -51,7 +52,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     let SynLongIdent(id = lid) = lid
     let name = (List.last lid).idText
     IdentifierConvention.check src PascalCase true name range
-    AssignmentConvention.checkNamePatParis src pat
+    AssignmentConvention.checkNamePatPairs src pat
   | SynPat.Paren(pat = pat) ->
     checkPattern src case isArg trivia pat
   | SynPat.Tuple(elementPats = pats) ->
@@ -78,7 +79,7 @@ and checkMatchClause (src: ISourceText) clause =
   match pat with
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
-    AssignmentConvention.checkNamePatParis src pats
+    AssignmentConvention.checkNamePatPairs src pats
   | _ -> ()
   if whenExpr.IsSome then
     FunctionCallConvention.checkMethodParenSpacing src whenExpr.Value
@@ -159,7 +160,7 @@ and checkExpression src = function
     | SynExpr.App(flag = ExprAtomicFlag.Atomic), _, true ->
       IndexedPropertyConvention.check src expr
     | _ ->
-      GenericArgumentConvention.checkTypeAppParenSpacing src expr
+      TypeUseConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix flag funcExpr argExpr
       checkExpression src funcExpr
@@ -185,7 +186,7 @@ and checkExpression src = function
   | SynExpr.TypeApp(expr = expr
                     typeArgs = typeArgs
                     typeArgsRange = typeArgsRange) ->
-    GenericArgumentConvention.check src expr typeArgs typeArgsRange
+    TypeUseConvention.check src expr typeArgs typeArgsRange
     checkExpression src expr
   | SynExpr.ObjExpr(bindings = bindings; members = members) ->
     checkBindings src LowerCamelCase bindings
@@ -283,7 +284,7 @@ and checkTypeDefnSimpleRepr src trivia = function
   | SynTypeDefnSimpleRepr.Exception repr ->
     checkExceptionDefnRepr src repr
   | SynTypeDefnSimpleRepr.TypeAbbrev(rhsType = rhsType) ->
-    GenericArgumentConvention.checkTypeAbbrev src rhsType
+    TypeUseConvention.checkTypeAbbrev src rhsType
   | SynTypeDefnSimpleRepr.None _ ->
     () (* no need to check this *)
   | repr ->
@@ -297,7 +298,7 @@ and checkExceptionDefnRepr src repr =
 and checkTypeDefnRepr src lid repr trivia =
   match repr with
   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
-    TypeDefinition.checkIdentifierWithParen src members
+    ClassDefinition.checkIdentifierWithParen src members
     checkMemberDefns src members
   | SynTypeDefnRepr.Simple(repr, _) ->
     checkTypeDefnSimpleRepr src trivia repr
@@ -315,7 +316,7 @@ and checkTypeDefn src defn =
   if hasAttr "Measure" attrs then ()
   else IdentifierConvention.check src PascalCase true name range
   if implicitConstructor.IsSome then
-    TypeDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
+    ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
   else
     ()
   checkTypeDefnRepr src lid repr trivia
@@ -347,10 +348,8 @@ and checkBindings src case bindings =
     checkBinding src case binding
 
 and checkDeclarations src decls =
-  ModuleDeclarationConvention.check src decls
+  DeclarationConvention.check src decls
   for decl in decls do
-    FunctionBodyConvention.check src decl
-    TypeDefinition.check src decl
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
@@ -364,7 +363,13 @@ and checkDeclarations src decls =
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
       checkExpression src expr
-    | SynModuleDecl.Types(typeDefns, _range) ->
+    | SynModuleDecl.Types(typeDefns, range) when typeDefns.Length > 1 ->
+      ClassDefinition.checkNestedTypeDefns src range typeDefns
+    | SynModuleDecl.Types(typeDefns, range) ->
+      if typeDefns.Length > 1 then
+        ClassDefinition.checkNestedTypeDefns src range typeDefns
+      else
+        ()
       for typeDefn in typeDefns do checkTypeDefn src typeDefn
     | SynModuleDecl.Exception(SynExceptionDefn(exnRepr = repr), _) ->
       checkExceptionDefnRepr src repr

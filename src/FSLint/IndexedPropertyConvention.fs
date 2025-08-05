@@ -14,7 +14,8 @@ let checkBracketSpacing src (innerRange: range) (range: range) =
   if range.StartColumn + 1 <> innerRange.StartColumn
     || range.EndColumn - 1 <> innerRange.EndColumn then
     reportError src range "No space allowed in indexer"
-  else ()
+  else
+    ()
 
 let checkIndexRangeSpacing src = function
   | SynExpr.IndexRange(opm = opm; expr1 = expr1; expr2 = expr2) ->
@@ -34,8 +35,7 @@ let checkIndexRangeSpacing src = function
 /// Ensures no space between bracket and element in indexer expressions.
 let check src expr =
   collectBracketInfoInAppExpr expr
-  |> List.iter (fun computed ->
-    match computed with
+  |> List.iter (function
     | SynExpr.ArrayOrListComputed(expr = innerExpr; range = range) ->
       checkBracketSpacing src innerExpr.Range range
       checkIndexRangeSpacing src innerExpr

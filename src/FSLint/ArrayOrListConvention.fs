@@ -166,17 +166,17 @@ let rec checkSingleLine src = function
     checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _
-  | SynExpr.ForEach _
   | SynExpr.Upcast _
-  | SynExpr.App _
   | SynExpr.InterpolatedString _
-  | SynExpr.Const _
-  | SynExpr.Ident _
   | SynExpr.Paren _
   | SynExpr.Tuple _
   | SynExpr.IfThenElse _
   | SynExpr.Record _
-  | SynExpr.LongIdent _ -> () (* No need to check string here *)
+  | SynExpr.LongIdent _
+  | SynExpr.ForEach _
+  | SynExpr.Const _
+  | SynExpr.Ident _
+  | SynExpr.App _ -> () (* No need to check string here *)
   | expr -> warn $"[checkSingleLine]TODO: {expr}"
 
 let checkMultiLine src isArray range = function

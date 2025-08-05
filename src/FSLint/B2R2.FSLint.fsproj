@@ -38,6 +38,7 @@
     <Compile Include="AppConvention.fs" />
     <Compile Include="ClassMemberConvention.fs" />
     <Compile Include="TypeConstructor.fs" />
+    <Compile Include="ModuleDeclarationConvention.fs" />
     <Compile Include="FunctionBodyConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />

@@ -347,7 +347,7 @@ and checkBindings src case bindings =
     checkBinding src case binding
 
 and checkDeclarations src decls =
-  FunctionBodyConvention.checkTop src decls
+  ModuleDeclarationConvention.check src decls
   for decl in decls do
     FunctionBodyConvention.check src decl
     TypeDefinition.check src decl

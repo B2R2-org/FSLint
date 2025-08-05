@@ -58,9 +58,12 @@ let checkTypeElementSpacing (src: ISourceText) (typeArgs: SynType list) =
       else
         reportError src typeRange "Need single space between type."
     else
-      let typeStr = src.GetLineString(typeRange.StartLine - 1)
-      if typeStr.IndexOf ',' <> -1
-        && typeStr.IndexOf ',' + 1 <> typeStr.Length then
+      let typeStr =
+        let lineStr = src.GetLineString(typeRange.StartLine - 1)
+        if lineStr.EndsWith "," then
+          lineStr[0..lineStr.Length - 2]
+        else lineStr
+      if typeStr.IndexOf ',' <> -1 then
         let comma = typeStr.Split ','
         if (Array.last comma)[0] = ' ' && (Array.last comma)[1] <> ' ' then ()
         else reportError src typeRange "Need single space between type."
@@ -68,7 +71,8 @@ let checkTypeElementSpacing (src: ISourceText) (typeArgs: SynType list) =
           reportError src typeRange "No space allowed before comma."
         else
           ()
-      else ()
+      else
+        ()
   )
 
 /// Checks if there is an unwanted space before parentheses in type application,

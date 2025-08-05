@@ -6,24 +6,18 @@ open FSharp.Compiler.Text
 let reportPascalCaseError src range =
   reportError src range "No space between ident and paren"
 
-let getActualEndColumn (src: ISourceText) (idRange: range) (ctorRange: range) =
-  if idRange.EndLine <> ctorRange.StartLine then
-    idRange.EndColumn
-  else
-    try
-      let hasGenericArgu =
-        (Position.mkPos idRange.EndLine idRange.EndColumn,
-         Position.mkPos ctorRange.StartLine ctorRange.StartColumn)
-        ||> Range.mkRange ""
-        |> src.GetSubTextFromRange
-      if hasGenericArgu.Contains("<") && hasGenericArgu.Contains(">") then
-        idRange.EndColumn + hasGenericArgu.LastIndexOf('>') + 1
-      else
-        idRange.EndColumn
-    with _ ->
-      idRange.EndColumn
+let checkMultiLineIdentWithParen (src: ISourceText) (ctorRange: range) =
+  src.GetLineString(ctorRange.StartLine - 1)
+  |> fun str ->
+    if src.GetSubTextFromRange(ctorRange).TrimStart()[0] = str.TrimStart()[0]
+    then
+      ()
+    else
+      let subStr = str.Substring(ctorRange.StartColumn - 1, 2)
+      if subStr.StartsWith ' ' then reportPascalCaseError src ctorRange
+      else ()
 
-let checkIdentifierWithParen (src: ISourceText) (lid: LongIdent) members =
+let checkIdentifierWithParen (src: ISourceText) members =
   members
   |> List.iter (fun memberDefn ->
     match memberDefn with
@@ -36,11 +30,8 @@ let checkIdentifierWithParen (src: ISourceText) (lid: LongIdent) members =
         if idRange.EndColumn <> ctorArgs.Range.StartColumn then
           reportPascalCaseError src ctorArgs.Range
         else ()
-      | _ when (List.last lid).idRange.EndLine = ctorArgs.Range.StartLine
-        && (getActualEndColumn src (List.last lid).idRange ctorArgs.Range
-        <> ctorArgs.Range.StartColumn) ->
-            reportPascalCaseError src ctorArgs.Range
-      | _ -> ()
+      | _ ->
+        checkMultiLineIdentWithParen src ctorArgs.Range
     | SynMemberDefn.ImplicitInherit(inheritType = inheritType
                                     inheritArgs = inheritArgs) ->
       if inheritType.Range.EndColumn <> inheritArgs.Range.StartColumn then

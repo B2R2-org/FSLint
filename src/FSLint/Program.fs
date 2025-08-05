@@ -213,7 +213,7 @@ and checkExpression src = function
       let SynExprRecordField(expr = expr) = recordField
       if expr.IsSome then checkExpression src expr.Value
       else ()
-  | SynExpr.Lazy (expr = expr) ->
+  | SynExpr.Lazy(expr = expr) ->
     checkExpression src expr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
@@ -297,7 +297,7 @@ and checkExceptionDefnRepr src repr =
 and checkTypeDefnRepr src lid repr trivia =
   match repr with
   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
-    TypeDefinition.checkIdentifierWithParen src lid members
+    TypeDefinition.checkIdentifierWithParen src members
     checkMemberDefns src members
   | SynTypeDefnRepr.Simple(repr, _) ->
     checkTypeDefnSimpleRepr src trivia repr
@@ -315,9 +315,9 @@ and checkTypeDefn src defn =
   if hasAttr "Measure" attrs then ()
   else IdentifierConvention.check src PascalCase true name range
   if implicitConstructor.IsSome then
-    [ implicitConstructor.Value ]
-    |> TypeDefinition.checkIdentifierWithParen src lid
-  else ()
+    TypeDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
+  else
+    ()
   checkTypeDefnRepr src lid repr trivia
   checkMemberDefns src members
 
@@ -347,6 +347,7 @@ and checkBindings src case bindings =
     checkBinding src case binding
 
 and checkDeclarations src decls =
+  FunctionBodyConvention.checkTop src decls
   for decl in decls do
     FunctionBodyConvention.check src decl
     TypeDefinition.check src decl

@@ -4,6 +4,7 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
 let [<Literal>] private ColonSpace = 2
+
 let [<Literal>] private Dot = 1
 
 let private reportTypeError src range =

@@ -5,7 +5,7 @@ open B2R2.FSLint
 open B2R2.FSLint.Program
 
 [<TestClass>]
-type LineTests () =
+type LineTests() =
 
   let goodOnes = String.replicate 72 "1"
 
@@ -20,31 +20,27 @@ let x = {badOnes}
 """
 
   let goodTrailingWhiteSpaceTest = """
-type A () =
+type A() =
   member _.X = 42
 """
 
   let space = " "
 
   let badTrailingWhiteSpaceTest = $"""
-type A () ={space}
+type A() ={space}
   member _.X = 42
 """
 
   [<TestMethod>]
-  member _.``80 Line Test`` () =
-    linterForFs.Lint Constants.FakeFsPath goodLine80Test
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint Constants.FakeFsPath badLine80Test
+  member _.``80 Line Test``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodLine80Test)
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badLine80Test)
     ) |> ignore
 
   [<TestMethod>]
-  member _.``Trailing Whitespace Test`` () =
-    linterForFs.Lint
-      Constants.FakeFsPath
-      goodTrailingWhiteSpaceTest
-    Assert.ThrowsException<LintException> (fun () ->
-      linterForFs.Lint
-        Constants.FakeFsPath
-        badTrailingWhiteSpaceTest
+  member _.``Trailing Whitespace Test``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodTrailingWhiteSpaceTest)
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badTrailingWhiteSpaceTest)
     ) |> ignore

@@ -68,13 +68,15 @@ let adjustByComment src prevRange nextRange expect actual =
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise
-  |> List.iter (fun (prevDecl, nextDecl) ->
-    let expectedSpacing = calculateSpacingBetweenDecls (prevDecl, nextDecl)
-    let actualSpacing =
-      nextDecl.Range.StartLine - prevDecl.Range.EndLine
-      |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
-    if actualSpacing <> expectedSpacing then
-      reportError src nextDecl.Range "Wrong newLine appear."
+  |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
+    if not prevDecl.IsLet && not nextDecl.IsLet then ()
     else
-      ()
+      let expectedSpacing = calculateSpacingBetweenDecls (prevDecl, nextDecl)
+      let actualSpacing =
+        nextDecl.Range.StartLine - prevDecl.Range.EndLine
+        |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
+      if actualSpacing <> expectedSpacing then
+        reportError src nextDecl.Range "Wrong newLine appear."
+      else
+        ()
   )

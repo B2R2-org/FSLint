@@ -10,6 +10,24 @@ let collectScopedLetLines bindings =
     binding.RangeOfBindingWithoutRhs.StartLine - 1
   )
 
+let private countTripleQuotes (line: string) =
+  let rec count pos acc =
+    if pos <= line.Length - 3 then
+      if line.Substring(pos, 3) = "\"\"\"" then
+        count (pos + 3) (acc + 1)
+      else
+        count (pos + 1) acc
+    else
+      acc
+  count 0 0
+
+let private isInsideStringLiteral (src: ISourceText) (range: range) lineIdx =
+  let lines =
+    [ range.StartLine - 1 .. lineIdx ] |> List.map (src.GetLineString)
+  let totalTripleQuotes =
+    lines |> List.sumBy countTripleQuotes
+  totalTripleQuotes % 2 = 1
+
 let checkNested (src: ISourceText) range lineNums =
   for lineNum in lineNums do
     if src.GetLineString(lineNum - 1) <> "" then
@@ -21,7 +39,8 @@ let checkBlankLine (src: ISourceText) (range: range) lineNums =
     if List.contains (lineIdx + 1) lineNums then
       ()
     elif src.GetLineString lineIdx = "" then
-      reportError src range "Remove empty line in function body."
+      if isInsideStringLiteral src range lineIdx then ()
+      else reportError src range "Remove empty line in function body."
     else
       ()
 

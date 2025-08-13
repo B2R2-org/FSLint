@@ -1,5 +1,6 @@
 module B2R2.FSLint.RecordConvention
 
+open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
@@ -40,6 +41,22 @@ let checkOpeningBracketPosition src (range: range) (trivia: SynTypeDefnTrivia) =
       ()
   else ()
 
+let checkFieldCompFlag (src: ISourceText) (range: range) (innerRange: range) =
+  (Position.mkPos (innerRange.EndLine + 1) 0,
+   Position.mkPos range.EndLine 0)
+  ||> Range.mkRange ""
+  |> src.GetSubTextFromRange
+  |> fun subStr ->
+    subStr.Split([| '\n' |], StringSplitOptions.None)
+    |> fun strArr ->
+      let flagStartIsWrong =
+        (Array.head strArr).TrimStart().StartsWith "#if" |> not
+      let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
+      if flagEndIsWrong || flagStartIsWrong then
+        reportError src innerRange "Field not inline with bracket."
+      else
+        ()
+
 let checkFieldIsInlineWithBracket src (range: range) fields =
   fields
   |> List.map (fun (SynField(range = range)) -> range)
@@ -47,11 +64,31 @@ let checkFieldIsInlineWithBracket src (range: range) fields =
   |> fun innerRange ->
     if range.StartLine <> innerRange.StartLine
       || range.EndLine <> innerRange.EndLine
-    then reportError src innerRange "Field not inline with bracket."
+    then
+      try checkFieldCompFlag src range innerRange
+      with | _ -> reportError src innerRange "Field not inline with bracket."
     elif range.StartColumn + 2 <> innerRange.StartColumn
       || range.EndColumn - 2 <> innerRange.EndColumn
     then reportError src range "Wrong spacing inside brackets"
     else ()
+
+let checkBracketCompFlag src (fullRange: range) (fieldRange: range) exprRange =
+  if fullRange.StartLine <> fieldRange.StartLine then
+    reportError src fieldRange "Opening Bracket not inline with equal operator"
+  elif (exprRange: range).EndLine <> fullRange.EndLine then
+    (Position.mkPos (exprRange.EndLine + 1) 0,
+     Position.mkPos fullRange.EndLine 0)
+    ||> Range.mkRange ""
+    |> src.GetSubTextFromRange
+    |> fun subStr ->
+      let strArr = subStr.Split([| '\n' |], StringSplitOptions.None)
+      let flagStartWrong =
+        (Array.head strArr).TrimStart().StartsWith "#if" |> not
+      let flagEndWrong = Array.last strArr |> String.IsNullOrEmpty |> not
+      if flagStartWrong && flagEndWrong then
+        reportError src fullRange "Bracket should inline with record field."
+      else
+        ()
 
 /// Checks for correct spacing and formatting in record field assignments,
 /// ensuring the format `{ field = expr }` is used instead of `{field = expr}`.
@@ -77,7 +114,11 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         | _ -> fieldRange
       if fieldRange.StartLine <> range.StartLine
         || exprRange.EndLine <> range.EndLine
-      then reportError src range "Bracket should inline with record field."
+      then
+        try
+          checkBracketCompFlag src range fieldRange exprRange
+        with | _ ->
+          reportError src exprRange "Bracket should inline with record field."
       elif fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
       then reportError src range "Wrong spacing inside brackets"

@@ -1,5 +1,6 @@
 module B2R2.FSLint.ArrayOrListConvention
 
+open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
@@ -37,6 +38,24 @@ let checkElementSpacing src (elemAndSepRanges: Range list) =
       reportError src separatorRange "Exactly 1 space required after separator"
     else ()
 
+let checkBracketCompFlag (src: ISourceText) (elemRange: range) (range: range) =
+  let added =
+    if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then 2
+    else 1
+  (Position.mkPos (elemRange.EndLine + added) 0,
+    Position.mkPos range.EndLine 0)
+  ||> Range.mkRange ""
+  |> src.GetSubTextFromRange
+  |> fun subStr ->
+    subStr.Split([| '\n' |], StringSplitOptions.None)
+    |> fun strArr ->
+      let flagStartIsWrong =
+        (Array.head strArr).TrimStart().StartsWith "#if" |> not
+      let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
+      if flagEndIsWrong || flagStartIsWrong then
+        reportBracketSpacingError src range
+      else ()
+
 /// Checks proper spacing inside brackets for list/array literals.
 /// Ensures single space after opening and before closing brackets.
 let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
@@ -45,7 +64,8 @@ let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
   let isStartBracketSpacingIncorrect =
     range.StartColumn + distFstElemToOpenBracket <> elemRange.StartColumn
   if isStartBracketSpacingIncorrect || isEndBracketSpacingIncorrect then
-    reportBracketSpacingError src range
+    try checkBracketCompFlag src elemRange range
+    with | _ -> reportBracketSpacingError src range
   else ()
 
 /// Checks proper spacing around range operator (..) in list/array literals.
@@ -97,6 +117,26 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
     else ()
   )
 
+let checkEdgeCompFlag (src: ISourceText) (elemRange: range) (range: range) =
+  let added =
+    if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then
+      2
+    else
+      1
+  (Position.mkPos (elemRange.EndLine + added) 0,
+    Position.mkPos range.EndLine 0)
+  ||> Range.mkRange ""
+  |> src.GetSubTextFromRange
+  |> fun subStr ->
+    subStr.Split([| '\n' |], StringSplitOptions.None)
+    |> fun strArr ->
+      let flagStartIsWrong =
+        (Array.head strArr).TrimStart().StartsWith "#if" |> not
+      let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
+      if flagEndIsWrong || flagStartIsWrong then
+        reportError src elemRange "Bracket-edge element must be inline"
+      else ()
+
 /// Checks proper bracket-element alignment in multi-line list/array literals.
 let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
@@ -109,7 +149,8 @@ let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
     if (elemRange.StartLine <> range.StartLine
       && not isOnlyCommentInlineWithBracket)
       || endLineOfElem <> range.EndLine then
-      reportError src elemRange "Bracket-edge element must be inline"
+      try checkEdgeCompFlag src elemRange range
+      with | _ -> reportError src elemRange "BracketEdge element must be inline"
     else ()
 
 /// In single-line, the last element must not be followed by a semicolon.

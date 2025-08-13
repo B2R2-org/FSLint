@@ -34,8 +34,7 @@ let private checkSpacingOrNot (src: ISourceText) (range: range) =
         (Position.mkPos range.EndLine (range.EndColumn + 3))
     let str = src.GetSubTextFromRange createThreeRangeAfterEndCol
     str.Length >= 2 && str[0] = ' ' && not (isSymbolOrPunctuation str[1]) &&
-    str <> " wi" && str <> " th" (* Heuristic: 'with' / 'then' detection *)
-    |> not
+    str = " wi" || str = " th" (* Heuristic: 'with' / 'then' detection *)
   with
   | _ -> true
 

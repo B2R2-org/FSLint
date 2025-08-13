@@ -25,11 +25,18 @@ let countLeadingDocComments lines startIdx =
     trimmed.StartsWith "///")
   |> Array.length
 
-let calculateSpacingBetweenDecls = function
-  | SynModuleDecl.Exception _, SynModuleDecl.Exception _
-  | SynModuleDecl.Attributes _, SynModuleDecl.Expr _
-  | SynModuleDecl.Open _, SynModuleDecl.Open _ -> 1
-  | _ -> 2
+let calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
+  let normalCase =
+    match prevDecl, nextDecl with
+    | SynModuleDecl.Attributes _, _
+    | SynModuleDecl.Open _, SynModuleDecl.Open _ -> 1
+    | _ -> 2
+  let lastLineStr = src.GetLineString(prevDecl.Range.EndLine - 1)
+  if lastLineStr.TrimStart().StartsWith "[<"
+    && lastLineStr.TrimStart().EndsWith ">]"
+    && normalCase = 2
+  then normalCase - 1
+  else normalCase
 
 /// Determines line breaks between declarations based on their types.
 /// Skips validation if compiler directives are present.
@@ -68,10 +75,9 @@ let adjustByComment src prevRange nextRange expect actual =
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise
-  |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
-    if not prevDecl.IsLet && not nextDecl.IsLet then ()
-    else
-      let expectedSpacing = calculateSpacingBetweenDecls (prevDecl, nextDecl)
+  |> List.iter (fun ((prevDecl: SynModuleDecl), nextDecl) ->
+    if prevDecl.IsLet && nextDecl.IsLet then
+      let expectedSpacing = calculateSpacingBetweenDecls src prevDecl nextDecl
       let actualSpacing =
         nextDecl.Range.StartLine - prevDecl.Range.EndLine
         |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
@@ -79,4 +85,6 @@ let check (src: ISourceText) decls =
         reportError src nextDecl.Range "Wrong newLine appear."
       else
         ()
+    else
+      ()
   )

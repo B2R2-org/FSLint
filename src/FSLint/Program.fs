@@ -109,6 +109,7 @@ and checkExpression src = function
     checkExpression src enumExpr
     checkExpression src bodyExpr
   | SynExpr.Do(expr = expr)
+  | SynExpr.DoBang(expr = expr)
   | SynExpr.For(doBody = expr) ->
     checkExpression src expr
   | SynExpr.While(whileExpr = whileExpr; doExpr = doExpr) ->
@@ -363,8 +364,6 @@ and checkDeclarations src decls =
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
       checkExpression src expr
-    | SynModuleDecl.Types(typeDefns, range) when typeDefns.Length > 1 ->
-      ClassDefinition.checkNestedTypeDefns src range typeDefns
     | SynModuleDecl.Types(typeDefns, range) ->
       if typeDefns.Length > 1 then
         ClassDefinition.checkNestedTypeDefns src range typeDefns

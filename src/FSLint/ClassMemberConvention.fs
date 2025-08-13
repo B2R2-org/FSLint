@@ -1,5 +1,6 @@
 module B2R2.FSLint.ClassMemberConvention
 
+open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
@@ -147,6 +148,11 @@ let rec findSelfIdentifierInApp src patIdent acc = function
         findSelfIdentifierInApp src patIdent acc whenExpr.Value
       else false
     )
+  | SynExpr.NamedIndexedPropertySet(longDotId = SynLongIdent(id = id)
+                                    expr1 = expr1; expr2 = expr2) ->
+    not id.IsEmpty && id.Head.idText = patIdent
+    || findSelfIdentifierInApp src patIdent acc expr1
+    || findSelfIdentifierInApp src patIdent acc expr2
   | SynExpr.InterpolatedString(contents = contents)
     when not contents.IsEmpty && contents.Head.IsString ->
       contents
@@ -177,7 +183,7 @@ let rec findSelfIdentifierInApp src patIdent acc = function
     )
   | _ -> acc
 
-let checkSelfIdentifierUsage src pat body =
+let checkSelfIdentifierUsage (src: ISourceText) pat body =
   match pat with
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty && id.Head.idText = "__" ->
@@ -186,5 +192,15 @@ let checkSelfIdentifierUsage src pat body =
     when not id.IsEmpty
       && (id.Head.idText = "this" || id.Head.idText = "self") ->
     if findSelfIdentifierInApp src id.Head.idText false body then ()
-    else reportError src id.Head.idRange "Remove unused self-identifier"
+    else
+      [ id.Head.idRange.StartLine .. src.GetLineCount() - 1 ]
+      |> List.map src.GetLineString
+      |> List.takeWhile (fun line ->
+        not (String.IsNullOrWhiteSpace(line.Trim())))
+      |> List.exists (fun (line: string) -> line.Contains "this.")
+      |> fun existCompFlag ->
+        if not existCompFlag then
+          reportError src id.Head.idRange "Remove unused self-identifier"
+        else
+          ()
   | _ -> ()

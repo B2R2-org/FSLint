@@ -45,10 +45,10 @@ let json = $$"""
 }
 """
 async {
-  use client = new HttpClient ()
-  use content = new StringContent (json, Encoding.UTF8, "application/json")
-  let! msg = client.PostAsync (Uri url, content) |> Async.AwaitTask
-  return! msg.Content.ReadAsStringAsync () |> Async.AwaitTask
+  use client = new HttpClient()
+  use content = new StringContent(json, Encoding.UTF8, "application/json")
+  let! msg = client.PostAsync(Uri url, content) |> Async.AwaitTask
+  return! msg.Content.ReadAsStringAsync() |> Async.AwaitTask
 }
 |> Async.RunSynchronously
 |> Console.WriteLine

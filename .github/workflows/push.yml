@@ -3,6 +3,8 @@ on: push
 jobs:
     notify-push-main:
         runs-on: ubuntu-latest
+        env:
+            COMMIT: "${{ github.event.head_commit.message }}"
         steps:
         - name: Main Branch Push
           run: |
@@ -10,13 +12,12 @@ jobs:
             echo "Pushing commit to main: ${{ github.event.head_commit.id }}"
             echo "Pushed by: ${{ github.event.pusher.name }}"
 
+        - uses: actions/checkout@v4
+
         - name: Setup .NET
           uses: actions/setup-dotnet@v4
           with:
             dotnet-version: 9.0.x
-
-        - name: Checking out
-          uses: actions/checkout@v4
 
         - name: Push Notification to Google Chat
           working-directory: .github

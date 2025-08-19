@@ -232,6 +232,19 @@ let checkArrowSpacing src clauses =
     | None -> ()
   )
 
+let checkParenTupleSpacing src (pats: SynPat list) =
+  pats
+  |> List.iter (fun pat ->
+    match pat with
+    | SynPat.Paren(pat = innerPat) ->
+      match innerPat with
+      | SynPat.Tuple(elementPats = elementPats; commaRanges = commaRanges) ->
+        TupleConvention.checkPat src elementPats commaRanges
+      | _ -> ()
+      ParenConvention.checkPat src pat
+    | _ -> ()
+  )
+
 /// Checks that '|' is vertically aligned with its 'match' keyword.
 let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
   let rec collectBarsFromPattern currentPat acc =

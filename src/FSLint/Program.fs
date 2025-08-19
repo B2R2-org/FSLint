@@ -83,6 +83,8 @@ and checkMatchClause (src: ISourceText) clause =
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
     AssignmentConvention.checkNamePatPairs src pats
+  | SynPat.LongIdent(argPats = SynArgPats.Pats pats) ->
+    PatternMatchingConvention.checkParenTupleSpacing src pats
   | _ -> ()
   if whenExpr.IsSome then
     FunctionCallConvention.checkMethodParenSpacing src whenExpr.Value

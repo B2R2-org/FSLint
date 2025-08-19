@@ -39,11 +39,12 @@ let rec checkExpr src = function
   | _ -> ()
 
 let rec checkPat src = function
-  | SynPat.Paren(pat, range) when pat.IsTyped ->
+  | SynPat.Paren(SynPat.Const(constant = SynConst.Unit), range) ->
+    checkEmptySpacing src range
+  | SynPat.Paren(pat, range) ->
     if range.StartColumn + 1 <> pat.Range.StartColumn
       || range.EndColumn - 1 <> pat.Range.EndColumn
     then reportError src range "Contains invalid whitespace"
     else ()
-  | SynPat.Paren(SynPat.Const(constant = SynConst.Unit), range) ->
-    checkEmptySpacing src range
-  | _ -> ()
+  | _ ->
+    ()

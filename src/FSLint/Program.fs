@@ -29,7 +29,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     IdentifierConvention.check src case true id.idText range
   | SynPat.Typed(pat = pat; targetType = typ; range = range) ->
     checkPattern src case isArg trivia pat
-    TypeAnnotation.check src pat range typ
+    TypeAnnotation.checkPat src pat range typ
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
     checkPattern src case isArg trivia lhs
     checkPattern src case isArg trivia rhs
@@ -53,7 +53,8 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     let name = (List.last lid).idText
     IdentifierConvention.check src PascalCase true name range
     AssignmentConvention.checkNamePatPairs src pat
-  | SynPat.Paren(pat = pat) ->
+  | SynPat.Paren(pat = pat) as synPat ->
+    ParenConvention.checkPat src synPat
     checkPattern src case isArg trivia pat
   | SynPat.Tuple(elementPats = pats) ->
     for pat in pats do checkPattern src case isArg trivia pat
@@ -68,7 +69,8 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
 and checkSimplePattern src case = function
   | SynSimplePat.Id(ident = id) ->
     IdentifierConvention.check src case true id.idText id.idRange
-  | SynSimplePat.Typed(pat = pat) ->
+  | SynSimplePat.Typed(pat = pat; targetType = targetType) ->
+    TypeAnnotation.checkFunction src pat targetType
     checkSimplePattern src case pat
   | pat ->
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
@@ -76,6 +78,7 @@ and checkSimplePattern src case = function
 and checkMatchClause (src: ISourceText) clause =
   let SynMatchClause(pat = pat; whenExpr = whenExpr; resultExpr = expr) = clause
   PatternMatchingConvention.checkBody src pat
+  TypeUseConvention.checkParamTypeSpacing src pat
   match pat with
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
@@ -89,7 +92,7 @@ and checkMatchClause (src: ISourceText) clause =
 
 and checkExpression src = function
   | SynExpr.Paren(expr = innerExpr) as expr ->
-    ParenConvention.check src expr
+    ParenConvention.checkExpr src expr
     checkExpression src innerExpr
   | SynExpr.Typed(expr = expr) ->
     checkExpression src expr
@@ -183,7 +186,7 @@ and checkExpression src = function
     TypeCastConvention.check src expr targetType
     checkExpression src expr
   | SynExpr.Const _ as expr ->
-    ParenConvention.check src expr
+    ParenConvention.checkExpr src expr
   | SynExpr.TypeApp(expr = expr
                     typeArgs = typeArgs
                     typeArgsRange = typeArgsRange) ->
@@ -251,15 +254,20 @@ and checkMemberDefns src members =
       if set.IsSome then checkBinding src PascalCase set.Value else ()
     | SynMemberDefn.LetBindings(bindings = bindings) ->
       checkBindings src LowerCamelCase bindings
-    | SynMemberDefn.AbstractSlot(slotSig = SynValSig(ident = id)) ->
+    | SynMemberDefn.AbstractSlot(slotSig = SynValSig(ident = id
+                                                     synType = synType)) ->
       let SynIdent(ident = id) = id
+      TypeAnnotation.checkAbstractSlot src id synType
+      TypeUseConvention.checkTypeAbbrevWithAnnotation src synType
       IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.Interface(members = Some members) ->
       checkMemberDefns src members
     | SynMemberDefn.ValField(SynField(idOpt = idOpt), _) ->
       checkIdOpt src PascalCase idOpt
-    | SynMemberDefn.AutoProperty(ident = id) ->
+    | SynMemberDefn.AutoProperty(ident = id; typeOpt = typ; synExpr = expr) ->
+      TypeAnnotation.checkMember src id typ
       IdentifierConvention.check src PascalCase true id.idText id.idRange
+      checkExpression src expr
     | SynMemberDefn.ImplicitInherit(inheritArgs = inheritArgs) ->
       checkExpression src inheritArgs
     | SynMemberDefn.ImplicitCtor _
@@ -270,6 +278,8 @@ and checkMemberDefns src members =
 
 and checkTypeDefnSimpleRepr src trivia = function
   | SynTypeDefnSimpleRepr.Union(unionCases = cases) ->
+    TypeAnnotation.checkUnionType src cases
+    TypeUseConvention.checkUnionType src cases
     for case in cases do
       let SynUnionCase(ident = SynIdent(ident = id); range = range) = case
       IdentifierConvention.check src PascalCase false id.idText range
@@ -278,14 +288,16 @@ and checkTypeDefnSimpleRepr src trivia = function
       let SynEnumCase(ident = SynIdent(ident = id); range = range) = case
       IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
+    TypeAnnotation.checkSynFields src fields
     RecordConvention.checkDefinition src fields range trivia
     for field in fields do
-      let SynField(idOpt = idOpt) = field
+      let SynField(idOpt = idOpt; fieldType = fieldType) = field
+      TypeUseConvention.checkTypeAbbrevWithAnnotation src fieldType
       checkIdOpt src PascalCase idOpt
   | SynTypeDefnSimpleRepr.Exception repr ->
     checkExceptionDefnRepr src repr
   | SynTypeDefnSimpleRepr.TypeAbbrev(rhsType = rhsType) ->
-    TypeUseConvention.checkTypeAbbrev src rhsType
+    TypeUseConvention.checkTypeAbbrevWithAnnotation src rhsType
   | SynTypeDefnSimpleRepr.None _ ->
     () (* no need to check this *)
   | repr ->
@@ -337,11 +349,16 @@ and checkBinding src case binding =
   let SynBinding(headPat = pat
                  expr = body
                  attributes = attrs
+                 returnInfo = returnInfo
                  trivia = trivia) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false trivia pat
+  DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
+  TypeUseConvention.checkParamTypeSpacing src pat
+  TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
   ClassMemberConvention.checkSelfIdentifierUsage src pat body
+  TypeUseConvention.checkExprAnnotation src body
   checkExpression src body
 
 and checkBindings src case bindings =

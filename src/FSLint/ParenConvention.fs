@@ -28,12 +28,22 @@ let checkBracketSpacing (src: ISourceText) (range: range) =
     else
       ()
 
-let rec check src = function
+let rec checkExpr src = function
   | SynExpr.Paren(expr = expr; range = range) ->
     if expr.Range.StartLine <> range.StartLine
       || expr.Range.EndLine <> range.EndLine
     then ()
     else checkBracketSpacing src range
   | SynExpr.Const(SynConst.Unit, range) ->
+    checkEmptySpacing src range
+  | _ -> ()
+
+let rec checkPat src = function
+  | SynPat.Paren(pat, range) when pat.IsTyped ->
+    if range.StartColumn + 1 <> pat.Range.StartColumn
+      || range.EndColumn - 1 <> pat.Range.EndColumn
+    then reportError src range "Contains invalid whitespace"
+    else ()
+  | SynPat.Paren(SynPat.Const(constant = SynConst.Unit), range) ->
     checkEmptySpacing src range
   | _ -> ()

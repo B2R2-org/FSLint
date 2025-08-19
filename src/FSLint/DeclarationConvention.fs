@@ -72,6 +72,31 @@ let adjustByComment src prevRange nextRange expect actual =
         actual - countLeadingDocComments lines startIdx
       | _ -> actual
 
+let checkEqualSpacing (src: ISourceText) (range: range option) =
+  if range.IsSome then
+    if src.GetLineString(range.Value.EndLine - 1).EndsWith "=" then
+      (Position.mkPos range.Value.EndLine (range.Value.StartColumn - 1),
+       range.Value.Start)
+      ||> Range.mkRange ""
+      |> src.GetSubTextFromRange
+      |> fun subStr ->
+        if subStr <> " " then
+          reportError src range.Value "Need space before '='."
+        else
+          ()
+    else
+      (Position.mkPos range.Value.EndLine (range.Value.StartColumn - 1),
+       Position.mkPos range.Value.EndLine (range.Value.EndColumn + 1))
+       ||> Range.mkRange ""
+       |> src.GetSubTextFromRange
+       |> fun subStr ->
+         if subStr <> " = " then
+           reportError src range.Value "Need space before and after '='."
+         else
+           ()
+  else
+    ()
+
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise

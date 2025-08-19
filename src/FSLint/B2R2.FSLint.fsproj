@@ -29,8 +29,8 @@
     <Compile Include="FunctionCallConvention.fs" />
     <Compile Include="TypeCastConvention.fs" />
     <Compile Include="ClassDefinitionConvention.fs" />
-    <Compile Include="TypeUseConvention.fs" />
     <Compile Include="TypeAnnotationConvention.fs" />
+    <Compile Include="TypeUseConvention.fs" />
     <Compile Include="IndexedPropertyConvention.fs" />
     <Compile Include="ArrayOrListConvention.fs" />
     <Compile Include="RecordConvention.fs" />

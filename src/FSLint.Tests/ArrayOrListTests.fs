@@ -61,7 +61,7 @@ type ArrayOrListTests() =
 [ 1; 2; 3(* Bad *) ]
 """
 
-  let goodMultiLineBracketSpacingTest ="""
+  let goodMultiLineBracketSpacingTest = """
 [ 1
   2
   3 ]
@@ -73,7 +73,7 @@ type ArrayOrListTests() =
  3 ]
 """
 
-  let goodArrayMultiLineBracketSpacingTest ="""
+  let goodArrayMultiLineBracketSpacingTest = """
 [| 1
    2
    3 |]

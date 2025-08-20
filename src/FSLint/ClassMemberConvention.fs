@@ -111,6 +111,7 @@ let rec findSelfIdentifierInApp src patIdent acc = function
   | SynExpr.DotGet(expr = expr)
   | SynExpr.YieldOrReturn(expr = expr)
   | SynExpr.YieldOrReturnFrom(expr = expr)
+  | SynExpr.ComputationExpr(expr = expr)
   | SynExpr.ArrayOrListComputed(expr = expr) ->
     findSelfIdentifierInApp src patIdent acc expr
   | SynExpr.LetOrUseBang(rhs = expr1; body = expr2)

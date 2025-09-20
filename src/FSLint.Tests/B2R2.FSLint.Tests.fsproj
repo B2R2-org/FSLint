@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="ParallelPerfTests.fs" />
     <Compile Include="MSTestSettings.fs" />
     <Compile Include="Constants.fs" />
     <Compile Include="LineTests.fs" />

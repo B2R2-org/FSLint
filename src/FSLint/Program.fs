@@ -1,11 +1,15 @@
 module B2R2.FSLint.Program
 
+open System
 open System.IO
+open System.Text
+open System.Text.RegularExpressions
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open type IdentifierConvention.CaseStyle
+
 
 let parseFile txt (path: string) =
   let checker = FSharpChecker.Create()
@@ -438,15 +442,77 @@ let linterForProjSln =
       member _.Lint(_path, txt) =
         LineConvention.checkWindowsLineEndings txt }
 
+type LintOutcome =
+  { Index: int
+    Path: string
+    Ok: bool
+    Log: string }
+
+/// Collects all .fs source files under the given root directory
+let getFsFiles (root: string) =
+  let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape
+  let exclusion =
+    [| Regex $"obj{sep}Debug{sep}"
+       Regex $"obj{sep}Release{sep}"
+       Regex $"CFG.Tests" |]
+  Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
+  |> Seq.filter (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
+  |> Seq.sort
+  |> Seq.toArray
+
+/// Collects .fsproj and .sln project/solution files
+let getProjOrSlnFiles (root: string) =
+  seq {
+    yield! Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
+    yield! Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
+  }
+  |> Seq.sort
+  |> Seq.toArray
+
+/// Lints a single file, catching exceptions and returning a `LintOutcome`.
+let tryLintToBuffer (linter: ILintable) (index: int) (path: string) : LintOutcome =
+  let sb = StringBuilder()
+  let append (s: string) = sb.AppendLine(s) |> ignore
+  try
+    Console.WriteLine($"--- File: {path}")
+    append $"Linting file: {path}"
+    let bytes = File.ReadAllBytes path |> ensureNoBOM
+    let txt = System.Text.Encoding.UTF8.GetString bytes
+    linter.Lint(path, txt)
+    { Index = index; Path = path; Ok = true; Log = sb.ToString() }
+  with
+  | LintException msg ->
+      Console.WriteLine($"--- File: {path}")
+      append msg
+      { Index = index; Path = path; Ok = false; Log = sb.ToString() }
+
+/// Runs linting jobs in parallel for all given files
+let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
+  let jobs =
+    paths
+    |> Array.mapi (fun i p -> async { return tryLintToBuffer linter i p })
+  let results =
+    jobs
+    |> Async.Parallel
+    |> Async.RunSynchronously
+    |> Array.sortBy (fun r -> r.Index)
+
+  results |> Array.exists (fun r -> not r.Ok)
+
 [<EntryPoint>]
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
-    runLinter linterForFs args[0]
-    0
+    let outcome = tryLintToBuffer linterForFs 0 args[0]
+    if outcome.Ok then 0 else 1
   elif Directory.Exists args[0] then
-    runOnEveryProjectSlnFile args[0] (runLinter linterForProjSln)
-    runOnEveryFsFile args[0] (runLinter linterForFs)
-    System.Console.WriteLine "Linting completed."
-    0
-  else exitWithError $"File or directory '{args[0]}' not found"
+    let projOrSln = getProjOrSlnFiles args[0]
+    for p in projOrSln do
+      let bytes = File.ReadAllBytes p |> ensureNoBOM
+      let txt = System.Text.Encoding.UTF8.GetString bytes
+      linterForProjSln.Lint(p, txt)
+    let fsFiles = getFsFiles args[0]
+    let hasErrors = runParallelPreservingOrder linterForFs fsFiles
+    if hasErrors then 1 else 0
+  else
+    exitWithError $"File or directory '{args[0]}' not found"

@@ -1,6 +1,5 @@
 module B2R2.FSLint.Program
 
-
 open System
 open System.IO
 open System.Text
@@ -445,7 +444,7 @@ type LintOutcome =
     Ok: bool
     Log: string }
 
-// .fs 파일 수집
+/// Collects all .fs source files under the given root directory
 let getFsFiles (root: string) =
   let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape
   let exclusion =
@@ -457,7 +456,7 @@ let getFsFiles (root: string) =
   |> Seq.sort
   |> Seq.toArray
 
-// .fsproj / .sln 파일 수집
+/// Collects .fsproj and .sln project/solution files
 let getProjOrSlnFiles (root: string) =
   seq {
     yield! Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
@@ -466,11 +465,12 @@ let getProjOrSlnFiles (root: string) =
   |> Seq.sort
   |> Seq.toArray
 
-// 파일 린트 (예외를 잡아 Result처럼 반환)
+/// Lints a single file, catching exceptions and returning a `LintOutcome`.
 let tryLintToBuffer (linter: ILintable) (index: int) (path: string) : LintOutcome =
   let sb = StringBuilder()
   let append (s: string) = sb.AppendLine(s) |> ignore
   try
+    Console.WriteLine($"--- File: {path}")
     append $"Linting file: {path}"
     let bytes = File.ReadAllBytes path |> ensureNoBOM
     let txt = System.Text.Encoding.UTF8.GetString bytes
@@ -478,10 +478,11 @@ let tryLintToBuffer (linter: ILintable) (index: int) (path: string) : LintOutcom
     { Index = index; Path = path; Ok = true; Log = sb.ToString() }
   with
   | LintException msg ->
+      Console.WriteLine($"--- File: {path}")
       append msg
       { Index = index; Path = path; Ok = false; Log = sb.ToString() }
 
-// 병렬 실행 (Async 기반, 순서 보존 출력)
+/// Runs linting jobs in parallel for all given files
 let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
   let jobs =
     paths
@@ -501,17 +502,13 @@ let main args =
     let outcome = tryLintToBuffer linterForFs 0 args[0]
     if outcome.Ok then 0 else 1
   elif Directory.Exists args[0] then
-    // .fsproj / .sln 파일 검사 (직렬)
     let projOrSln = getProjOrSlnFiles args[0]
     for p in projOrSln do
       let bytes = File.ReadAllBytes p |> ensureNoBOM
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
-
-    // .fs 파일 검사 (병렬)
     let fsFiles = getFsFiles args[0]
     let hasErrors = runParallelPreservingOrder linterForFs fsFiles
-
     if hasErrors then 1 else 0
   else
     exitWithError $"File or directory '{args[0]}' not found"

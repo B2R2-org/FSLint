@@ -37,6 +37,10 @@ let check (txt: string) =
       Console.WriteLine line
       Console.WriteLine(String.replicate (line.Length - 1) " " + "^")
       raiseWithError $"Line {i + 1} contains trailing whitespace."
+    elif line.Contains("let") && line.Contains("\"\"\"") then
+      Console.WriteLine line
+      Console.WriteLine("      ^^^ triple quote with let")
+      raiseWithError $"Line {i + 1}: Triple outlet must not be in same line with let statement."
     else
       checkControlChar line
   )

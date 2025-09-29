@@ -244,7 +244,6 @@ and checkExpression src = function
   | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)
   | expr ->
-    printfn ">>> Unmatched expr: %A" expr
     failwith $"{nameof checkExpression} TODO: {expr}"
 
 and checkIdOpt src case = function

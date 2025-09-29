@@ -22,6 +22,7 @@
     <Compile Include="Constants.fs" />
     <Compile Include="LineTests.fs" />
     <Compile Include="TripleQuoteLetTests.fs" />
+    <Compile Include="DotGetTests.fs" />
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="ArgumentAssignmentTests.fs" />
     <Compile Include="TupleTests.fs" />

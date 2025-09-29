@@ -97,6 +97,27 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
   else
     ()
 
+let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
+  let SynBinding(expr = body; trivia = trivia) = binding
+  match trivia.EqualsRange with
+  | Some eqRange ->
+      let isStringConst =
+        match body with
+        | SynExpr.Const(SynConst.String _, _) -> true
+        | SynExpr.InterpolatedString(_, _, _) -> true
+        | _ -> false
+
+      if isStringConst && eqRange.StartLine = body.Range.StartLine then
+        let line = src.GetLineString(body.Range.StartLine - 1)
+        let s = body.Range.StartColumn
+        let startsWithTripleQuote =
+          s + 2 < line.Length &&
+          line.[s] = '"' && line.[s+1] = '"' && line.[s+2] = '"'
+        if startsWithTripleQuote then
+          reportError src body.Range
+            "Triple-quoted string must start on the next line after '='."
+  | None -> ()
+
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise

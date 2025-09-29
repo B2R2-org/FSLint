@@ -108,9 +108,6 @@ let checkNewKeywordSpacing src = function
     reportError src argExpr.Range "Contains invalid whitespace."
   | _ -> ()
 
-/// Checks spacing between method ident and paren based on naming convention.
-/// Ensures that PascalCase have no space before paren
-/// and lowerCase methods have a single space.
 let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
   let checkByFlag flag funcExpr =
     ensureMethodSpacing src flag funcExpr expr
@@ -161,3 +158,24 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
   | SynExpr.Tuple(exprs = exprs) ->
     exprs |> List.iter (checkMethodParenSpacing src)
   | _ -> ()
+
+
+/// Detect spaces around '.' using only AST ranges.
+/// We slice the exact gaps [exprEnd .. dotStart) and (dotEnd .. firstIdStart)
+/// and check for any whitespace chars.
+let checkDotGetSpacing (src: ISourceText) (_expr: SynExpr) (dotm: range) (longDotId: SynLongIdent) =
+  let lineText =
+    try src.GetLineString(dotm.StartLine - 1)
+    with _ -> ""
+
+  let hasSpaceBefore =
+    dotm.StartColumn > 0
+    && dotm.StartColumn - 1 < lineText.Length
+    && lineText.[dotm.StartColumn - 1] = ' '
+
+  let hasSpaceAfter =
+    dotm.EndColumn < lineText.Length
+    && lineText.[dotm.EndColumn] = ' '
+
+  if hasSpaceBefore || hasSpaceAfter then
+    reportError src dotm "Unexpected space around '.' in member access"

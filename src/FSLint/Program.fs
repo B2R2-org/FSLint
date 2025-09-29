@@ -181,8 +181,9 @@ and checkExpression src = function
   | SynExpr.DotSet(targetExpr = targetExpr; rhsExpr = rhsExpr) ->
     checkExpression src targetExpr
     checkExpression src rhsExpr
-  | SynExpr.DotGet(expr = expr) ->
+  | SynExpr.DotGet (expr, dotRange, longId, _fullRange) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
+    FunctionCallConvention.checkDotGetSpacing src expr dotRange longId
     checkExpression src expr
   | SynExpr.YieldOrReturn(expr = expr)
   | SynExpr.YieldOrReturnFrom(expr = expr) ->
@@ -243,6 +244,7 @@ and checkExpression src = function
   | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)
   | expr ->
+    printfn ">>> Unmatched expr: %A" expr
     failwith $"{nameof checkExpression} TODO: {expr}"
 
 and checkIdOpt src case = function
@@ -360,6 +362,7 @@ and checkBinding src case binding =
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false trivia pat
   DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
+  DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
   TypeUseConvention.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat

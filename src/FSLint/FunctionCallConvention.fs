@@ -159,23 +159,16 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
     exprs |> List.iter (checkMethodParenSpacing src)
   | _ -> ()
 
-
-/// Detect spaces around '.' using only AST ranges.
-/// We slice the exact gaps [exprEnd .. dotStart) and (dotEnd .. firstIdStart)
-/// and check for any whitespace chars.
-let checkDotGetSpacing (src: ISourceText) (_expr: SynExpr) (dotm: range) (longDotId: SynLongIdent) =
-  let lineText =
-    try src.GetLineString(dotm.StartLine - 1)
-    with _ -> ""
-
-  let hasSpaceBefore =
-    dotm.StartColumn > 0
-    && dotm.StartColumn - 1 < lineText.Length
-    && lineText.[dotm.StartColumn - 1] = ' '
-
-  let hasSpaceAfter =
-    dotm.EndColumn < lineText.Length
-    && lineText.[dotm.EndColumn] = ' '
-
-  if hasSpaceBefore || hasSpaceAfter then
-    reportError src dotm "Unexpected space around '.' in member access"
+let checkDotGetSpacing (_src: ISourceText) (expr: SynExpr) (dotm: range) (longDotId: SynLongIdent) =
+  if expr.Range.EndLine = dotm.StartLine then
+    if expr.Range.EndColumn <> dotm.StartColumn then
+      reportError _src dotm "Unexpected space before '.' in member access"
+  let firstIdOpt =
+    match longDotId with
+    | SynLongIdent(id = ids) -> ids |> List.tryHead
+  match firstIdOpt with
+  | Some firstId ->
+    if dotm.EndLine = firstId.idRange.StartLine then
+      if dotm.EndColumn <> firstId.idRange.StartColumn then
+        reportError _src dotm "Unexpected space after '.' in member access"
+  | None -> ()

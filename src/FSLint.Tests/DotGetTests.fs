@@ -7,35 +7,31 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type DotGetTests() =
 
-  // ✅ OK: dot 앞뒤에 공백 없음 (괄호로 LHS를 고정해서 DotGet을 안정적으로 생성)
   let goodDotGet = """
-module M =
-  type C() =
-    member _.Foo = 42
+type C() =
+  member _.Foo = 42
 
-  let test (c: C) =
-    let x = (c).Foo
-    x
+let test (c: C) =
+  let x = (c).Foo
+  x
 """
 
   let badDotGetBefore = """
-module M =
-  type C() =
-    member _.Foo = 42
+type C() =
+  member _.Foo = 42
 
-  let test (c: C) =
-    let x = (c) .Foo
-    x
+let test (c: C) =
+  let x = (c) .Foo   // space before dot
+  x
 """
 
   let badDotGetAfter = """
-module M =
-  type C() =
-    member _.Foo = 42
+type C() =
+  member _.Foo = 42
 
-  let test (c: C) =
-    let x = (c). Foo
-    x
+let test (c: C) =
+  let x = (c). Foo   // space after dot
+  x
 """
 
   [<TestMethod>]

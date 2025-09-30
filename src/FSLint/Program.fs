@@ -181,7 +181,7 @@ and checkExpression src = function
   | SynExpr.DotSet(targetExpr = targetExpr; rhsExpr = rhsExpr) ->
     checkExpression src targetExpr
     checkExpression src rhsExpr
-  | SynExpr.DotGet (expr, dotRange, longId, _fullRange) ->
+  | SynExpr.DotGet (expr, dotRange, longId, _) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
     FunctionCallConvention.checkDotGetSpacing src expr dotRange longId
     checkExpression src expr

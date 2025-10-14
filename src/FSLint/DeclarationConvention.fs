@@ -110,7 +110,6 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
     | _ -> ()
   | None -> ()
  
-
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise

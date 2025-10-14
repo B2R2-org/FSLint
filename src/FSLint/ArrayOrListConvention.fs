@@ -205,12 +205,20 @@ let rec checkSingleLine src = function
                        opm = opm
                        range2 = rangeOfSecondElement) ->
     checkRangeOpSpacing src exprOfFirstElement.Value rangeOfSecondElement opm
+  | SynExpr.Paren(expr = innerExpr) ->
+    checkSingleLine src innerExpr
+  | SynExpr.Tuple(exprs = exprs) ->
+    exprs |> List.iter (checkSingleLine src)
+  | SynExpr.DotGet(expr, dotm, longDotId, _) ->
+    FunctionCallConvention.checkDotGetSpacing src expr dotm longDotId
+    checkSingleLine src expr
+  | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
+    checkSingleLine src funcExpr
+    checkSingleLine src argExpr
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _
   | SynExpr.Upcast _
   | SynExpr.InterpolatedString _
-  | SynExpr.Paren _
-  | SynExpr.Tuple _
   | SynExpr.IfThenElse _
   | SynExpr.Record _
   | SynExpr.LongIdent _

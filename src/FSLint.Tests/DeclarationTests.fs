@@ -7,18 +7,21 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type DeclarationTests() =
 
-  let goodTopBindingSpacingTest = """
+  let goodTopBindingSpacingTest =
+    """
 let foo = 1
 
 let bar = 2
 """
 
-  let badTopBindingSpacingTest = """
+  let badTopBindingSpacingTest =
+    """
 let foo = 1
 let bar = 2
 """
 
-  let badTopBindingTooMuchSpacingTest = """
+  let badTopBindingTooMuchSpacingTest =
+    """
 let foo = 1
 
 

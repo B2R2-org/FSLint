@@ -7,33 +7,41 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type AppTests() =
 
-  let goodListSpaceInfixTest = """
+  let goodListSpaceInfixTest =
+    """
 [ this.Address + uint64 this.Length + this.Name ]
 """
 
-  let badListSpaceInfixTest = """
+  let badListSpaceInfixTest =
+    """
 [ this.Address +  uint64 this.Length + this.Name ]
 """
 
-  let goodListAppIndexerTest = """
+  let goodListAppIndexerTest =
+    """
 [ lifter.File.RawBytes[ptr.Offset] ]
 """
 
-  let badListAppIndexerTest = """
+  let badListAppIndexerTest =
+    """
 [ lifter.File.RawBytes[ ptr.Offset ] ]
 """
 
-  let goodListAppIndexerInRangeTest = """
+  let goodListAppIndexerInRangeTest =
+    """
 good[1..]
 """
 
-  let badListAppIndexerInRangeTest = """
+  let badListAppIndexerInRangeTest =
+    """
 bad[ 1.. ]
 """
 
-  let goodListSpaceFunAppTest = """[ fn 1 2 3 x ]"""
+  let goodListSpaceFunAppTest =
+    """[ fn 1 2 3 x ]"""
 
-  let badListSpaceFunAppTest = """[ fn  1 2 3 x ]"""
+  let badListSpaceFunAppTest =
+    """[ fn  1 2 3 x ]"""
 
   [<TestMethod>]
   member _.``[App] List Space Before and After Infix Test``() =

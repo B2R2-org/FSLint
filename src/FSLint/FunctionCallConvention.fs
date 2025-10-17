@@ -162,20 +162,14 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
     exprs |> List.iter (checkMethodParenSpacing src)
   | _ -> ()
 
-let checkDotGetSpacing (src: ISourceText) (expr: SynExpr) (dotRange: range) (longDotId: SynLongIdent) =
+let checkDotGetSpacing src (expr: SynExpr) (dotRange: range) longDotId =
   if expr.Range.EndLine = dotRange.StartLine
     && expr.Range.EndColumn <> dotRange.StartColumn
-  then 
-    reportError src dotRange "Unexpected space before '.' in member access"
+  then reportError src dotRange "Unexpected space before '.' in member access"
   else ()
-  
-  let (SynLongIdent(id = ids)) = longDotId
-  match ids with
-  | firstId :: _ -> 
-    if dotRange.EndLine = firstId.idRange.StartLine then
-      if dotRange.EndColumn <> firstId.idRange.StartColumn then
-        reportError src dotRange "Unexpected space after '.' in member access"
-      else ()
+  match longDotId with
+  | SynLongIdent(id = id) ->
+    if dotRange.EndLine = id[0].idRange.StartLine
+      && dotRange.EndColumn <> id[0].idRange.StartColumn
+    then reportError src dotRange "Unexpected space after '.' in member access"
     else ()
-  | [] -> 
-    ()

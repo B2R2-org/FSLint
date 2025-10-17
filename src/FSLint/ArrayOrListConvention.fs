@@ -218,6 +218,8 @@ let rec checkSingleLine src = function
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _
   | SynExpr.Upcast _
+  | SynExpr.ArrayOrList _
+  | SynExpr.ArrayOrListComputed _
   | SynExpr.InterpolatedString _
   | SynExpr.IfThenElse _
   | SynExpr.Record _

@@ -7,9 +7,11 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type AssignmentTests() =
 
-  let goodNamedArgumentSpacingTest = """func (param = value)"""
+  let goodNamedArgumentSpacingTest =
+    """func (param = value)"""
 
-  let badNamedArgumentSpacingTest = """func (param=value)"""
+  let badNamedArgumentSpacingTest =
+    """func (param=value)"""
 
 
   [<TestMethod>]

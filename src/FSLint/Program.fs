@@ -126,11 +126,12 @@ and checkExpression src = function
     checkExpression src doExpr
   | SynExpr.IfThenElse(ifExpr = ifExpr
                        thenExpr = thenExpr
-                       elseExpr = elseExpr) ->
+                       elseExpr = elseExpr
+                       range = range) ->
+    IfThenElseConvention.check src ifExpr thenExpr elseExpr range
     checkExpression src ifExpr
     checkExpression src thenExpr
-    if Option.isSome elseExpr then
-      checkExpression src (Option.get elseExpr)
+    if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
     else ()
   | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
     checkExpression src expr
@@ -456,21 +457,25 @@ let getFsFiles (root: string) =
        Regex $"obj{sep}Release{sep}"
        Regex $"CFG.Tests" |]
   Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
-  |> Seq.filter (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
+  |> Seq.filter
+   (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
   |> Seq.sort
   |> Seq.toArray
 
 /// Collects .fsproj and .sln project/solution files
 let getProjOrSlnFiles (root: string) =
   seq {
-    yield! Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
-    yield! Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
+    yield!
+     Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
+    yield!
+     Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
   }
   |> Seq.sort
   |> Seq.toArray
 
 /// Lints a single file, catching exceptions and returning a `LintOutcome`.
-let tryLintToBuffer (linter: ILintable) (index: int) (path: string) : LintOutcome =
+let tryLintToBuffer
+ (linter: ILintable) (index: int) (path: string): LintOutcome =
   let sb = StringBuilder()
   let append (s: string) = sb.AppendLine(s) |> ignore
   try
@@ -496,7 +501,6 @@ let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
     |> Async.Parallel
     |> Async.RunSynchronously
     |> Array.sortBy (fun r -> r.Index)
-
   results |> Array.exists (fun r -> not r.Ok)
 
 [<EntryPoint>]

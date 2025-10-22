@@ -8,6 +8,8 @@ open FSharp.Compiler.Text
 
 exception LintException of string
 
+let private outputLock = obj ()
+
 let raiseWithError (message: string) =
   raise <| LintException message
 
@@ -19,8 +21,11 @@ let warn (message: string) =
   Console.Error.WriteLine message
 
 let reportError (src: ISourceText) (range: range) message =
-  Console.Error.WriteLine(src.GetLineString(range.StartLine - 1))
-  Console.Error.WriteLine(String.replicate range.StartColumn " " + "^")
+  lock outputLock (fun () ->
+    Console.Error.WriteLine(sprintf "Line %d: %O" range.StartLine message)
+    Console.Error.WriteLine(src.GetLineString(range.StartLine - 1))
+    Console.Error.WriteLine(String.replicate range.StartColumn " " + "^")
+  )
   raiseWithError $"{range.StartLine} {message}"
 
 let runOnEveryFsFile (path: string) (action: string -> unit) =

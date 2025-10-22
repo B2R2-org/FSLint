@@ -13,10 +13,8 @@ let collectScopedLetLines bindings =
 let private countTripleQuotes (line: string) =
   let rec count pos acc =
     if pos <= line.Length - 3 then
-      if line.Substring(pos, 3) = "\"\"\"" then
-        count (pos + 3) (acc + 1)
-      else
-        count (pos + 1) acc
+      if line.Substring(pos, 3) = "\"\"\"" then count (pos + 3) (acc + 1)
+      else count (pos + 1) acc
     else
       acc
   count 0 0

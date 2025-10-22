@@ -99,13 +99,15 @@ let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
 let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
   if expr.IsEmpty && range.EndColumn - range.StartColumn <> enclosureWidth then
     reportError src range "Contains Invalid Whitespace"
-  else ()
+  else
+    ()
 
 /// Checks proper placement of opening bracket after `let` keyword.
 let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
   if src.GetLineString(range.StartLine - 1).TrimStart().StartsWith "let" then
     reportError src range "Misplaced bracket after binding keyword"
-  else ()
+  else
+    ()
 
 /// Checks proper one element per line in multi-line list/array literals.
 let checkSingleElementPerLine src (elemRanges: Range list) =
@@ -119,10 +121,8 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
 
 let checkEdgeCompFlag (src: ISourceText) (elemRange: range) (range: range) =
   let added =
-    if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then
-      2
-    else
-      1
+    if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then 2
+    else 1
   (Position.mkPos (elemRange.EndLine + added) 0,
     Position.mkPos range.EndLine 0)
   ||> Range.mkRange ""
@@ -211,6 +211,7 @@ let rec checkSingleLine src = function
   | SynExpr.InterpolatedString _
   | SynExpr.Paren _
   | SynExpr.Tuple _
+  | SynExpr.ArrayOrListComputed _
   | SynExpr.IfThenElse _
   | SynExpr.Record _
   | SynExpr.LongIdent _
@@ -233,7 +234,5 @@ let checkMultiLine src isArray range = function
 let check src isArray (range: Range) expr =
   let rangeAdjusted = adjustRangeByComment src range expr
   checkCommon src isArray rangeAdjusted expr.Range
-  if range.StartLine = range.EndLine then
-    checkSingleLine src expr
-  else
-    checkMultiLine src isArray rangeAdjusted expr
+  if range.StartLine = range.EndLine then checkSingleLine src expr
+  else checkMultiLine src isArray rangeAdjusted expr

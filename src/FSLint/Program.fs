@@ -122,11 +122,12 @@ and checkExpression src = function
     checkExpression src doExpr
   | SynExpr.IfThenElse(ifExpr = ifExpr
                        thenExpr = thenExpr
-                       elseExpr = elseExpr) ->
+                       elseExpr = elseExpr
+                       range = range) ->
+    IfThenElseConvention.check src ifExpr thenExpr elseExpr range
     checkExpression src ifExpr
     checkExpression src thenExpr
-    if Option.isSome elseExpr then
-      checkExpression src (Option.get elseExpr)
+    if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
     else ()
   | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
     checkExpression src expr

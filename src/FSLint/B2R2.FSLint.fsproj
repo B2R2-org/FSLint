@@ -40,6 +40,7 @@
     <Compile Include="TypeConstructor.fs" />
     <Compile Include="DeclarationConvention.fs" />
     <Compile Include="FunctionBodyConvention.fs" />
+    <Compile Include="IfThenElseConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

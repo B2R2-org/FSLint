@@ -151,10 +151,8 @@ let collectFieldsInfo fields =
     let SynExprRecordField(fieldName = fieldName; expr = expr
                            blockSeparator = blockSeparator) = field
     let SynLongIdent(id = id), _ = fieldName
-    if expr.IsSome then
-      Some(id.Head.idRange, expr.Value.Range, blockSeparator)
-    else
-      None
+    if expr.IsSome then Some(id.Head.idRange, expr.Value.Range, blockSeparator)
+    else None
   )
 
 let checkSeparatorSpacing src fields =

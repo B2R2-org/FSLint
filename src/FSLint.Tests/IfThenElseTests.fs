@@ -145,7 +145,10 @@ let x =
   [<TestMethod>]
   member _.``[IfThenElse] Error - Case 2 but all on one line``() =
     let code =
-      """let myResult = if veryLongConditionNameThatDefinitelyExceedsEightyColumnsForSure then valueExpression else otherExpression"""
+      """let myResult =
+      if veryLongConditionNameThatDefinitely then valueExpression
+      else otherExpression
+      """
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(Constants.FakeFsPath, code)
     ) |> ignore
@@ -153,9 +156,10 @@ let x =
   [<TestMethod>]
   member _.``[IfThenElse] Error - Case 2 but expr not separated``() =
     let code =
+      """let myVariable =
+      if veryLongConditionNameThatDefinitelyandSomewhat then resultExpression
+      else alternativeExpression
       """
-let myVariable = if veryLongConditionNameThatDefinitelyExceedsEightyColumnsForSure then resultExpression else alternativeExpression
-"""
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(Constants.FakeFsPath, code)
     ) |> ignore
@@ -163,11 +167,10 @@ let myVariable = if veryLongConditionNameThatDefinitelyExceedsEightyColumnsForSu
   [<TestMethod>]
   member _.``[IfThenElse] Error - Case 2 but partial separation``() =
     let code =
+      """let myLongVariableName =
+      if veryLongConditionNameThatDefinitely then resultExpression
+      else alternativeExpression
       """
-let myLongVariableName =
-  if veryLongConditionNameThatDefinitelyExceedsEightyColumnsForSureAbsolutely then resultExpression
-  else alternativeExpression
-"""
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(Constants.FakeFsPath, code)
     ) |> ignore

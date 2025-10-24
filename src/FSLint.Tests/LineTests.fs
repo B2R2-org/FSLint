@@ -19,7 +19,7 @@ let x = {goodOnes}
 let x = {badOnes}
 """
 
-  let goodTrailingWhiteSpaceTest = """
+  let goodTrailingWhiteSpaceTest = $"""
 type A() =
   member _.X = 42
 """

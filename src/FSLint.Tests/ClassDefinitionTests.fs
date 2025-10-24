@@ -7,17 +7,20 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type ClassDefinitionTests() =
 
-  let goodImplicitCtorTest = """
+  let goodImplicitCtorTest =
+    """
 type TestClass(param1: string, param2: int) =
   member _.Param1 = param1
 """
 
-  let badImplicitCtorTest = """
+  let badImplicitCtorTest =
+    """
 type TestClass (param1: string, param2: int) =
   member _.Param1 = param1
 """
 
-  let goodImplicitInheritTest = """
+  let goodImplicitInheritTest =
+    """
 type BaseClass(value: int) =
   member _.Value = value
 
@@ -26,7 +29,8 @@ type DerivedClass(x: int, y: string) =
   member _.Y = y
 """
 
-  let badImplicitInheritTest = """
+  let badImplicitInheritTest =
+    """
 type BaseClass(value: int) =
   member _.Value = value
 
@@ -35,7 +39,8 @@ type DerivedClass(x: int, y: string) =
   member _.Y = y
 """
 
-  let goodExplicitInheritTest = """
+  let goodExplicitInheritTest =
+    """
 type BaseClass(value: int) =
   member _.Value = value
 
@@ -45,7 +50,8 @@ type DerivedClass() =
   member _.Helper = helper
 """
 
-  let badExplicitInheritTest = """
+  let badExplicitInheritTest =
+    """
 type BaseClass(value: int) =
   member _.Value = value
 
@@ -55,7 +61,8 @@ type DerivedClass() =
   member _.Helper = helper
 """
 
-  let goodNestedInheritTest = """
+  let goodNestedInheritTest =
+    """
 type GrandParent(name: string) =
   member _.Name = name
 
@@ -68,7 +75,8 @@ type Child(name: string, age: int, grade: int) =
   member _.Grade = grade
 """
 
-  let badNestedInheritTest = """
+  let badNestedInheritTest =
+    """
 type GrandParent(name: string) =
   member _.Name = name
 
@@ -81,7 +89,8 @@ type Child(name: string, age: int, grade: int) =
   member _.Grade = grade
 """
 
-  let goodMixedCaseTest = """
+  let goodMixedCaseTest =
+    """
 type ComplexClass(initialValue: int) =
   let mutable counter = 0
   inherit System.Object()
@@ -89,7 +98,8 @@ type ComplexClass(initialValue: int) =
   member _.Increment() = counter <- counter + 1
 """
 
-  let badMixedCaseTest = """
+  let badMixedCaseTest =
+    """
 type ComplexClass (initialValue: int) =
   let mutable counter = 0
   inherit System.Object ()

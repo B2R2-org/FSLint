@@ -181,7 +181,8 @@ and checkExpression src = function
   | SynExpr.DotSet(targetExpr = targetExpr; rhsExpr = rhsExpr) ->
     checkExpression src targetExpr
     checkExpression src rhsExpr
-  | SynExpr.DotGet(expr = expr) ->
+  | SynExpr.DotGet(expr, dotm, longDotId, _) ->
+    FunctionCallConvention.checkDotGetSpacing src expr dotm longDotId
     FunctionCallConvention.checkMethodParenSpacing src expr
     checkExpression src expr
   | SynExpr.YieldOrReturn(expr = expr)
@@ -360,6 +361,7 @@ and checkBinding src case binding =
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false trivia pat
   DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
+  DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
   TypeUseConvention.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
@@ -456,21 +458,25 @@ let getFsFiles (root: string) =
        Regex $"obj{sep}Release{sep}"
        Regex $"CFG.Tests" |]
   Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
-  |> Seq.filter (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
+  |> Seq.filter
+    (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
   |> Seq.sort
   |> Seq.toArray
 
 /// Collects .fsproj and .sln project/solution files
 let getProjOrSlnFiles (root: string) =
   seq {
-    yield! Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
-    yield! Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
+    yield!
+      Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
+    yield!
+      Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
   }
   |> Seq.sort
   |> Seq.toArray
 
 /// Lints a single file, catching exceptions and returning a `LintOutcome`.
-let tryLintToBuffer (linter: ILintable) (index: int) (path: string) : LintOutcome =
+let tryLintToBuffer
+  (linter: ILintable) (index: int) (path: string): LintOutcome =
   let sb = StringBuilder()
   let append (s: string) = sb.AppendLine(s) |> ignore
   try
@@ -496,7 +502,6 @@ let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
     |> Async.Parallel
     |> Async.RunSynchronously
     |> Array.sortBy (fun r -> r.Index)
-
   results |> Array.exists (fun r -> not r.Ok)
 
 [<EntryPoint>]

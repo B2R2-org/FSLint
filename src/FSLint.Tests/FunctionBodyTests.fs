@@ -7,14 +7,16 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type FunctionBodyTests() =
 
-  let goodEmptyNewLineTest = """
+  let goodEmptyNewLineTest =
+    """
 let fn () =
   let x = 1
   let y = 2
   x + y
 """
 
-  let badEmptyNewLineTest = """
+  let badEmptyNewLineTest =
+    """
 let fn () =
   let x = 1
   let y = 2
@@ -22,7 +24,8 @@ let fn () =
   x + y
 """
 
-  let goodBindingWithAndKeywordTest = """
+  let goodBindingWithAndKeywordTest =
+    """
 let fn () =
   let x = 1
   let y = 2
@@ -31,7 +34,8 @@ let fn () =
 and good = ()
 """
 
-  let badBindingWithAndKeywordTest = """
+  let badBindingWithAndKeywordTest =
+    """
 let fn () =
   let x = 1
   let y = 2

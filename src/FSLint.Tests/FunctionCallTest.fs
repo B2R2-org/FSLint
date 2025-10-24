@@ -7,23 +7,32 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type FunctionCallTests() =
 
-  let goodNonCurriedFuncTest = """Func(p1, p2, p3)"""
+  let goodNonCurriedFuncTest =
+    """Func(p1, p2, p3)"""
 
-  let badNonCurriedFuncBracketSpacingTest = """Func( p1, p2, p3 )"""
+  let badNonCurriedFuncBracketSpacingTest =
+    """Func( p1, p2, p3 )"""
 
-  let badNonCurriedFuncSpacingTest = """Func (p1, p2, p3)"""
+  let badNonCurriedFuncSpacingTest =
+    """Func (p1, p2, p3)"""
 
-  let goodCurriedFuncPascalCaseTest = """str.Replace()"""
+  let goodCurriedFuncPascalCaseTest =
+    """str.Replace()"""
 
-  let badCurriedFuncPascalCaseTest = """str.Replace ()"""
+  let badCurriedFuncPascalCaseTest =
+    """str.Replace ()"""
 
-  let goodCurriedFuncLowerCaseTest = """str.replace ()"""
+  let goodCurriedFuncLowerCaseTest =
+    """str.replace ()"""
 
-  let badCurriedFuncLowerCaseTest = """str.replace()"""
+  let badCurriedFuncLowerCaseTest =
+    """str.replace()"""
 
-  let goodCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart()"""
+  let goodCurriedFuncPascalCaseNestedTest =
+    """str.Substring(1).TrimStart()"""
 
-  let badCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart ()"""
+  let badCurriedFuncPascalCaseNestedTest =
+    """str.Substring(1).TrimStart ()"""
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function Bracket Spacing Test``() =

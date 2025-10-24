@@ -97,6 +97,24 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
   else
     ()
 
+let isTripleQuoteString = function
+  | SynExpr.Const(SynConst.String(synStringKind = SynStringKind.TripleQuote), _)
+    -> true
+  | _
+    -> false
+
+let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
+  let SynBinding(expr = body; trivia = trivia) = binding
+  match trivia.EqualsRange with
+  | Some eqRange ->
+    match body with
+    | _
+     when isTripleQuoteString body && eqRange.StartLine = body.Range.StartLine
+      -> reportError src body.Range "Triple-quoted should be on the next line."
+    | _
+      -> ()
+  | None -> ()
+
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise

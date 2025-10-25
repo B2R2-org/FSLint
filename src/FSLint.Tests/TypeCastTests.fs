@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type TypeCastTests() =
@@ -17,14 +15,10 @@ type TypeCastTests() =
 
   [<TestMethod>]
   member _.``[TypeCast] Upcast Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodUpcastSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badUpcastSpacingTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodUpcastSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badUpcastSpacingTest
 
   [<TestMethod>]
   member _.``[TypeCast] Downcast Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodDowncastSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badDowncastSpacingTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodDowncastSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badDowncastSpacingTest

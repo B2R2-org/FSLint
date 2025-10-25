@@ -20,6 +20,7 @@
   <ItemGroup>
     <Compile Include="MSTestSettings.fs" />
     <Compile Include="Constants.fs" />
+    <Compile Include="Utils.fs" />
     <Compile Include="LineTests.fs" />
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="ArgumentAssignmentTests.fs" />

@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type RecordTests() =
@@ -68,39 +66,27 @@ type InsSize =
 
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketPositionTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketPositionTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodBracketPositionTest
+    assertFSLintFailure Constants.FakeFsPath badBracketPositionTest
 
   [<TestMethod>]
   member _.``[Record] Bracket Position Inline With Equal Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketPositionWithEqualTest)
-    ) |> ignore
+    assertFSLintFailure Constants.FakeFsPath badBracketPositionWithEqualTest
 
   [<TestMethod>]
   member _.``[Record] Field Type Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badFieldTypeSpacingTest)
-    ) |> ignore
+    assertFSLintFailure Constants.FakeFsPath badFieldTypeSpacingTest
 
   [<TestMethod>]
   member _.``[Record] Bracket Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketSpacingTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodBracketSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badBracketSpacingTest
 
   [<TestMethod>]
   member _.``[Record] Bracket Spacing MultiLine Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketSpacingMultiLineTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketSpacingMultiLineTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodBracketSpacingMultiLineTest
+    assertFSLintFailure Constants.FakeFsPath badBracketSpacingMultiLineTest
 
   [<TestMethod>]
   member _.``[Record] Operator Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badOperatorSpacingTest)
-    ) |> ignore
+    assertFSLintFailure Constants.FakeFsPath badOperatorSpacingTest

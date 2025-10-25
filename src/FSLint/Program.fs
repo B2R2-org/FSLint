@@ -421,32 +421,41 @@ let lintFile (linter: ILintable) (path: string) =
   let txt = System.Text.Encoding.UTF8.GetString bytes
   linter.Lint(path, txt)
 
-let runLinter linter (path: string) =
-  try lintFile linter path
-  with LintException msg ->
-    System.Console.WriteLine msg
-    exit 1
-
 let linterForFs =
   { new ILintable with
       member _.Lint(path, txt) =
-        LineConvention.check txt
-        parseFile txt path ||> checkWithAST }
+        try
+          LineConvention.check txt
+          parseFile txt path ||> checkWithAST
+          Success
+        with LintException(msg) ->
+          Failure(msg) }
 
 let linterForProjSln =
   { new ILintable with
       member _.Lint(_path, txt) =
-        LineConvention.checkWindowsLineEndings txt }
+        try
+          LineConvention.checkWindowsLineEndings txt
+          Success
+        with LintException(msg) ->
+          Failure(msg) }
 
 [<EntryPoint>]
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
-    runLinter linterForFs args[0]
-    0
+    let b = lintFile linterForFs args[0] |> parseResult true
+    if b then
+      System.Console.WriteLine "Linting succeeded."
+      0
+    else
+      1
   elif Directory.Exists args[0] then
-    runOnEveryProjectSlnFile args[0] (runLinter linterForProjSln)
-    runOnEveryFsFile args[0] (runLinter linterForFs)
-    System.Console.WriteLine "Linting completed."
-    0
+    let b1 = runOnEveryProjectSlnFile args[0] (lintFile linterForProjSln)
+    let b2 = runOnEveryFsFile args[0] (lintFile linterForFs)
+    if b1 && b2 then
+      System.Console.WriteLine "Linting succeeded."
+      0
+    else
+      1
   else exitWithError $"File or directory '{args[0]}' not found"

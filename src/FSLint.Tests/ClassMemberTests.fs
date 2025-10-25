@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type ClassMemberTests() =
@@ -49,28 +47,20 @@ type Class() =
 
   [<TestMethod>]
   member _.``[ClassMember] Between Infix and Paren Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSpacingInfixParenTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSpacingInfixParenTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodSpacingInfixParenTest
+    assertFSLintFailure Constants.FakeFsPath badSpacingInfixParenTest
 
   [<TestMethod>]
   member _.``[ClassMember] Between Function and Paren Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSpacingFunctionParenTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSpacingFunctionParenTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodSpacingFunctionParenTest
+    assertFSLintFailure Constants.FakeFsPath badSpacingFunctionParenTest
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Double Underscore Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSelfIdentifierUnderscoreTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSelfIdentifierUnderscoreTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodSelfIdentifierUnderscoreTest
+    assertFSLintFailure Constants.FakeFsPath badSelfIdentifierUnderscoreTest
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Unused Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSelfIdentifierUnusedTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSelfIdentifierUnusedTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodSelfIdentifierUnusedTest
+    assertFSLintFailure Constants.FakeFsPath badSelfIdentifierUnusedTest

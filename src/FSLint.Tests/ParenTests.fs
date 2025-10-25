@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type ParenTests() =
@@ -17,14 +15,10 @@ type ParenTests() =
 
   [<TestMethod>]
   member _.``[Paren] Paren Empty Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodEmptyTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badEmptyTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodEmptyTest
+    assertFSLintFailure Constants.FakeFsPath badEmptyTest
 
   [<TestMethod>]
   member _.``[Paren] Paren Bracket Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketSpacingTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodBracketSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badBracketSpacingTest

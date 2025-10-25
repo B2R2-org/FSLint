@@ -20,6 +20,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="LintResult.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />

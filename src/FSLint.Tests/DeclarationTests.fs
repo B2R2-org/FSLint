@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type DeclarationTests() =
@@ -27,13 +25,10 @@ let bar = 2
 
   [<TestMethod>]
   member _.``[ModuleDeclaration] Top Binding Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTopBindingSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTopBindingSpacingTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTopBindingSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badTopBindingSpacingTest
 
   [<TestMethod>]
   member _.``[ModuleDeclaration] Top Binding Too Much Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTopBindingTooMuchSpacingTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTopBindingSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badTopBindingTooMuchSpacingTest

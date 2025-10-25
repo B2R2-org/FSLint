@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type AppTests() =
@@ -37,28 +35,20 @@ bad[ 1.. ]
 
   [<TestMethod>]
   member _.``[App] List Space Before and After Infix Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodListSpaceInfixTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badListSpaceInfixTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodListSpaceInfixTest
+    assertFSLintFailure Constants.FakeFsPath badListSpaceInfixTest
 
   [<TestMethod>]
   member _.``[App] List App Indexer Bracket Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodListAppIndexerTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badListAppIndexerTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodListAppIndexerTest
+    assertFSLintFailure Constants.FakeFsPath badListAppIndexerTest
 
   [<TestMethod>]
   member _.``[App] List App Indexer Index Range Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodListAppIndexerInRangeTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badListAppIndexerInRangeTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodListAppIndexerInRangeTest
+    assertFSLintFailure Constants.FakeFsPath badListAppIndexerInRangeTest
 
   [<TestMethod>]
   member _.``[App] List Space Fununction Application Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodListSpaceFunAppTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badListSpaceFunAppTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodListSpaceFunAppTest
+    assertFSLintFailure Constants.FakeFsPath badListSpaceFunAppTest

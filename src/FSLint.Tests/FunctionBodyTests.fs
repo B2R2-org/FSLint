@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type FunctionBodyTests() =
@@ -41,14 +39,10 @@ and bad = ()
 
   [<TestMethod>]
   member _.``[FunctionBody] Empty NewLine Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodEmptyNewLineTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badEmptyNewLineTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodEmptyNewLineTest
+    assertFSLintFailure Constants.FakeFsPath badEmptyNewLineTest
 
   [<TestMethod>]
   member _.``[FunctionBody] Recursive Binding NewLine Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBindingWithAndKeywordTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBindingWithAndKeywordTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodBindingWithAndKeywordTest
+    assertFSLintFailure Constants.FakeFsPath badBindingWithAndKeywordTest

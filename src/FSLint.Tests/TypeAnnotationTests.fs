@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type TypeAnnotationTest() =
@@ -104,84 +102,60 @@ let fn (x: list<int>->string[] * string) = x
 
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodEmptyParenTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badEmptyParenTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodEmptyParenTest
+    assertFSLintFailure Constants.FakeFsPath badEmptyParenTest
 
   [<TestMethod>]
   member _.``Type Annotation Int Array Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationIntArrayTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationIntArrayTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationIntArrayTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationIntArrayTest
 
   [<TestMethod>]
   member _.``Type Annotation(int) Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationIntTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationIntTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationIntTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationIntTest
 
   [<TestMethod>]
   member _.``Type Annotation(string) Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationStringTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationStringTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationStringTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationStringTest
 
   [<TestMethod>]
   member _.``Type Annotation(string) Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationStringSpaceTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationStringSpaceTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationStringSpaceTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationStringSpaceTest
 
   [<TestMethod>]
   member _.``Type Annotation(Array) Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationArrayTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationArrayTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationArrayTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationArrayTest
 
   [<TestMethod>]
   member _.``Type Annotation Colon Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationColonSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationColonSpacingTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationColonSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationColonSpacingTest
 
   [<TestMethod>]
   member _.``Type Annotation Star Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationStarSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationStarSpacingTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationStarSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationStarSpacingTest
 
   [<TestMethod>]
   member _.``Type Annotation Array Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTypeAnnotationArraySpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTypeAnnotationArraySpacingTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTypeAnnotationArraySpacingTest
+    assertFSLintFailure Constants.FakeFsPath badTypeAnnotationArraySpacingTest
 
   [<TestMethod>]
   member _.``Type Annotation Param Array Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodParamArrayTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badParamArrayTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodParamArrayTest
+    assertFSLintFailure Constants.FakeFsPath badParamArrayTest
 
   [<TestMethod>]
   member _.``Type Annotation Tuple Array Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTupleArrayTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTupleArrayTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTupleArrayTest
+    assertFSLintFailure Constants.FakeFsPath badTupleArrayTest
 
   [<TestMethod>]
   member _.``Type Annotation Arrow Space Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodArrowSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badArrowSpacingTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodArrowSpacingTest
+    assertFSLintFailure Constants.FakeFsPath badArrowSpacingTest

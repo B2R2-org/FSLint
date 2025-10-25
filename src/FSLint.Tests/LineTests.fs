@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type LineTests() =
@@ -33,14 +31,10 @@ type A() ={space}
 
   [<TestMethod>]
   member _.``80 Line Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodLine80Test)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badLine80Test)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodLine80Test
+    assertFSLintFailure Constants.FakeFsPath badLine80Test
 
   [<TestMethod>]
   member _.``Trailing Whitespace Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTrailingWhiteSpaceTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTrailingWhiteSpaceTest)
-    ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodTrailingWhiteSpaceTest
+    assertFSLintFailure Constants.FakeFsPath badTrailingWhiteSpaceTest

@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type FunctionCallTests() =
@@ -27,35 +25,24 @@ type FunctionCallTests() =
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function Bracket Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodNonCurriedFuncTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath,
-        badNonCurriedFuncBracketSpacingTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodNonCurriedFuncTest
+    assertFSLintFailure Constants.FakeFsPath badNonCurriedFuncBracketSpacingTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function App Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badNonCurriedFuncSpacingTest)
-     ) |> ignore
+    assertFSLintFailure Constants.FakeFsPath badNonCurriedFuncSpacingTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function PascalCase Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCurriedFuncPascalCaseTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badCurriedFuncPascalCaseTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodCurriedFuncPascalCaseTest
+    assertFSLintFailure Constants.FakeFsPath badCurriedFuncPascalCaseTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function LowerCase Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCurriedFuncLowerCaseTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badCurriedFuncLowerCaseTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodCurriedFuncLowerCaseTest
+    assertFSLintFailure Constants.FakeFsPath badCurriedFuncLowerCaseTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function Nested Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCurriedFuncPascalCaseNestedTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badCurriedFuncPascalCaseNestedTest)
-     ) |> ignore
+    assertFSLintSuccess Constants.FakeFsPath goodCurriedFuncPascalCaseNestedTest
+    assertFSLintFailure Constants.FakeFsPath badCurriedFuncPascalCaseNestedTest

@@ -7,17 +7,13 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type TypeCastTests() =
 
-  let goodUpcastSpacingTest =
-    """source :> target"""
+  let goodUpcastSpacingTest = """source :> target"""
 
-  let badUpcastSpacingTest =
-    """source:>target"""
+  let badUpcastSpacingTest = """source:>target"""
 
-  let goodDowncastSpacingTest =
-    """source :?> target"""
+  let goodDowncastSpacingTest = """source :?> target"""
 
-  let badDowncastSpacingTest =
-    """source:?>target"""
+  let badDowncastSpacingTest = """source:?>target"""
 
   [<TestMethod>]
   member _.``[TypeCast] Upcast Spacing Test``() =

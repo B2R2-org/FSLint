@@ -7,8 +7,7 @@ type CaseStyle =
   | LowerCamelCase
   | PascalCase
 
-let private keywords =
-  [| "new" |]
+let private keywords = [| "new" |]
 
 let private isKnownKeyWord (identifier: string) =
   Array.exists (fun kw -> kw = identifier) keywords

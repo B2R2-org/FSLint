@@ -108,12 +108,44 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
   match trivia.EqualsRange with
   | Some eqRange ->
     match body with
-    | _
-     when isTripleQuoteString body && eqRange.StartLine = body.Range.StartLine
-      -> reportError src body.Range "Triple-quoted should be on the next line."
-    | _
-      -> ()
+    | _ when isTripleQuoteString body
+      && eqRange.StartLine = body.Range.StartLine ->
+      if body.Range.StartLine = body.Range.EndLine then
+        ()
+      else
+        reportError src body.Range "Triple-quoted should be on the next line."
+    | _ -> ()
   | None -> ()
+
+let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
+  let SynBinding(headPat = pattern; expr = body; range = bindingRange;
+                 trivia = trivia) = binding
+  if body.Range.StartLine <> body.Range.EndLine then
+    ()
+  else
+    match trivia.EqualsRange with
+    | Some eqRange ->
+      if eqRange.EndLine < body.Range.StartLine then
+        let fullRange =
+          Range.mkRange ""
+            (Position.mkPos pattern.Range.StartLine 0)
+            (Position.mkPos body.Range.EndLine
+              (src.GetLineString(body.Range.EndLine - 1).Length))
+        let declText = src.GetSubTextFromRange fullRange
+        let lines =
+          declText.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
+        let indent = pattern.Range.StartColumn
+        let contentParts =
+          lines
+          |> Array.map (fun line -> line.Trim())
+          |> Array.filter (fun line -> line <> "")
+        let oneLine = String.concat " " contentParts
+        let totalLength = indent + oneLine.Length
+        if totalLength <= 80 then
+          reportError src body.Range
+            "Unnecessary line break: declaration fits within 80 columns"
+      else ()
+    | None -> ()
 
 let check (src: ISourceText) decls =
   decls

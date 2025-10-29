@@ -7,20 +7,15 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type IndexedPropertyTests() =
 
-  let goodIndexedPropertyTest =
-    """src[1]"""
+  let goodIndexedPropertyTest = """src[1]"""
 
-  let badIndexedPropertySpacingFromAppTest =
-    """src [1]"""
+  let badIndexedPropertySpacingFromAppTest = """src [1]"""
 
-  let badIndexedPropertyBracketSpacingTest =
-    """src[ 1 ]"""
+  let badIndexedPropertyBracketSpacingTest = """src[ 1 ]"""
 
-  let goodIndexedPropertyHasOpmTest =
-    """src[expr1..opm..expr2]"""
+  let goodIndexedPropertyHasOpmTest = """src[expr1..opm..expr2]"""
 
-  let badIndexedPropertyHasOpmTest =
-    """src[expr1 .. opm .. expr2]"""
+  let badIndexedPropertyHasOpmTest = """src[expr1 .. opm .. expr2]"""
 
   [<TestMethod>]
   member _.``[IndexedProperty] Indexed Property Spacing From App Test``() =

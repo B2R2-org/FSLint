@@ -358,6 +358,7 @@ and checkBinding src case binding =
   checkPattern src case false trivia pat
   DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
   DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
+  DeclarationConvention.checkUnnecessaryLineBreak src binding
   TypeUseConvention.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
@@ -478,6 +479,7 @@ let tryLintToBuffer
   try
     Console.WriteLine($"--- File: {path}")
     append $"Linting file: {path}"
+    Utils.setCurrentFile path
     let bytes = File.ReadAllBytes path |> ensureNoBOM
     let txt = System.Text.Encoding.UTF8.GetString bytes
     linter.Lint(path, txt)
@@ -504,11 +506,13 @@ let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
+    Utils.setCurrentFile args[0]
     let outcome = tryLintToBuffer linterForFs 0 args[0]
     if outcome.Ok then 0 else 1
   elif Directory.Exists args[0] then
     let projOrSln = getProjOrSlnFiles args[0]
     for p in projOrSln do
+      Utils.setCurrentFile p
       let bytes = File.ReadAllBytes p |> ensureNoBOM
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)

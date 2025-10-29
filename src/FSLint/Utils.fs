@@ -8,19 +8,36 @@ open FSharp.Compiler.Text
 
 exception LintException of string
 
-let raiseWithError (message: string) =
-  raise <| LintException message
+let private outputLock = obj ()
+
+let private currentFilePath = new Threading.AsyncLocal<string>()
+
+let setCurrentFile (path: string) = currentFilePath.Value <- path
+
+let raiseWithError (message: string) = raise <| LintException message
 
 let exitWithError (message: string) =
   Console.WriteLine message
   exit 1
 
-let warn (message: string) =
-  Console.Error.WriteLine message
+let warn (message: string) = Console.Error.WriteLine message
 
 let reportError (src: ISourceText) (range: range) message =
-  Console.Error.WriteLine(src.GetLineString(range.StartLine - 1))
-  Console.Error.WriteLine(String.replicate range.StartColumn " " + "^")
+  lock outputLock (fun () ->
+    let fileName =
+      let path = currentFilePath.Value
+      if isNull path || String.IsNullOrEmpty(path) then ""
+      else Path.GetFileName(path)
+    if String.IsNullOrEmpty(fileName) then
+      Console.Error.WriteLine(sprintf "Line %d: %O" range.StartLine message)
+    else
+      Console.Error.WriteLine(
+        sprintf "[%s] Line %d: %O" fileName range.StartLine message)
+    Console.Error.WriteLine(
+      src.GetLineString(range.StartLine - 1))
+    Console.Error.WriteLine(
+      String.replicate range.StartColumn " " + "^")
+  )
   raiseWithError $"{range.StartLine} {message}"
 
 let runOnEveryFsFile (path: string) (action: string -> unit) =

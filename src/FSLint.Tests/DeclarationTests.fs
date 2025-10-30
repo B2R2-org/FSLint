@@ -40,3 +40,63 @@ let bar = 2
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(Constants.FakeFsPath, badTopBindingTooMuchSpacingTest)
      ) |> ignore
+
+  [<TestMethod>]
+  member _.``[Declaration] Single line fits in 80 columns``() =
+    let code =
+      """
+let func = printfn "hello"
+"""
+    linterForFs.Lint(Constants.FakeFsPath, code)
+
+  [<TestMethod>]
+  member _.``[Declaration] Short function on one line``() =
+    let code =
+      """
+let add x y = x + y
+"""
+    linterForFs.Lint(Constants.FakeFsPath, code)
+
+  [<TestMethod>]
+  member _.``[Declaration] Multi-line with long body - allowed``() =
+    let code =
+      """
+let processData input =
+  let step1 = transform input
+  let step2 = validate step1
+  compute step2
+"""
+    linterForFs.Lint(Constants.FakeFsPath, code)
+
+  [<TestMethod>]
+  member _.``[Declaration] Error - unnecessary line break``() =
+    let code =
+      """
+let func =
+  printfn "hello"
+"""
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, code)
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[Declaration] Error - short function unnecessarily split``() =
+    let code =
+      """
+let add x y =
+  x + y
+"""
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, code)
+    ) |> ignore
+
+  [<TestMethod>]
+  member _.``[Declaration] Error - simple value unnecessarily split``() =
+    let code =
+      """
+let value =
+  42
+"""
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, code)
+    ) |> ignore

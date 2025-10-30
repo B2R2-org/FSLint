@@ -9,59 +9,41 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type ArrayOrListTests() =
 
-  let goodEmptyTest =
-    """[]"""
+  let goodEmptyTest = """[]"""
 
-  let badEmptyTest =
-    """[ ]"""
+  let badEmptyTest = """[ ]"""
 
-  let goodArrayEmptyTest =
-    """[||]"""
+  let goodArrayEmptyTest = """[||]"""
 
-  let badArrayEmptyTest =
-    """[| |]"""
+  let badArrayEmptyTest = """[| |]"""
 
-  let goodBracketSpacingTest =
-    """[ 1; 2; 3; 4 ]"""
+  let goodBracketSpacingTest = """[ 1; 2; 3; 4 ]"""
 
-  let badBracketSpacingTest =
-    """[1; 2; 3; 4]"""
+  let badBracketSpacingTest = """[1; 2; 3; 4]"""
 
-  let goodArrayBracketSpacingTest =
-    """[| 1; 2; 3; 4 |]"""
+  let goodArrayBracketSpacingTest = """[| 1; 2; 3; 4 |]"""
 
-  let badArrayBracketSpacingTest =
-    """[|1; 2; 3; 4|]"""
+  let badArrayBracketSpacingTest = """[|1; 2; 3; 4|]"""
 
-  let goodElementSpacingTest =
-    """[ 1; 2 ]"""
+  let goodElementSpacingTest = """[ 1; 2 ]"""
 
-  let badNoWhitespaceBetweenElementsTest =
-    """[ 1;2 ]"""
+  let badNoWhitespaceBetweenElementsTest = """[ 1;2 ]"""
 
-  let badTooMuchWhitespaceBetweenElementsTest =
-    """[ 1;  2 ]"""
+  let badTooMuchWhitespaceBetweenElementsTest = """[ 1;  2 ]"""
 
-  let badWhitespaceBeforeSeparatorTest =
-    """[ 1 ;2 ]"""
+  let badWhitespaceBeforeSeparatorTest = """[ 1 ;2 ]"""
 
-  let goodRangeOperatorTest =
-    """[ 1 .. 10 ]"""
+  let goodRangeOperatorTest = """[ 1 .. 10 ]"""
 
-  let badRangeOperatorTest =
-    """[ 1..10 ]"""
+  let badRangeOperatorTest = """[ 1..10 ]"""
 
-  let goodRangeOperatorWithIdentTest =
-    """[ startIdent .. endIdent ]"""
+  let goodRangeOperatorWithIdentTest = """[ startIdent .. endIdent ]"""
 
-  let badRangeOperatorWithIdentTest =
-    """[ startIdent..endIdent ]"""
+  let badRangeOperatorWithIdentTest = """[ startIdent..endIdent ]"""
 
-  let goodRangeOperatorWithStepTest =
-    """[ 1 .. 2 .. 10 ]"""
+  let goodRangeOperatorWithStepTest = """[ 1 .. 2 .. 10 ]"""
 
-  let badRangeOperatorWithStepTest =
-    """[ 1 ..2.. 10 ]"""
+  let badRangeOperatorWithStepTest = """[ 1 ..2.. 10 ]"""
 
   let goodRangeOperatorWithStepAndIdentTest =
     """

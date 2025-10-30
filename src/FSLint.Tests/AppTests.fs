@@ -37,11 +37,9 @@ good[1..]
 bad[ 1.. ]
 """
 
-  let goodListSpaceFunAppTest =
-    """[ fn 1 2 3 x ]"""
+  let goodListSpaceFunAppTest = """[ fn 1 2 3 x ]"""
 
-  let badListSpaceFunAppTest =
-    """[ fn  1 2 3 x ]"""
+  let badListSpaceFunAppTest = """[ fn  1 2 3 x ]"""
 
   [<TestMethod>]
   member _.``[App] List Space Before and After Infix Test``() =

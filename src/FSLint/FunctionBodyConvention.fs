@@ -24,8 +24,7 @@ let private countTripleQuotes (line: string) =
 let private isInsideStringLiteral (src: ISourceText) (range: range) lineIdx =
   let lines =
     [ range.StartLine - 1 .. lineIdx ] |> List.map (src.GetLineString)
-  let totalTripleQuotes =
-    lines |> List.sumBy countTripleQuotes
+  let totalTripleQuotes = lines |> List.sumBy countTripleQuotes
   totalTripleQuotes % 2 = 1
 
 let checkNested (src: ISourceText) range lineNums =

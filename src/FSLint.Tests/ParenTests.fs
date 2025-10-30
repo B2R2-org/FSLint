@@ -7,17 +7,13 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type ParenTests() =
 
-  let goodEmptyTest =
-    """()"""
+  let goodEmptyTest = """()"""
 
-  let badEmptyTest =
-    """( )"""
+  let badEmptyTest = """( )"""
 
-  let goodBracketSpacingTest =
-    """(1, 2)"""
+  let goodBracketSpacingTest = """(1, 2)"""
 
-  let badBracketSpacingTest =
-    """( 1, 2 )"""
+  let badBracketSpacingTest = """( 1, 2 )"""
 
   [<TestMethod>]
   member _.``[Paren] Paren Empty Test``() =

@@ -143,10 +143,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
   | SynExpr.App(flag = flag
                 funcExpr = funcExpr
                 argExpr = SynExpr.Paren(expr = parenExpr; range = range)) ->
-    if checkSpacingOrNot src range then
-      checkByFlag flag funcExpr
-    else
-      checkMethodParenSpacing src funcExpr
+    if checkSpacingOrNot src range then checkByFlag flag funcExpr
+    else checkMethodParenSpacing src funcExpr
     checkMethodParenSpacing src parenExpr
   | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
     checkNewKeywordSpacing src (funcExpr, argExpr)

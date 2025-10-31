@@ -363,6 +363,7 @@ and checkBinding src case binding =
   DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
   DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
   DeclarationConvention.checkUnnecessaryLineBreak src binding
+  DeclarationConvention.checkComputationExprPlacement src binding
   TypeUseConvention.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat

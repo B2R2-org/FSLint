@@ -182,7 +182,8 @@ and checkExpression src = function
   | SynExpr.DotSet(targetExpr = targetExpr; rhsExpr = rhsExpr) ->
     checkExpression src targetExpr
     checkExpression src rhsExpr
-  | SynExpr.DotGet(expr = expr) ->
+  | SynExpr.DotGet(expr, dotm, longDotId, _) ->
+    FunctionCallConvention.checkDotGetSpacing src expr dotm longDotId
     FunctionCallConvention.checkMethodParenSpacing src expr
     checkExpression src expr
   | SynExpr.YieldOrReturn(expr = expr)
@@ -361,6 +362,8 @@ and checkBinding src case binding =
   let case = if hasAttr "Literal" attrs then PascalCase else case
   checkPattern src case false trivia pat
   DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
+  DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
+  DeclarationConvention.checkUnnecessaryLineBreak src binding
   TypeUseConvention.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
@@ -458,7 +461,7 @@ let getFsFiles (root: string) =
        Regex $"CFG.Tests" |]
   Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
   |> Seq.filter
-   (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
+    (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
   |> Seq.sort
   |> Seq.toArray
 
@@ -466,21 +469,22 @@ let getFsFiles (root: string) =
 let getProjOrSlnFiles (root: string) =
   seq {
     yield!
-     Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
+      Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
     yield!
-     Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
+      Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
   }
   |> Seq.sort
   |> Seq.toArray
 
 /// Lints a single file, catching exceptions and returning a `LintOutcome`.
 let tryLintToBuffer
- (linter: ILintable) (index: int) (path: string): LintOutcome =
+  (linter: ILintable) (index: int) (path: string): LintOutcome =
   let sb = StringBuilder()
   let append (s: string) = sb.AppendLine(s) |> ignore
   try
     Console.WriteLine($"--- File: {path}")
     append $"Linting file: {path}"
+    Utils.setCurrentFile path
     let bytes = File.ReadAllBytes path |> ensureNoBOM
     let txt = System.Text.Encoding.UTF8.GetString bytes
     linter.Lint(path, txt)
@@ -507,11 +511,13 @@ let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
+    Utils.setCurrentFile args[0]
     let outcome = tryLintToBuffer linterForFs 0 args[0]
     if outcome.Ok then 0 else 1
   elif Directory.Exists args[0] then
     let projOrSln = getProjOrSlnFiles args[0]
     for p in projOrSln do
+      Utils.setCurrentFile p
       let bytes = File.ReadAllBytes p |> ensureNoBOM
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)

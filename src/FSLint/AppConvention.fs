@@ -187,6 +187,30 @@ let checkInfixOrFuncSpacing src isInfix funcExpr argExpr =
   then checkFuncSpacing src funcExpr argExpr
   else ()
 
+let checkUnaryOperatorSpacing (src: ISourceText) (expr: SynExpr) =
+  match expr with
+  | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
+    match funcExpr with
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = identList)) ->
+      match identList with
+      | [ id ] when
+          id.idText = "op_UnaryNegation" ||
+          id.idText = "op_UnaryPlus" ||
+          id.idText = "op_LogicalNot" ->
+        if funcExpr.Range.EndLine = argExpr.Range.StartLine then
+          let startPos =
+            Position.mkPos funcExpr.Range.EndLine funcExpr.Range.EndColumn
+          let endPos =
+            Position.mkPos argExpr.Range.StartLine argExpr.Range.StartColumn
+          let betweenRange = Range.mkRange "" startPos endPos
+          let betweenText = src.GetSubTextFromRange betweenRange
+          if betweenText.Trim() = "" && betweenText.Length > 0 then
+            reportError src argExpr.Range
+              "No space allowed between unary operator and operand"
+      | _ -> ()
+    | _ -> ()
+  | _ -> ()
+
 let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
   match funcExpr with
   | SynExpr.App(isInfix = subIsInfix; funcExpr = subFuncExpr

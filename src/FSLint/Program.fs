@@ -171,6 +171,7 @@ and checkExpression src = function
       TypeUseConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix flag funcExpr argExpr
+      AppConvention.checkUnaryOperatorSpacing src expr
       checkExpression src funcExpr
       checkExpression src argExpr
   | SynExpr.Sequential(expr1 = expr1; expr2 = expr2) ->

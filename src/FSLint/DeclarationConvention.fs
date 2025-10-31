@@ -147,6 +147,20 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
       else ()
     | None -> ()
 
+let isComputationExpr = function
+  | SynExpr.ComputationExpr _ -> true
+  | SynExpr.App(argExpr = SynExpr.ComputationExpr _) -> true
+  | _ -> false
+
+let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
+  let SynBinding(expr = body; trivia = trivia) = binding
+  match trivia.EqualsRange with
+  | Some eqRange ->
+    if isComputationExpr body && eqRange.EndLine = body.Range.StartLine then
+      reportError src body.Range
+        "Computation expression should start on the next line after '='"
+  | None -> ()
+
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise

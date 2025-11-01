@@ -65,7 +65,7 @@ let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
     range.StartColumn + distFstElemToOpenBracket <> elemRange.StartColumn
   if isStartBracketSpacingIncorrect || isEndBracketSpacingIncorrect then
     try checkBracketCompFlag src elemRange range
-    with | _ -> reportBracketSpacingError src range
+    with _ -> reportBracketSpacingError src range
   else ()
 
 /// Checks proper spacing around range operator (..) in list/array literals.
@@ -150,7 +150,7 @@ let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
       && not isOnlyCommentInlineWithBracket)
       || endLineOfElem <> range.EndLine then
       try checkEdgeCompFlag src elemRange range
-      with | _ -> reportError src elemRange "BracketEdge element must be inline"
+      with _ -> reportError src elemRange "BracketEdge element must be inline"
     else ()
 
 /// In single-line, the last element must not be followed by a semicolon.

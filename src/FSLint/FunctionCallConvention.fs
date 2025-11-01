@@ -36,7 +36,7 @@ let private checkSpacingOrNot (src: ISourceText) (range: range) =
     str.Length >= 2 && str[0] = ' ' && not (isSymbolOrPunctuation str[1]) &&
     str = " wi" || str = " th" (* Heuristic: 'with' / 'then' detection *)
   with
-  | _ -> true
+    _ -> true
 
 let getLineAfterExpr (src: ISourceText) (expr: SynExpr) =
   let line = src.GetLineString(expr.Range.EndLine - 1)

@@ -17,7 +17,7 @@ let isUnaryOperator (src: ISourceText) (operatorRange: range) =
     else
       false
   with
-  | _ -> false
+    _ -> false
 
 let isOperator src = function
   | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = trivias)
@@ -71,7 +71,7 @@ let findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
     else
       None
   with
-  | _ -> None
+    _ -> None
 
 let shouldCheckFuncSpacing funcExpr (argExpr: SynExpr) =
   let isLowerCaseFirstChar: string list -> bool = function

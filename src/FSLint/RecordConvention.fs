@@ -66,7 +66,7 @@ let checkFieldIsInlineWithBracket src (range: range) fields =
       || range.EndLine <> innerRange.EndLine
     then
       try checkFieldCompFlag src range innerRange
-      with | _ -> reportError src innerRange "Field not inline with bracket."
+      with _ -> reportError src innerRange "Field not inline with bracket."
     elif range.StartColumn + 2 <> innerRange.StartColumn
       || range.EndColumn - 2 <> innerRange.EndColumn
     then reportError src range "Wrong spacing inside brackets"
@@ -117,7 +117,7 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
       then
         try
           checkBracketCompFlag src range fieldRange exprRange
-        with | _ ->
+        with _ ->
           reportError src exprRange "Bracket should inline with record field."
       elif fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn

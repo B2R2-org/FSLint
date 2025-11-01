@@ -152,6 +152,7 @@ and checkExpression src = function
     checkExpression src finallyExpr
   | SynExpr.TryWith(tryExpr = tryExpr; withCases = clauses) ->
     checkExpression src tryExpr
+    TryWithConvention.check src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
     ArrayOrListConvention.check src isArray range expr
@@ -489,7 +490,7 @@ let tryLintToBuffer
     linter.Lint(path, txt)
     { Index = index; Path = path; Ok = true; Log = sb.ToString() }
   with
-  | LintException msg ->
+    LintException msg ->
       Console.WriteLine($"--- File: {path}")
       append msg
       { Index = index; Path = path; Ok = false; Log = sb.ToString() }

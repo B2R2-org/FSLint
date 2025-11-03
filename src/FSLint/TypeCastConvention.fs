@@ -27,7 +27,7 @@ let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
       ||> Range.mkRange ""
   with
   (* TODO: Cannot detect multi line *)
-  | :? System.ArgumentOutOfRangeException -> Range.Zero
+    :? System.ArgumentOutOfRangeException -> Range.Zero
 
 /// Checks the spacing around the upcast operator (:>) in infix expressions.
 let check src expr (targetType: SynType) =

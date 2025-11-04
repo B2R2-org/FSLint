@@ -23,6 +23,7 @@
     <Compile Include="LineTests.fs" />
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="ArgumentAssignmentTests.fs" />
+    <Compile Include="ClassMemberOrderTests.fs" />
     <Compile Include="TupleTests.fs" />
     <Compile Include="ParenTests.fs" />
     <Compile Include="TypeCastTests.fs" />

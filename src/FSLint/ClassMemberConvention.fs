@@ -6,7 +6,109 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open FunctionCallConvention
 
-/// Check the spacing around backtick-enclosed method names in F# source code.
+type MemberCategory =
+  | ConstantField = 0
+  | Field = 1
+  | Constructor = 2
+  | Event = 3
+  | Property = 4
+  | Indexer = 5
+  | Method = 6
+  | NestedType = 7
+
+type AccessLevel =
+  | Public = 0
+  | Internal = 1
+  | Protected = 2
+  | Private = 3
+
+type MemberScope =
+  | Static = 0
+  | Instance = 1
+
+let getMemberCategory (memberDefn: SynMemberDefn) =
+  match memberDefn with
+  | SynMemberDefn.ImplicitCtor _ -> MemberCategory.Constructor
+  | SynMemberDefn.Member(binding, _) ->
+    let SynBinding(headPat = pat) = binding
+    match pat with
+    | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
+      match longDotId with
+      | SynLongIdent(id = [ id ]) when id.idText = "new" ->
+        MemberCategory.Constructor
+      | _ ->
+        match args with
+        | SynArgPats.Pats [] -> MemberCategory.Property
+        | _ -> MemberCategory.Method
+    | _ -> MemberCategory.Method
+  | SynMemberDefn.GetSetMember _ -> MemberCategory.Property
+  | SynMemberDefn.AutoProperty _ -> MemberCategory.Property
+  | SynMemberDefn.AbstractSlot _ -> MemberCategory.Method
+  | SynMemberDefn.ValField _ -> MemberCategory.Field
+  | SynMemberDefn.LetBindings _ -> MemberCategory.Field
+  | SynMemberDefn.NestedType _ -> MemberCategory.NestedType
+  | _ -> MemberCategory.Method
+
+let isStaticMember (memberDefn: SynMemberDefn) =
+  match memberDefn with
+  | SynMemberDefn.Member(binding, _) ->
+    let SynBinding(headPat = pat; trivia = trivia) = binding
+    trivia.LeadingKeyword.IsStaticMember
+  | _ -> false
+
+let getMemberScope (memberDefn: SynMemberDefn) =
+  if isStaticMember memberDefn then MemberScope.Static
+  else MemberScope.Instance
+
+let getAccessLevel (memberDefn: SynMemberDefn) =
+  match memberDefn with
+  | SynMemberDefn.Member(binding, _) ->
+    let SynBinding(accessibility = access) = binding
+    match access with
+    | Some(SynAccess.Private _) -> AccessLevel.Private
+    | Some(SynAccess.Internal _) -> AccessLevel.Internal
+    | Some(SynAccess.Public _) -> AccessLevel.Public
+    | None -> AccessLevel.Public
+  | _ -> AccessLevel.Public
+
+let getMemberOrderKey (memberDefn: SynMemberDefn) =
+  let category = int (getMemberCategory memberDefn)
+  let scope = int (getMemberScope memberDefn)
+  let access = int (getAccessLevel memberDefn)
+  (category * 100) + (scope * 10) + access
+
+let checkMemberOrder (src: ISourceText) (members: SynMemberDefn list) =
+  let orderableMembers =
+    members
+    |> List.filter (fun m ->
+      match m with
+      | SynMemberDefn.ImplicitCtor _
+      | SynMemberDefn.ImplicitInherit _
+      | SynMemberDefn.Inherit _
+      | SynMemberDefn.Interface _ -> false
+      | _ -> true
+    )
+  orderableMembers
+  |> List.pairwise
+  |> List.iter (fun (prev, next) ->
+    let prevKey = getMemberOrderKey prev
+    let nextKey = getMemberOrderKey next
+    if prevKey > nextKey then
+      let prevCat = getMemberCategory prev
+      let nextCat = getMemberCategory next
+      let prevScope = getMemberScope prev
+      let nextScope = getMemberScope next
+      let message =
+        if prevCat <> nextCat then
+          sprintf "Wrong member order: %A should come before %A"
+            nextCat prevCat
+        elif prevScope <> nextScope then
+          "Wrong member order: static should come before instance members"
+        else
+          "Wrong member order: members should be ordered by access level"
+      reportError src next.Range message
+  )
+
 let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
   if (dotRanges: range list).Length = 1 then
     let dotRange = List.head dotRanges

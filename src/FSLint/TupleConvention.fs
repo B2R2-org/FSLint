@@ -20,7 +20,7 @@ let adjustRangeByComment (src: ISourceText) rangeWithElems =
     let gapStr = src.GetSubTextFromRange betweenElementsRange
     if findPointer.Chars(0).Equals '?' then
       comRange, fstElem.Range, makeNewRangeAdjustedByGap sndElem.Range 1
-    elif gapStr.IndexOf "(*" <> - 1 then
+    elif gapStr.IndexOf "(*" <> -1 then
       let gap = gapStr.IndexOf "*)" - gapStr.IndexOf "(*" + 3
       makeNewRangeAdjustedByGap comRange gap,
       fstElem.Range,
@@ -38,7 +38,7 @@ let adjustRangeByCommentInPat (src: ISourceText) rangeWithElems =
     let gapStr = src.GetSubTextFromRange betweenElementsRange
     if findPointer.Chars(0).Equals '?' then
       comRange, fstElem.Range, makeNewRangeAdjustedByGap sndElem.Range 1
-    elif gapStr.IndexOf "(*" <> - 1 then
+    elif gapStr.IndexOf "(*" <> -1 then
       let gap = gapStr.IndexOf "*)" - gapStr.IndexOf "(*" + 3
       makeNewRangeAdjustedByGap comRange gap,
       fstElem.Range,

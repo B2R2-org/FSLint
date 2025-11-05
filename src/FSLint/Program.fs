@@ -322,6 +322,7 @@ and checkTypeDefnRepr src lid repr trivia =
   match repr with
   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
     ClassDefinition.checkIdentifierWithParen src members
+    ClassMemberConvention.checkMemberOrder src members
     checkMemberDefns src members
   | SynTypeDefnRepr.Simple(repr, _) ->
     checkTypeDefnSimpleRepr src trivia repr

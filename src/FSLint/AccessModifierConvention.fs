@@ -4,26 +4,27 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
 type AccessLevel =
-  | Public = 0
-  | Internal = 1
-  | Private = 2
+  | Public
+  | Internal
+  | Private
 
 type ScopeContext =
     { ModuleAccess: AccessLevel
       TypeAccess: AccessLevel option }
 
 let getAccessLevel = function
-  | Some(SynAccess.Public _) -> AccessLevel.Public
-  | Some(SynAccess.Internal _) -> AccessLevel.Internal
-  | Some(SynAccess.Private _) -> AccessLevel.Private
-  | None -> AccessLevel.Public
+  | Some(SynAccess.Public _) -> Public
+  | Some(SynAccess.Internal _) -> Internal
+  | Some(SynAccess.Private _) -> Private
+  | None -> Public
 
-let defaultContext =
-    { ModuleAccess = AccessLevel.Public
-      TypeAccess = None }
+let getRestrictiveness = function
+  | Public -> 0
+  | Internal -> 1
+  | Private -> 2
 
 let isRedundant (parentAccess: AccessLevel) (memberAccess: AccessLevel) =
-  memberAccess <= parentAccess
+  getRestrictiveness memberAccess <= getRestrictiveness parentAccess
 
 let checkLetBinding src (context: ScopeContext) (binding: SynBinding) =
   let SynBinding(headPat = pat; range = range) = binding
@@ -37,9 +38,9 @@ let checkLetBinding src (context: ScopeContext) (binding: SynBinding) =
     if isRedundant context.ModuleAccess memberAccess then
       let accessStr =
         match memberAccess with
-        | AccessLevel.Private -> "private"
-        | AccessLevel.Internal -> "internal"
-        | _ -> "public"
+        | Private -> "private"
+        | Internal -> "internal"
+        | Public -> "public"
       reportError src range
         (sprintf
           "Redundant '%s' modifier: already restricted by enclosing module"
@@ -64,9 +65,9 @@ let checkTypeMember
       if isRedundant typeAccess memberAccess then
         let accessStr =
           match memberAccess with
-          | AccessLevel.Private -> "private"
-          | AccessLevel.Internal -> "internal"
-          | _ -> "public"
+          | Private -> "private"
+          | Internal -> "internal"
+          | Public -> "public"
         reportError src range
           (sprintf
             "Redundant '%s' modifier: already restricted by enclosing type"
@@ -86,9 +87,9 @@ let checkNestedModule (src: ISourceText) (context: ScopeContext)
     if isRedundant context.ModuleAccess moduleAccess then
       let accessStr =
         match moduleAccess with
-        | AccessLevel.Private -> "private"
-        | AccessLevel.Internal -> "internal"
-        | _ -> "public"
+        | Private -> "private"
+        | Internal -> "internal"
+        | Public -> "public"
       reportError src range
         (sprintf
           "Redundant '%s' modifier: already restricted by enclosing module"
@@ -105,9 +106,9 @@ let checkTypeInModule (src: ISourceText) (context: ScopeContext)
     if isRedundant context.ModuleAccess typeAccess then
       let accessStr =
         match typeAccess with
-        | AccessLevel.Private -> "private"
-        | AccessLevel.Internal -> "internal"
-        | _ -> "public"
+        | Private -> "private"
+        | Internal -> "internal"
+        | Public -> "public"
       reportError src range
         (sprintf
           "Redundant '%s' modifier: already restricted by enclosing module"

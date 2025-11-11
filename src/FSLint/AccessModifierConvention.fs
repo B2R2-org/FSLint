@@ -18,19 +18,6 @@ let getAccessLevel = function
   | Some(SynAccess.Private _) -> AccessLevel.Private
   | None -> AccessLevel.Public
 
-let getAccessLevelFromAttributes (attrs: SynAttributeList list) =
-  let hasPrivate =
-    attrs
-    |> List.exists (fun attrList ->
-      attrList.Attributes
-      |> List.exists (fun attr ->
-        match attr.TypeName with
-        | SynLongIdent(id = [ id ]) when id.idText = "private" -> true
-        | _ -> false
-      )
-    )
-  if hasPrivate then AccessLevel.Private else AccessLevel.Public
-
 let defaultContext =
     { ModuleAccess = AccessLevel.Public
       TypeAccess = None }
@@ -126,11 +113,3 @@ let checkTypeInModule (src: ISourceText) (context: ScopeContext)
           "Redundant '%s' modifier: already restricted by enclosing module"
           accessStr)
   | None -> ()
-
-let hasAccessModifier (componentInfo: SynComponentInfo) =
-  let (SynComponentInfo(accessibility = access)) = componentInfo
-  access
-
-let getAccessFromComponentInfo (componentInfo: SynComponentInfo) =
-  let (SynComponentInfo(accessibility = access)) = componentInfo
-  getAccessLevel access

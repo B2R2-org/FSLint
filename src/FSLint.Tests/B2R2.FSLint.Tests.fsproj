@@ -24,6 +24,7 @@
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="ArgumentAssignmentTests.fs" />
     <Compile Include="ClassMemberOrderTests.fs" />
+    <Compile Include="AccessModifierTests.fs" />
     <Compile Include="TupleTests.fs" />
     <Compile Include="TryWithTests.fs" />
     <Compile Include="ParenTests.fs" />

@@ -10,6 +10,11 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open type IdentifierConvention.CaseStyle
 
+type CheckContext =
+  { ModuleAccess: AccessModifierConvention.AccessLevel }
+
+let defaultCheckContext =
+  { ModuleAccess = AccessModifierConvention.AccessLevel.Public }
 
 let parseFile txt (path: string) =
   let checker = FSharpChecker.Create()
@@ -375,18 +380,73 @@ and checkBindings src case bindings =
   for binding in bindings do
     checkBinding src case binding
 
-and checkDeclarations src decls =
+and checkTypeDefnWithContext
+ (src: ISourceText) (context: CheckContext) (typeDefn: SynTypeDefn) =
+  let (SynTypeDefn(typeInfo = componentInfo;
+                   typeRepr = repr;
+                   members = explicitMembers;
+                   range = range)) = typeDefn
+  let (SynComponentInfo(accessibility = typeAccess)) = componentInfo
+  let effectiveTypeAccess =
+    match typeAccess with
+    | Some _ -> AccessModifierConvention.getAccessLevel typeAccess
+    | None -> context.ModuleAccess
+  match typeAccess with
+  | Some _ ->
+    let explicitAccess = AccessModifierConvention.getAccessLevel typeAccess
+    if explicitAccess <= context.ModuleAccess then
+      let scopeContext: AccessModifierConvention.ScopeContext =
+        { AccessModifierConvention.ModuleAccess = context.ModuleAccess
+          AccessModifierConvention.TypeAccess = None }
+      AccessModifierConvention.checkTypeInModule
+       src scopeContext typeAccess range
+  | None -> ()
+  let allMembers =
+    match repr with
+    | SynTypeDefnRepr.ObjectModel(_, reprMembers, _) -> reprMembers
+    | _ -> []
+  let allMembers = allMembers @ explicitMembers
+  let memberScopeContext: AccessModifierConvention.ScopeContext =
+    { AccessModifierConvention.ModuleAccess = context.ModuleAccess
+      AccessModifierConvention.TypeAccess = Some effectiveTypeAccess }
+  for memberDefn in allMembers do
+    AccessModifierConvention.checkTypeMember src memberScopeContext memberDefn
+  checkTypeDefn src typeDefn
+
+and checkDeclarationsWithContext
+ (src: ISourceText) (context: CheckContext) (decls: SynModuleDecl list) =
   DeclarationConvention.check src decls
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule(moduleInfo = info; decls = decls) ->
-      let SynComponentInfo(longId = lid) = info
+    | SynModuleDecl.NestedModule(
+      moduleInfo = info; decls = decls; range = range) ->
+      let SynComponentInfo(longId = lid; accessibility = access) = info
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
-      checkDeclarations src decls
+      let effectiveModuleAccess =
+        match access with
+        | Some _ -> AccessModifierConvention.getAccessLevel access
+        | None -> context.ModuleAccess
+      match access with
+      | Some _ ->
+        let explicitAccess = AccessModifierConvention.getAccessLevel access
+        if explicitAccess <= context.ModuleAccess then
+          let scopeContext: AccessModifierConvention.ScopeContext =
+            { AccessModifierConvention.ModuleAccess = context.ModuleAccess
+              AccessModifierConvention.TypeAccess = None }
+          AccessModifierConvention.checkNestedModule
+           src scopeContext access range
+      | None -> ()
+      let nestedContext = { ModuleAccess = effectiveModuleAccess }
+      checkDeclarationsWithContext src nestedContext decls
     | SynModuleDecl.Let(_, bindings, range) ->
+      let scopeContext: AccessModifierConvention.ScopeContext =
+        { AccessModifierConvention.ModuleAccess = context.ModuleAccess
+          AccessModifierConvention.TypeAccess = None }
+      for binding in bindings do
+        AccessModifierConvention.checkLetBinding src scopeContext binding
       FunctionBodyConvention.checkBindings src range bindings
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
@@ -396,23 +456,31 @@ and checkDeclarations src decls =
         ClassDefinition.checkNestedTypeDefns src range typeDefns
       else
         ()
-      for typeDefn in typeDefns do checkTypeDefn src typeDefn
-    | SynModuleDecl.Exception(SynExceptionDefn(exnRepr = repr), _) ->
-      checkExceptionDefnRepr src repr
+      for typeDefn in typeDefns do
+        checkTypeDefnWithContext src context typeDefn
     | SynModuleDecl.Open _
     | SynModuleDecl.HashDirective _
+    | SynModuleDecl.Exception _
     | SynModuleDecl.Attributes _ ->
       () (* no need to check this *)
     | _ ->
       failwith $"{nameof checkDeclarations} TODO: {decl}"
 
-let checkWithAST src = function
-  | ParsedInput.ImplFile(ParsedImplFileInput(contents=modules)) ->
+and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
+  checkDeclarationsWithContext src defaultCheckContext decls
+
+let checkWithAST src input =
+  match input with
+  | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules)) ->
     for m in modules do
-      let SynModuleOrNamespace(longId = lid; decls = decls) = m
+      let SynModuleOrNamespace(longId = lid;
+                                decls = decls;
+                                accessibility = access) = m
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
-      checkDeclarations src decls
+      let moduleAccess = AccessModifierConvention.getAccessLevel access
+      let context = { ModuleAccess = moduleAccess }
+      checkDeclarationsWithContext src context decls
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 

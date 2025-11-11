@@ -44,8 +44,8 @@ type TryWithTests() =
       "  try\n" +
       "    riskyOp ()\n" +
       "  with\n" +
-      "  | :? System.IO.IOException as ex -> printfn \"IO\"\n" +
-      "  | :? System.TimeoutException as ex -> printfn \"Timeout\"\n" +
+      "  | System.IO.IOException as ex -> printfn \"IO\"\n" +
+      "  | System.TimeoutException as ex -> printfn \"Timeout\"\n" +
       "  | _ -> printfn \"Other\"\n"
     linterForFs.Lint(Constants.FakeFsPath, code)
 

@@ -27,7 +27,6 @@
     <Compile Include="AccessModifierTests.fs" />
     <Compile Include="TupleTests.fs" />
     <Compile Include="NegationSimplificationTests.fs" />
-    <Compile Include="TryWithTests.fs" />
     <Compile Include="ParenTests.fs" />
     <Compile Include="TypeCastTests.fs" />
     <Compile Include="ClassDefinitionTests.fs" />

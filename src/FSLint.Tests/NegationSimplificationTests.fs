@@ -77,3 +77,26 @@ type NegationSimplificationTests() =
   member _.``[NegationSimplification] Good - not with complex expression``() =
     let code = "let f a b = not (a > 0 && b < 0)\n"
     linterForFs.Lint(Constants.FakeFsPath, code)
+
+  [<TestMethod>]
+  member _.``[NegationSimplification] Error - pipeline not``() =
+    let code = "let f a b = a = b |> not\n"
+    Assert.ThrowsException<LintException>(fun () ->
+    linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+
+  [<TestMethod>]
+  member _.``[NegationSimplification] Error - pipeline with paren not``() =
+    let code = "let f a b = (a = b) |> not\n"
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+
+  [<TestMethod>]
+  member _.``[NegationSimplification] Error - pipeline not ``() =
+    let code = "let f a b = a > b |> not\n"
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+
+  [<TestMethod>]
+  member _.``[NegationSimplification] Good - pipeline non-comparison``() =
+    let code = "let f a = isValid a |> not\n"
+    linterForFs.Lint(Constants.FakeFsPath, code)

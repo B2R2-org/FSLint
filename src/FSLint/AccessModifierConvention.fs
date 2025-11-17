@@ -5,112 +5,64 @@ open FSharp.Compiler.Syntax
 
 type AccessLevel =
   | Public
-  | Internal
   | Private
 
 type ScopeContext =
-    { ModuleAccess: AccessLevel
-      TypeAccess: AccessLevel option }
+  { ModuleAccess: AccessLevel
+    TypeAccess: AccessLevel option }
 
 let getAccessLevel = function
-  | Some(SynAccess.Public _) -> Public
-  | Some(SynAccess.Internal _) -> Internal
   | Some(SynAccess.Private _) -> Private
-  | None -> Public
+  | _ -> Public
 
-let getRestrictiveness = function
-  | Public -> 0
-  | Internal -> 1
-  | Private -> 2
+let isRedundant parentAccess memberAccess =
+  parentAccess = Private && memberAccess = Private
 
-let isRedundant (parentAccess: AccessLevel) (memberAccess: AccessLevel) =
-  getRestrictiveness memberAccess <= getRestrictiveness parentAccess
+let accessToString = function
+  | Private -> "private"
+  | Public -> "public"
+
+let reportRedundant src range accessLevel scopeType =
+  reportError src range
+    (sprintf "Redundant '%s' modifier: already restricted by enclosing %s"
+      (accessToString accessLevel) scopeType)
+
+let getPatternAccess = function
+  | SynPat.LongIdent(accessibility = acc) -> acc
+  | _ -> None
 
 let checkLetBinding src (context: ScopeContext) (binding: SynBinding) =
   let SynBinding(headPat = pat; range = range) = binding
-  let access =
-    match pat with
-    | SynPat.LongIdent(accessibility = acc) -> acc
-    | _ -> None
-  match access with
-  | Some _ ->
-    let memberAccess = getAccessLevel access
+  getPatternAccess pat
+  |> Option.iter (fun _ ->
+    let memberAccess = getAccessLevel (getPatternAccess pat)
     if isRedundant context.ModuleAccess memberAccess then
-      let accessStr =
-        match memberAccess with
-        | Private -> "private"
-        | Internal -> "internal"
-        | Public -> "public"
-      reportError src range
-        (sprintf
-          "Redundant '%s' modifier: already restricted by enclosing module"
-          accessStr)
-    else
-      ()
-  | None ->
-    ()
+      reportRedundant src range Private "module"
+  )
 
-let checkTypeMember
- (src: ISourceText) (context: ScopeContext) (memberDefn: SynMemberDefn) =
+let checkTypeMember src (context: ScopeContext) (memberDefn: SynMemberDefn) =
   match memberDefn with
-  | SynMemberDefn.Member(binding, _) ->
-    let SynBinding(headPat = pat; range = range) = binding
-    let access =
-      match pat with
-      | SynPat.LongIdent(accessibility = acc) -> acc
-      | _ -> None
-    match access, context.TypeAccess with
+  | SynMemberDefn.Member(SynBinding(headPat = pat; range = range), _) ->
+    match getPatternAccess pat, context.TypeAccess with
     | Some _, Some typeAccess ->
-      let memberAccess = getAccessLevel access
+      let memberAccess = getAccessLevel (getPatternAccess pat)
       if isRedundant typeAccess memberAccess then
-        let accessStr =
-          match memberAccess with
-          | Private -> "private"
-          | Internal -> "internal"
-          | Public -> "public"
-        reportError src range
-          (sprintf
-            "Redundant '%s' modifier: already restricted by enclosing type"
-            accessStr)
-      else
-        ()
-    | _ ->
-      ()
-  | _ ->
-    ()
+        reportRedundant src range Private "type"
+    | _ -> ()
+  | _ -> ()
 
-let checkNestedModule (src: ISourceText) (context: ScopeContext)
-                      (access: SynAccess option) (range: range) =
-  match access with
-  | Some _ ->
+let checkNestedModule src (context: ScopeContext) access range =
+  access
+  |> Option.iter (fun _ ->
     let moduleAccess = getAccessLevel access
     if isRedundant context.ModuleAccess moduleAccess then
-      let accessStr =
-        match moduleAccess with
-        | Private -> "private"
-        | Internal -> "internal"
-        | Public -> "public"
-      reportError src range
-        (sprintf
-          "Redundant '%s' modifier: already restricted by enclosing module"
-          accessStr)
-    else
-      ()
-  | None -> ()
+      reportRedundant src range Private "module"
+  )
 
-let checkTypeInModule (src: ISourceText) (context: ScopeContext)
-                      (access: SynAccess option) (range: range) =
-  match access with
-  | Some _ ->
+let checkTypeInModule src (context: ScopeContext) access range =
+  access
+  |> Option.iter (fun _ ->
     let typeAccess = getAccessLevel access
     if isRedundant context.ModuleAccess typeAccess then
-      let accessStr =
-        match typeAccess with
-        | Private -> "private"
-        | Internal -> "internal"
-        | Public -> "public"
-      reportError src range
-        (sprintf
-          "Redundant '%s' modifier: already restricted by enclosing module"
-          accessStr)
-  | None -> ()
+      reportRedundant src range Private "module"
+  )

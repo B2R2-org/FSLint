@@ -24,6 +24,7 @@
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />
     <Compile Include="TryWithConvention.fs" />
+    <Compile Include="AccessModifierConvention.fs" />
     <Compile Include="ArgumentAssignmentConvention.fs" />
     <Compile Include="TupleConvention.fs" />
     <Compile Include="ParenConvention.fs" />

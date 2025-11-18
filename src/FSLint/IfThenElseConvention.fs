@@ -14,7 +14,7 @@ let safeGetSubText (src: ISourceText) (range: range) =
     else
       ""
   with
-  | _ -> ""
+    _ -> ""
 
 let rec containsMatchOrBar (expr: SynExpr) =
   match expr with
@@ -47,7 +47,7 @@ let calculateIfThenExprLength
       let indent = ifRange.StartColumn
       indent + 3 + ifText.Length + 6 + thenText.Length
   with
-  | _ -> System.Int32.MaxValue
+    _ -> System.Int32.MaxValue
 
 let calculateElseExprLength
  (src: ISourceText) (ifRange: range) (elseExpr: SynExpr) =
@@ -59,7 +59,7 @@ let calculateElseExprLength
       let indent = ifRange.StartColumn
       indent + 5 + elseText.Length
   with
-  | _ -> System.Int32.MaxValue
+    _ -> System.Int32.MaxValue
 
 let isCompactFormat
  (ifExpr: SynExpr) (thenExpr: SynExpr) (elseExpr: SynExpr) =

@@ -10,79 +10,57 @@ open System.Threading.Tasks
 
 [<CLIMutable>]
 type Position =
-{
-  [<JsonProperty("line")>]
-  line: int
-  [<JsonProperty("character")>]
-  character: int
-}
+  { [<JsonProperty("line")>] Line: int
+    [<JsonProperty("character")>] Character: int }
+
 [<CLIMutable>]
-type Range = {
-  [<JsonProperty("start")>]
-  start: Position
-  [<JsonProperty("end")>]
-  ``end``: Position
-}
+type Range =
+  { [<JsonProperty("start")>] Start: Position
+    [<JsonProperty("end")>] End: Position }
+
 [<CLIMutable>]
-type Diagnostic = {
-  [<JsonProperty("range")>]
-  range: Range
-  [<JsonProperty("severity")>]
-  severity: int
-  [<JsonProperty("source")>]
-  source: string
-  [<JsonProperty("message")>]
-  message: string
-}
+type Diagnostic =
+  { [<JsonProperty("range")>] Range: Range
+    [<JsonProperty("severity")>] Severity: int
+    [<JsonProperty("source")>] Source: string
+    [<JsonProperty("message")>] Message: string }
+
 [<CLIMutable>]
-type SaveOptions = {
-  [<JsonProperty("includeText")>]
-  includeText: bool
-}
+type SaveOptions =
+  { [<JsonProperty("includeText")>] IncludeText: bool }
+
 [<CLIMutable>]
-type TextDocumentSyncOptions = {
-  [<JsonProperty("openClose")>]
-  openClose: bool
-  [<JsonProperty("change")>]
-  change: int
-  [<JsonProperty("save")>]
-  save: SaveOptions option
-}
+type TextDocumentSyncOptions =
+  { [<JsonProperty("openClose")>] OpenClose: bool
+    [<JsonProperty("change")>] Change: int
+    [<JsonProperty("save")>] Save: SaveOptions option }
+
 [<CLIMutable>]
-type ServerCapabilities = {
-  [<JsonProperty("positionEncoding")>]
-  positionEncoding: string
-  [<JsonProperty("textDocumentSync")>]
-  textDocumentSync: TextDocumentSyncOptions
-}
+type ServerCapabilities =
+  { [<JsonProperty("positionEncoding")>] PositionEncoding: string
+    [<JsonProperty("textDocumentSync")>]
+    TextDocumentSync: TextDocumentSyncOptions }
+
 [<CLIMutable>]
-type ServerInfo = {
-  [<JsonProperty("name")>]
-  name: string
-  [<JsonProperty("version")>]
-  version: string
-}
+type ServerInfo =
+  { [<JsonProperty("name")>] Name: string
+    [<JsonProperty("version")>] Version: string }
+
 [<CLIMutable>]
-type InitializeResult = {
-  [<JsonProperty("capabilities")>]
-  capabilities: ServerCapabilities
-  [<JsonProperty("serverInfo")>]
-  serverInfo: ServerInfo
-}
+type InitializeResult =
+  { [<JsonProperty("capabilities")>] Capabilities: ServerCapabilities
+    [<JsonProperty("serverInfo")>] ServerInfo: ServerInfo }
+
 type LspServer(rpc: JsonRpc) =
-  /// Diagnostic 생성
-  let createDiagnostic (lineNum: int) (message: string) : Diagnostic =
-    {
-      range = {
-        start = { line = lineNum - 1; character = 0 }
-        ``end`` = { line = lineNum - 1; character = 1000 }
-      }
-      severity = 2 // Warning
-      source = "FSLint"
-      message = message
-    }
-  /// LintException을 Diagnostic으로 변환
-  let lintExceptionToDiagnostic (ex: Utils.LintException) : Diagnostic option =
+
+  let createDiagnostic (lineNum: int) (message: string): Diagnostic =
+    { Range = { Start = { Line = lineNum - 1; Character = 0 }
+                End = { Line = lineNum - 1; Character = 1000 } }
+      Severity = 2
+      Source = "FSLint"
+      Message = message }
+
+  let lintExceptionToDiagnostic (ex: Utils.LintException) =
     try
       let msg = ex.Message
       let parts = msg.Split([| '\n' |], 2)
@@ -93,14 +71,14 @@ type LspServer(rpc: JsonRpc) =
           let lineStr = lineParts.[0].Replace("Line", "").Trim()
           let message = lineParts.[1].Trim()
           match Int32.TryParse(lineStr) with
-          | true, lineNum -> Some (createDiagnostic lineNum message)
+          | true, lineNum -> Some(createDiagnostic lineNum message)
           | _ -> None
         else None
       else None
     with
-    | _ -> None
-  /// 파일 린팅
-  let lintFile (uri: string) (content: string) : Diagnostic[] =
+    _ -> None
+
+  let lintFile (uri: string) (content: string): Diagnostic[] =
     try
       Utils.setCurrentFile uri
       Program.linterForFs.Lint(uri, content)
@@ -113,41 +91,32 @@ type LspServer(rpc: JsonRpc) =
     | ex ->
       eprintfn "Error linting %s: %s" uri ex.Message
       [||]
-/// Diagnostics 발행
-  let publishDiagnostics (uri: string) (diagnostics: Diagnostic[]) : Task =
-    let notification = dict [
-      "uri", box uri
-      "diagnostics", box diagnostics
-    ]
+
+  let publishDiagnostics (uri: string) (diagnostics: Diagnostic[]): Task =
+    let notification =
+      dict [ "uri", box uri; "diagnostics", box diagnostics ]
     rpc.NotifyAsync("textDocument/publishDiagnostics", notification)
+
   [<JsonRpcMethod("initialize")>]
-  member _.Initialize(p: JToken) : Task<InitializeResult> =
+  member _.Initialize(p: JToken): Task<InitializeResult> =
     task {
-      eprintfn "Initialize called - START"
-      let result = {
-        capabilities = {
-          positionEncoding = "utf-16"
-          textDocumentSync = {
-            openClose = true
-            change = 1
-            save = Some { includeText = true }
-          }
-        }
-        serverInfo = {
-          name = "FSLint Language Server"
-          version = "1.0.0"
-        }
-      }
-      let json = JsonConvert.SerializeObject(result, Formatting.Indented)
+      let result =
+        { Capabilities =
+            { PositionEncoding = "utf-16"
+              TextDocumentSync =
+                { OpenClose = true
+                  Change = 1
+                  Save = Some { IncludeText = true } } }
+          ServerInfo =
+            { Name = "FSLint Language Server"; Version = "1.0.0" } }
       return result
     }
+
   [<JsonRpcMethod("initialized")>]
-  member _.Initialized(p: JToken) : Task =
-    task {
-      eprintfn "Initialized notification received"
-    }
+  member _.Initialized(p: JToken): Task = task { () }
+
   [<JsonRpcMethod("textDocument/didOpen")>]
-  member _.TextDocumentDidOpen(p: JToken) : Task =
+  member _.TextDocumentDidOpen(p: JToken): Task =
     task {
       let doc = p.["textDocument"]
       let uri = doc.["uri"].ToString()
@@ -155,8 +124,9 @@ type LspServer(rpc: JsonRpc) =
       let diagnostics = lintFile uri content
       do! publishDiagnostics uri diagnostics
     }
+
   [<JsonRpcMethod("textDocument/didChange")>]
-  member _.TextDocumentDidChange(p: JToken) : Task =
+  member _.TextDocumentDidChange(p: JToken): Task =
     task {
       let doc = p.["textDocument"]
       let uri = doc.["uri"].ToString()
@@ -167,8 +137,9 @@ type LspServer(rpc: JsonRpc) =
         let diagnostics = lintFile uri content
         do! publishDiagnostics uri diagnostics
     }
+
   [<JsonRpcMethod("textDocument/didSave")>]
-  member _.TextDocumentDidSave(p: JToken) : Task =
+  member _.TextDocumentDidSave(p: JToken): Task =
     task {
       let doc = p.["textDocument"]
       let uri = doc.["uri"].ToString()
@@ -179,33 +150,33 @@ type LspServer(rpc: JsonRpc) =
         let diagnostics = lintFile uri content
         do! publishDiagnostics uri diagnostics
     }
+
   [<JsonRpcMethod("textDocument/didClose")>]
-  member _.TextDocumentDidClose(p: JToken) : Task =
+  member _.TextDocumentDidClose(p: JToken): Task =
     task {
       let doc = p.["textDocument"]
       let uri = doc.["uri"].ToString()
       do! publishDiagnostics uri [||]
     }
+
   [<JsonRpcMethod("workspace/didChangeConfiguration")>]
-  member _.WorkspaceDidChangeConfiguration(p: JToken) : Task =
-    task {
-      ()
-    }
+  member _.WorkspaceDidChangeConfiguration(p: JToken): Task = task { () }
+
   [<JsonRpcMethod("workspace/didChangeWatchedFiles")>]
-  member _.WorkspaceDidChangeWatchedFiles(p: JToken) : Task =
-    task {
-      ()
-    }
+  member _.WorkspaceDidChangeWatchedFiles(p: JToken): Task = task { () }
+
   [<JsonRpcMethod("shutdown")>]
-  member _.Shutdown() : Task<obj> =
+  member _.Shutdown(): Task<obj> =
     task {
       eprintfn "Shutdown called"
       return null
     }
+
   [<JsonRpcMethod("exit")>]
   member _.Exit() =
     eprintfn "Exit called"
     Environment.Exit(0)
+
 [<EntryPoint>]
 let main argv =
   try
@@ -214,9 +185,10 @@ let main argv =
     let stdout = Console.OpenStandardOutput()
     Console.SetOut(Console.Error)
     use rpc = new JsonRpc(stdout, stdin)
-    // JSON-RPC 메시지 로깅 - Warning 레벨 이상만 출력
-    rpc.TraceSource <- new System.Diagnostics.TraceSource(
-      "JsonRpc", System.Diagnostics.SourceLevels.Warning)
+    rpc.TraceSource <-
+      new System.Diagnostics.TraceSource(
+        "JsonRpc",
+        System.Diagnostics.SourceLevels.Warning)
     rpc.TraceSource.Listeners.Add(
       new System.Diagnostics.ConsoleTraceListener()) |> ignore
     let server = LspServer(rpc)
@@ -227,6 +199,6 @@ let main argv =
     eprintfn "FSLint Language Server stopped"
     0
   with
-  | ex ->
+  ex ->
     eprintfn "Fatal error: %s\n%s" ex.Message ex.StackTrace
     1

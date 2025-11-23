@@ -176,17 +176,6 @@ let x =
     ) |> ignore
 
   [<TestMethod>]
-<<<<<<< HEAD
-=======
-  member _.``[IfThenElse] If without else - no check``() =
-    let code =
-      """
-let check x = if x > 0 then printfn "positive"
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
->>>>>>> a17b849 (Add NegationSimplify rule)
   member _.``[IfThenElse] Nested if-then-else``() =
     let code =
       """

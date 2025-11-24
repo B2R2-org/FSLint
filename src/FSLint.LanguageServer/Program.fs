@@ -53,7 +53,7 @@ type InitializeResult =
 
 type LspServer(rpc: JsonRpc) =
 
-  let createDiagnostic (lineNum: int) (message: string): Diagnostic =
+  let createDiagnostic (lineNum: int) (message: string) =
     { Range = { Start = { Line = lineNum - 1; Character = 0 }
                 End = { Line = lineNum - 1; Character = 1000 } }
       Severity = 2
@@ -62,14 +62,12 @@ type LspServer(rpc: JsonRpc) =
 
   let lintExceptionToDiagnostic (ex: Utils.LintException) =
     try
-      let msg = ex.Message
-      let parts = msg.Split([| '\n' |], 2)
+      let parts = ex.Message.Split([| '\n' |], 2)
       if parts.Length > 0 then
-        let firstLine = parts.[0]
-        let lineParts = firstLine.Split([| ':' |], 2)
+        let lineParts = parts[0].Split([| ':' |], 2)
         if lineParts.Length >= 2 then
-          let lineStr = lineParts.[0].Replace("Line", "").Trim()
-          let message = lineParts.[1].Trim()
+          let lineStr = lineParts[0].Replace("Line", "").Trim()
+          let message = lineParts[1].Trim()
           match Int32.TryParse(lineStr) with
           | true, lineNum -> Some(createDiagnostic lineNum message)
           | _ -> None
@@ -78,7 +76,7 @@ type LspServer(rpc: JsonRpc) =
     with
     _ -> None
 
-  let lintFile (uri: string) (content: string): Diagnostic[] =
+  let lintFile (uri: string) (content: string) =
     try
       Utils.setCurrentFile uri
       Program.linterForFs.Lint(uri, content)
@@ -92,13 +90,15 @@ type LspServer(rpc: JsonRpc) =
       eprintfn "Error linting %s: %s" uri ex.Message
       [||]
 
-  let publishDiagnostics (uri: string) (diagnostics: Diagnostic[]): Task =
-    let notification =
-      dict [ "uri", box uri; "diagnostics", box diagnostics ]
-    rpc.NotifyAsync("textDocument/publishDiagnostics", notification)
+  let publishDiagnostics (uri: string) (diagnostics: Diagnostic[]) =
+    rpc.NotifyWithParameterObjectAsync(
+      "textDocument/publishDiagnostics",
+      JObject(
+        JProperty("uri", uri),
+        JProperty("diagnostics", JArray(diagnostics))))
 
   [<JsonRpcMethod("initialize")>]
-  member _.Initialize(p: JToken): Task<InitializeResult> =
+  member _.Initialize(_: JToken) =
     task {
       let result =
         { Capabilities =
@@ -113,37 +113,40 @@ type LspServer(rpc: JsonRpc) =
     }
 
   [<JsonRpcMethod("initialized")>]
-  member _.Initialized(p: JToken): Task = task { () }
+  member _.Initialized(_: JToken) =
+    task {
+      ()
+    }
 
   [<JsonRpcMethod("textDocument/didOpen")>]
-  member _.TextDocumentDidOpen(p: JToken): Task =
+  member _.TextDocumentDidOpen(p: JToken) =
     task {
-      let doc = p.["textDocument"]
-      let uri = doc.["uri"].ToString()
-      let content = doc.["text"].ToString()
+      let doc = p["textDocument"]
+      let uri = doc["uri"].ToString()
+      let content = doc["text"].ToString()
       let diagnostics = lintFile uri content
       do! publishDiagnostics uri diagnostics
     }
 
   [<JsonRpcMethod("textDocument/didChange")>]
-  member _.TextDocumentDidChange(p: JToken): Task =
+  member _.TextDocumentDidChange(p: JToken) =
     task {
-      let doc = p.["textDocument"]
-      let uri = doc.["uri"].ToString()
-      let changes = p.["contentChanges"] :?> JArray
+      let doc = p["textDocument"]
+      let uri = doc["uri"].ToString()
+      let changes = p["contentChanges"] :?> JArray
       if changes.Count > 0 then
-        let lastChange = changes.[changes.Count - 1]
-        let content = lastChange.["text"].ToString()
+        let lastChange = changes[changes.Count - 1]
+        let content = lastChange["text"].ToString()
         let diagnostics = lintFile uri content
         do! publishDiagnostics uri diagnostics
     }
 
   [<JsonRpcMethod("textDocument/didSave")>]
-  member _.TextDocumentDidSave(p: JToken): Task =
+  member _.TextDocumentDidSave(p: JToken) =
     task {
-      let doc = p.["textDocument"]
-      let uri = doc.["uri"].ToString()
-      match p.["text"] with
+      let doc = p["textDocument"]
+      let uri = doc["uri"].ToString()
+      match p["text"] with
       | null -> ()
       | text ->
         let content = text.ToString()
@@ -152,21 +155,27 @@ type LspServer(rpc: JsonRpc) =
     }
 
   [<JsonRpcMethod("textDocument/didClose")>]
-  member _.TextDocumentDidClose(p: JToken): Task =
+  member _.TextDocumentDidClose(p: JToken) =
     task {
-      let doc = p.["textDocument"]
-      let uri = doc.["uri"].ToString()
+      let doc = p["textDocument"]
+      let uri = doc["uri"].ToString()
       do! publishDiagnostics uri [||]
     }
 
   [<JsonRpcMethod("workspace/didChangeConfiguration")>]
-  member _.WorkspaceDidChangeConfiguration(p: JToken): Task = task { () }
+  member _.WorkspaceDidChangeConfiguration(_: JToken) =
+    task {
+      ()
+    }
 
   [<JsonRpcMethod("workspace/didChangeWatchedFiles")>]
-  member _.WorkspaceDidChangeWatchedFiles(p: JToken): Task = task { () }
+  member _.WorkspaceDidChangeWatchedFiles(_: JToken) =
+    task {
+      ()
+    }
 
   [<JsonRpcMethod("shutdown")>]
-  member _.Shutdown(): Task<obj> =
+  member _.Shutdown() =
     task {
       eprintfn "Shutdown called"
       return null
@@ -178,7 +187,7 @@ type LspServer(rpc: JsonRpc) =
     Environment.Exit(0)
 
 [<EntryPoint>]
-let main argv =
+let main _ =
   try
     eprintfn "FSLint Language Server starting..."
     let stdin = Console.OpenStandardInput()

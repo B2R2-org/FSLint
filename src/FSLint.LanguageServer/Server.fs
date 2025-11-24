@@ -6,7 +6,6 @@ open Ionide.LanguageServerProtocol.Types
 open Ionide.LanguageServerProtocol.Server
 open B2R2.FSLint
 
-/// LSP Diagnostic 생성
 let createDiagnostic (lineNum: int) (message: string) =
   { Range =
     { Start = { Line = lineNum - 1; Character = 0 }
@@ -57,7 +56,6 @@ let serverinfo = Some
     Version = Some "1.0.0" }
 
 let createServer () =
-  // Initialize
   let initialize (p: InitializeParams) =
    async {
     eprintfn "Initialize called"
@@ -96,19 +94,15 @@ let createServer () =
       ServerInfo = serverinfo
     }
   }
-  // Initialized
   let initialized (_: InitializedParams) = async {
     eprintfn "Initialized"
   }
-  // Shutdown
   let shutdown () = async {
     eprintfn "Shutdown"
   }
-  // DidChangeConfiguration
   let didChangeConfiguration (_: DidChangeConfigurationParams) = async {
     eprintfn "DidChangeConfiguration"
   }
-  // DidOpenTextDocument
   let didOpenTextDocument (client: ILspClient) (p: DidOpenTextDocumentParams) =
    async {
     let uri = p.TextDocument.Uri
@@ -121,7 +115,6 @@ let createServer () =
       Version = Some p.TextDocument.Version
     }
   }
-  // DidChangeTextDocument
   let didChangeTextDocument (client: ILspClient)
    (p: DidChangeTextDocumentParams) = async {
     let uri = p.TextDocument.Uri
@@ -137,7 +130,6 @@ let createServer () =
       }
     | None -> ()
   }
-  // DidSaveTextDocument
   let didSaveTextDocument (client: ILspClient)
    (p: DidSaveTextDocumentParams) = async {
     let uri = p.TextDocument.Uri
@@ -152,7 +144,6 @@ let createServer () =
       }
     | None -> ()
   }
-  // DidCloseTextDocument
   let didCloseTextDocument (client: ILspClient)
    (p: DidCloseTextDocumentParams) = async {
     let uri = p.TextDocument.Uri
@@ -163,7 +154,6 @@ let createServer () =
       Version = None
     }
   }
-  // 더미 핸들러들
   let willSaveTextDocument (_: WillSaveTextDocumentParams) = async { () }
   let willSaveWaitUntilTextDocument
    (_: WillSaveTextDocumentParams) = async { return None }
@@ -171,7 +161,6 @@ let createServer () =
   let didCreateFiles (_: CreateFilesParams) = async { () }
   let didRenameFiles (_: RenameFilesParams) = async { () }
   let didDeleteFiles (_: DeleteFilesParams) = async { () }
-  // 서버 핸들러 반환
   {
     Initialize = initialize
     Initialized = initialized

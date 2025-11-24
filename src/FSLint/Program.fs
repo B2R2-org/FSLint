@@ -171,6 +171,7 @@ and checkExpression src = function
                 isInfix = isInfix
                 funcExpr = funcExpr
                 argExpr = argExpr) as expr ->
+    NegationSimplificationConvention.check src expr
     match funcExpr, flag, argExpr.IsArrayOrListComputed with
     | _, ExprAtomicFlag.Atomic, true
     | SynExpr.Paren _, _, true

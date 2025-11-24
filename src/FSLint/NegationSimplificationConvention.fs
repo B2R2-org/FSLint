@@ -3,7 +3,7 @@ module B2R2.FSLint.NegationSimplificationConvention
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
-let getOppositeOperator = function
+let private getOppositeOperator = function
   | "op_Equality" -> Some("op_Inequality", "=", "<>")
   | "op_Inequality" -> Some("op_Equality", "<>", "=")
   | "op_GreaterThan" -> Some("op_LessThanOrEqual", ">", "<=")
@@ -12,7 +12,7 @@ let getOppositeOperator = function
   | "op_LessThanOrEqual" -> Some("op_GreaterThan", "<=", ">")
   | _ -> None
 
-let extractComparisonOperator = function
+let private extractComparisonOperator = function
   | SynExpr.App(funcExpr = SynExpr.App(funcExpr = funcExpr)) ->
     match funcExpr with
     | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ]))
@@ -20,22 +20,22 @@ let extractComparisonOperator = function
     | _ -> None
   | _ -> None
 
-let checkParenthesizedNegation (src: ISourceText) = function
+let private checkParenthesizedNegation (src: ISourceText) = function
   | SynExpr.App(funcExpr = SynExpr.Ident(ident = notId);
                 argExpr = SynExpr.Paren(expr = innerExpr);
                 range = range) when notId.idText = "not" ->
     match extractComparisonOperator innerExpr with
     | Some opName ->
       match getOppositeOperator opName with
-      | Some(_, originalSymbol, oppositeSymbol) ->
+      | Some(_, oriSymbol, oppSymbol) ->
         reportError src range
-          (sprintf "Use '%s' instead of 'not (%s)'"
-            oppositeSymbol originalSymbol)
+          ("Use '" + oppSymbol + "' instead of 'not (" + oriSymbol +
+           ")'")
       | None -> ()
     | None -> ()
   | _ -> ()
 
-let checkPipelineNegation (src: ISourceText) = function
+let private checkPipelineNegation (src: ISourceText) = function
   | SynExpr.App(
     funcExpr = SynExpr.App(
       funcExpr = SynExpr.LongIdent(
@@ -51,10 +51,10 @@ let checkPipelineNegation (src: ISourceText) = function
     match extractComparisonOperator innerExpr with
     | Some opName ->
       match getOppositeOperator opName with
-      | Some(_, originalSymbol, oppositeSymbol) ->
+      | Some(_, oriSymbol, oppSymbol) ->
         reportError src range
-          (sprintf "Use '%s' instead of '(%s) |> not'"
-            oppositeSymbol originalSymbol)
+          ("Use '" + oppSymbol + "' instead of '(" + oriSymbol +
+           ") |> not'")
       | None -> ()
     | None -> ()
   | _ -> ()

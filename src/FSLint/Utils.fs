@@ -22,6 +22,9 @@ let exitWithError (message: string) =
 
 let warn (message: string) = Console.Error.WriteLine message
 
+[<Literal>]
+let MaxLineLength = 80
+
 let reportError (src: ISourceText) (range: range) message =
   lock outputLock (fun () ->
     let fileName =

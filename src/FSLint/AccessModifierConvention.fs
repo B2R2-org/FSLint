@@ -23,9 +23,10 @@ let accessToString = function
   | Public -> "public"
 
 let reportRedundant src range accessLevel scopeType =
+  let accessStr = accessToString accessLevel
   reportError src range
-    (sprintf "Redundant '%s' modifier: already restricted by enclosing %s"
-      (accessToString accessLevel) scopeType)
+    ("Redundant '" + accessStr + "' modifier: already restricted by " +
+     "enclosing " + scopeType)
 
 let getPatternAccess = function
   | SynPat.LongIdent(accessibility = acc) -> acc

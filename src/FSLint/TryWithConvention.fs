@@ -13,7 +13,8 @@ let checkSingleCaseBar (src: ISourceText) (clauses: SynMatchClause list) =
         barLine.Substring(barR.StartColumn, barR.EndColumn - barR.StartColumn)
       if barText.Trim() = "|" then
         reportError src barR
-          "Remove unnecessary '|' for single exception case in try-with"
+          ("Remove unnecessary '|' for single exception case in " +
+           "try-with")
       else ()
     | None -> ()
   else

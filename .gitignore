@@ -25,3 +25,5 @@ build/
 .fsdocs/
 
 .fake
+
+vscode-extension

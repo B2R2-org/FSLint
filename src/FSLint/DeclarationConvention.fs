@@ -97,7 +97,7 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
   else
     ()
 
-let isTripleQuoteString = function
+let private isTripleQuoteString = function
   | SynExpr.Const(SynConst.String(synStringKind = SynStringKind.TripleQuote), _)
     -> true
   | _
@@ -141,13 +141,14 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
           |> Array.filter (fun line -> line <> "")
         let oneLine = String.concat " " contentParts
         let totalLength = indent + oneLine.Length
-        if totalLength <= 80 then
+        if totalLength <= Utils.MaxLineLength then
           reportError src body.Range
-            "Unnecessary line break: declaration fits within 80 columns"
+            ("Unnecessary line break: declaration fits within 80 " +
+             "columns")
       else ()
     | None -> ()
 
-let isComputationExpr = function
+let private isComputationExpr = function
   | SynExpr.ComputationExpr _ -> true
   | SynExpr.App(argExpr = SynExpr.ComputationExpr _) -> true
   | _ -> false
@@ -158,7 +159,8 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   | Some eqRange ->
     if isComputationExpr body && eqRange.EndLine = body.Range.StartLine then
       reportError src body.Range
-        "Computation expression should start on the next line after '='"
+        ("Computation expression should start on the next line after " +
+         "'='")
   | None -> ()
 
 let check (src: ISourceText) decls =

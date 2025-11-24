@@ -13,19 +13,14 @@ let getOppositeOperator = function
   | _ -> None
 
 let extractComparisonOperator = function
-  | SynExpr.App(funcExpr = SynExpr.App(funcExpr = funcExpr;
-   argExpr = _);
-   argExpr = _) ->
+  | SynExpr.App(funcExpr = SynExpr.App(funcExpr = funcExpr)) ->
     match funcExpr with
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ])) ->
-      Some id.idText
-    | SynExpr.Ident(ident = id) ->
-      Some id.idText
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ]))
+    | SynExpr.Ident(ident = id) -> Some id.idText
     | _ -> None
   | _ -> None
 
-let checkParenthesizedNegation (src: ISourceText) (expr: SynExpr) =
-  match expr with
+let checkParenthesizedNegation (src: ISourceText) = function
   | SynExpr.App(funcExpr = SynExpr.Ident(ident = notId);
                 argExpr = SynExpr.Paren(expr = innerExpr);
                 range = range) when notId.idText = "not" ->
@@ -34,17 +29,17 @@ let checkParenthesizedNegation (src: ISourceText) (expr: SynExpr) =
       match getOppositeOperator opName with
       | Some(_, originalSymbol, oppositeSymbol) ->
         reportError src range
-          (sprintf "Use '%s' instead of 'not (%s)' for better readability"
+          (sprintf "Use '%s' instead of 'not (%s)'"
             oppositeSymbol originalSymbol)
       | None -> ()
     | None -> ()
   | _ -> ()
 
-let checkPipelineNegation (src: ISourceText) (expr: SynExpr) =
-  match expr with
+let checkPipelineNegation (src: ISourceText) = function
   | SynExpr.App(
     funcExpr = SynExpr.App(
-      funcExpr = SynExpr.LongIdent(longDotId = SynLongIdent(id = [ pipeId ]));
+      funcExpr = SynExpr.LongIdent(
+        longDotId = SynLongIdent(id = [ pipeId ]));
       argExpr = comparisonExpr);
     argExpr = SynExpr.Ident(ident = notId);
     range = range)
@@ -58,7 +53,7 @@ let checkPipelineNegation (src: ISourceText) (expr: SynExpr) =
       match getOppositeOperator opName with
       | Some(_, originalSymbol, oppositeSymbol) ->
         reportError src range
-          (sprintf "Use '%s' instead of '(%s) |> not' for better readability"
+          (sprintf "Use '%s' instead of '(%s) |> not'"
             oppositeSymbol originalSymbol)
       | None -> ()
     | None -> ()

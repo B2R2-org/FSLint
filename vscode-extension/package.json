@@ -1,0 +1,63 @@
+{
+  "name": "fslint",
+  "displayName": "FSLint",
+  "description": "F# code linter using FSLint",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:fsharp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "fsharp",
+        "extensions": [".fs", ".fsx", ".fsi"]
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "FSLint",
+      "properties": {
+        "fslint.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable FSLint"
+        },
+        "fslint.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to FSLint language server executable"
+        },
+        "fslint.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^2.19.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  }
+}

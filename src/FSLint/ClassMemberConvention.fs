@@ -100,8 +100,8 @@ let checkMemberOrder (src: ISourceText) (members: SynMemberDefn list) =
       let nextScope = getMemberScope next
       if prevCat <> nextCat then
         reportError src next.Range
-          ("Wrong member order: " + string nextCat +
-           " should come before " + string prevCat)
+          ($"Wrong member order: {nextCat} should come before " +
+           $"{prevCat}")
       elif prevScope <> nextScope then
         reportError src next.Range
           ("Wrong member order: static should come before instance " +

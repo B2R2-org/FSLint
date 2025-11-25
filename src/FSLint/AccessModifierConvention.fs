@@ -18,35 +18,33 @@ let getAccessLevel = function
 let isRedundant parentAccess memberAccess =
   parentAccess = Private && memberAccess = Private
 
-let accessToString = function
-  | Private -> "private"
-  | Public -> "public"
-
 let reportRedundant src range accessLevel scopeType =
-  let accessStr = accessToString accessLevel
+  let accStr =
+    match accessLevel with
+    | Private -> "private"
+    | Public -> "public"
   reportError src range
-    ("Redundant '" + accessStr + "' modifier: already restricted by " +
-     "enclosing " + scopeType)
-
-let getPatternAccess = function
-  | SynPat.LongIdent(accessibility = acc) -> acc
-  | _ -> None
+    ($"Redundant '{accStr}' modifier: already restricted by " +
+     $"enclosing {scopeType}")
 
 let checkLetBinding src (context: ScopeContext) (binding: SynBinding) =
   let SynBinding(headPat = pat; range = range) = binding
-  getPatternAccess pat
-  |> Option.iter (fun _ ->
-    let memberAccess = getAccessLevel (getPatternAccess pat)
-    if isRedundant context.ModuleAccess memberAccess then
-      reportRedundant src range Private "module"
-  )
+  match pat with
+  | SynPat.LongIdent(accessibility = acc) ->
+    acc
+    |> Option.iter (fun _ ->
+      let memberAccess = getAccessLevel acc
+      if isRedundant context.ModuleAccess memberAccess then
+        reportRedundant src range Private "module"
+    )
+  | _ -> ()
 
 let checkTypeMember src (context: ScopeContext) (memberDefn: SynMemberDefn) =
   match memberDefn with
   | SynMemberDefn.Member(SynBinding(headPat = pat; range = range), _) ->
-    match getPatternAccess pat, context.TypeAccess with
-    | Some _, Some typeAccess ->
-      let memberAccess = getAccessLevel (getPatternAccess pat)
+    match pat, context.TypeAccess with
+    | SynPat.LongIdent(accessibility = Some acc), Some typeAccess ->
+      let memberAccess = getAccessLevel (Some acc)
       if isRedundant typeAccess memberAccess then
         reportRedundant src range Private "type"
     | _ -> ()

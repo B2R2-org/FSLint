@@ -29,8 +29,7 @@ let private checkParenthesizedNegation (src: ISourceText) = function
       match getOppositeOperator opName with
       | Some(_, oriSymbol, oppSymbol) ->
         reportError src range
-          ("Use '" + oppSymbol + "' instead of 'not (" + oriSymbol +
-           ")'")
+          $"Use '{oppSymbol}' instead of 'not ({oriSymbol})'"
       | None -> ()
     | None -> ()
   | _ -> ()
@@ -53,8 +52,7 @@ let private checkPipelineNegation (src: ISourceText) = function
       match getOppositeOperator opName with
       | Some(_, oriSymbol, oppSymbol) ->
         reportError src range
-          ("Use '" + oppSymbol + "' instead of '(" + oriSymbol +
-           ") |> not'")
+          $"Use '{oppSymbol}' instead of '({oriSymbol}) |> not'"
       | None -> ()
     | None -> ()
   | _ -> ()

@@ -3,7 +3,7 @@ module B2R2.FSLint.TryWithConvention
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
-let checkSingleCaseBar (src: ISourceText) (clauses: SynMatchClause list) =
+let check (src: ISourceText) (clauses: SynMatchClause list) =
   if clauses.Length = 1 then
     let SynMatchClause(trivia = trivia) = clauses.Head
     match trivia.BarRange with
@@ -19,6 +19,3 @@ let checkSingleCaseBar (src: ISourceText) (clauses: SynMatchClause list) =
     | None -> ()
   else
     ()
-
-let check (src: ISourceText) (clauses: SynMatchClause list) =
-  checkSingleCaseBar src clauses

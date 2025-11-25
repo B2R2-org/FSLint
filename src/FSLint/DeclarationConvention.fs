@@ -97,22 +97,15 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
   else
     ()
 
-let private isTripleQuoteString = function
-  | SynExpr.Const(SynConst.String(synStringKind = SynStringKind.TripleQuote), _)
-    -> true
-  | _
-    -> false
-
 let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
   let SynBinding(expr = body; trivia = trivia) = binding
   match trivia.EqualsRange with
   | Some eqRange ->
     match body with
-    | _ when isTripleQuoteString body
-      && eqRange.StartLine = body.Range.StartLine ->
-      if body.Range.StartLine = body.Range.EndLine then
-        ()
-      else
+    | SynExpr.Const(SynConst.String(synStringKind = stringKind), _)
+      when stringKind = SynStringKind.TripleQuote
+      && eqRange.StartLine = body.Range.StartLine
+      && (body.Range.StartLine <> body.Range.EndLine) ->
         reportError src body.Range "Triple-quoted should be on the next line."
     | _ -> ()
   | None -> ()
@@ -148,20 +141,20 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
       else ()
     | None -> ()
 
-let private isComputationExpr = function
-  | SynExpr.ComputationExpr _ -> true
-  | SynExpr.App(argExpr = SynExpr.ComputationExpr _) -> true
-  | _ -> false
-
 let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   let SynBinding(expr = body; trivia = trivia) = binding
-  match trivia.EqualsRange with
-  | Some eqRange ->
-    if isComputationExpr body && eqRange.EndLine = body.Range.StartLine then
+  if trivia.EqualsRange.IsSome then
+    match body with
+    | SynExpr.ComputationExpr _
+    | SynExpr.App(argExpr = SynExpr.ComputationExpr _)
+      when trivia.EqualsRange.Value.EndLine = body.Range.StartLine ->
       reportError src body.Range
         ("Computation expression should start on the next line after " +
          "'='")
-  | None -> ()
+    | _ ->
+      ()
+  else
+    ()
 
 let check (src: ISourceText) decls =
   decls

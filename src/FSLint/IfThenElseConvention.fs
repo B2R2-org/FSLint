@@ -56,24 +56,17 @@ let private isSeparatedFormat
   let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
   ifCondOneLine && thenExprSeparated && elseSeparated
 
-let private hasMultiLineCondition (ifExpr: SynExpr) =
-  ifExpr.Range.StartLine <> ifExpr.Range.EndLine
-
-let private isAllOnSameLine
- (ifExpr: SynExpr) (thenExpr: SynExpr) (elseExpr: SynExpr) =
-  ifExpr.Range.StartLine = thenExpr.Range.EndLine &&
-  thenExpr.Range.EndLine = elseExpr.Range.EndLine
-
 let check
  (src: ISourceText) (ifExpr: SynExpr)
   (thenExpr: SynExpr) (elseExpr: SynExpr option) (range: range) =
   match elseExpr with
   | None -> ()
   | Some elseExpr ->
-    if isAllOnSameLine ifExpr thenExpr elseExpr then
+    if ifExpr.Range.StartLine = thenExpr.Range.EndLine &&
+       thenExpr.Range.EndLine = elseExpr.Range.EndLine then
       ()
     else
-      if hasMultiLineCondition ifExpr then
+      if isMultiLineExpr ifExpr then
         ()
       else
         if isMultiLineExpr thenExpr || isMultiLineExpr elseExpr then

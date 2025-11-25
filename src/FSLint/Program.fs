@@ -474,6 +474,20 @@ and checkDeclarationsWithContext
 and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
   checkDeclarationsWithContext src defaultCheckContext decls
 
+let tryCheck fn =
+  try
+    fn ()
+  with
+    LintException _ -> ()
+
+let tryCheckConvention (checkFn: unit -> unit) =
+  try
+    checkFn ()
+  with
+    LintException _ -> ()
+
+let safeCheck fn = tryCheck fn
+
 let checkWithAST src input =
   match input with
   | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules)) ->
@@ -508,11 +522,24 @@ let runLinter linter (path: string) =
     System.Console.WriteLine msg
     exit 1
 
-let linterForFs =
+let linterForFsWithContext (context: Utils.LintContext option) =
   { new ILintable with
       member _.Lint(path, txt) =
-        LineConvention.check txt
-        parseFile txt path ||> checkWithAST }
+        Utils.setCurrentLintContext context
+        Utils.setCurrentFile path
+        match context with
+        | Some ctx ->
+          tryCheck (fun () -> LineConvention.check txt)
+          match parseFile txt path with
+          | src, parseTree ->
+            tryCheck (fun () -> checkWithAST src parseTree)
+          Utils.setCurrentLintContext None
+          (* Don't report errors here - let the caller handle it *)
+        | None ->
+          LineConvention.check txt
+          parseFile txt path ||> checkWithAST }
+
+let linterForFs = linterForFsWithContext None
 
 let linterForProjSln =
   { new ILintable with
@@ -523,7 +550,8 @@ type LintOutcome =
   { Index: int
     Path: string
     Ok: bool
-    Log: string }
+    Log: string
+    Errors: Utils.LintError list }
 
 /// Collects all .fs source files under the given root directory
 let getFsFiles (root: string) =
@@ -551,33 +579,58 @@ let getProjOrSlnFiles (root: string) =
 
 /// Lints a single file, catching exceptions and returning a `LintOutcome`.
 let tryLintToBuffer
-  (linter: ILintable) (index: int) (path: string): LintOutcome =
-  let sb = StringBuilder()
-  let append (s: string) = sb.AppendLine(s) |> ignore
+  (index: int) (path: string): LintOutcome =
   try
-    Console.WriteLine($"--- File: {path}")
-    append $"Linting file: {path}"
     Utils.setCurrentFile path
     let bytes = File.ReadAllBytes path |> ensureNoBOM
     let txt = System.Text.Encoding.UTF8.GetString bytes
+    let src = SourceText.ofString txt
+    let context: Utils.LintContext =
+      { Errors = []
+        Source = src
+        FilePath = path }
+    let linter = linterForFsWithContext (Some context)
     linter.Lint(path, txt)
-    { Index = index; Path = path; Ok = true; Log = sb.ToString() }
+    let errors = context.Errors
+    Utils.setCurrentLintContext None
+    { Index = index
+      Path = path
+      Ok = List.isEmpty errors
+      Log = ""
+      Errors = errors }
   with
     LintException msg ->
-      Console.WriteLine($"--- File: {path}")
-      append msg
-      { Index = index; Path = path; Ok = false; Log = sb.ToString() }
+      { Index = index
+        Path = path
+        Ok = false
+        Log = msg
+        Errors = [] }
 
 /// Runs linting jobs in parallel for all given files
-let runParallelPreservingOrder (linter: ILintable) (paths: string array) =
+let runParallelPreservingOrder (paths: string array) =
   let jobs =
     paths
-    |> Array.mapi (fun i p -> async { return tryLintToBuffer linter i p })
+    |> Array.mapi (fun i p -> async { return tryLintToBuffer i p })
   let results =
     jobs
     |> Async.Parallel
     |> Async.RunSynchronously
     |> Array.sortBy (fun r -> r.Index)
+  for result in results do
+    if not result.Ok then
+      Console.WriteLine("")
+      Console.WriteLine($"--- File: {result.Path}")
+      Console.WriteLine($"Linting file: {result.Path}")
+      if not (List.isEmpty result.Errors) then
+        Utils.reportErrors result.Errors result.Path
+        Console.WriteLine("Linting errors found")
+        Console.WriteLine("")
+      elif not (String.IsNullOrEmpty result.Log) then
+        Console.WriteLine(result.Log)
+        Console.WriteLine("Linting errors found")
+        Console.WriteLine("")
+    else
+      Console.WriteLine($"Linting file: {result.Path}")
   results |> Array.exists (fun r -> not r.Ok)
 
 [<EntryPoint>]
@@ -585,7 +638,12 @@ let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
     Utils.setCurrentFile args[0]
-    let outcome = tryLintToBuffer linterForFs 0 args[0]
+    let outcome = tryLintToBuffer 0 args[0]
+    if not outcome.Ok then
+      Console.WriteLine($"--- File: {outcome.Path}")
+      Console.Write(outcome.Log)
+      if not (List.isEmpty outcome.Errors) then
+        Utils.reportErrors outcome.Errors outcome.Path
     if outcome.Ok then 0 else 1
   elif Directory.Exists args[0] then
     let projOrSln = getProjOrSlnFiles args[0]
@@ -595,7 +653,7 @@ let main args =
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
     let fsFiles = getFsFiles args[0]
-    let hasErrors = runParallelPreservingOrder linterForFs fsFiles
+    let hasErrors = runParallelPreservingOrder fsFiles
     if hasErrors then 1 else 0
   else
     exitWithError $"File or directory '{args[0]}' not found"

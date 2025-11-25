@@ -14,11 +14,7 @@ let rec private containsMatchOrBar (expr: SynExpr) =
     containsMatchOrBar e1 || containsMatchOrBar e2
   | SynExpr.IfThenElse(ifExpr = ie; thenExpr = te; elseExpr = ee) ->
     containsMatchOrBar ie || containsMatchOrBar te ||
-    (
-    match ee with
-    | Some e -> containsMatchOrBar e
-    | None -> false
-    )
+    Option.map containsMatchOrBar ee |> Option.defaultValue false
   | _ -> false
 
 let private isMultiLineExpr (expr: SynExpr) =
@@ -65,36 +61,23 @@ let check
     if ifExpr.Range.StartLine = thenExpr.Range.EndLine &&
        thenExpr.Range.EndLine = elseExpr.Range.EndLine then
       ()
+    elif isMultiLineExpr ifExpr ||
+         isMultiLineExpr thenExpr ||
+         isMultiLineExpr elseExpr ||
+         containsMatchOrBar ifExpr ||
+         containsMatchOrBar thenExpr ||
+         containsMatchOrBar elseExpr then
+      ()
     else
-      if isMultiLineExpr ifExpr then
-        ()
-      else
-        if isMultiLineExpr thenExpr || isMultiLineExpr elseExpr then
-          ()
-        else
-          let hasMatchInCond = containsMatchOrBar ifExpr
-          let hasMatchInThen = containsMatchOrBar thenExpr
-          let hasMatchInElse = containsMatchOrBar elseExpr
-          if hasMatchInCond || hasMatchInThen || hasMatchInElse then
-            ()
-          else
-            let ifThenExprLength =
-             calculateIfThenExprLength src range ifExpr thenExpr
-            let ifThenExprFits = ifThenExprLength <= Utils.MaxLineLength
-            let elseExprLength = calculateElseExprLength src range elseExpr
-            let elseExprFits = elseExprLength <= Utils.MaxLineLength
-            if ifThenExprFits && elseExprFits then
-              let isCorrect = isCompactFormat ifExpr thenExpr elseExpr
-              if not isCorrect then
-                reportError src range
-                  ("Both 'if-then-expr' and 'else-expr' fit in 80 " +
-                   "columns")
-              else
-                ()
-            else
-              let isCorrect = isSeparatedFormat ifExpr thenExpr elseExpr
-              if not isCorrect then
-                reportError src range
-                  "At least one part exceeds 80 columns"
-              else
-                ()
+      let ifThenExprLength =
+        calculateIfThenExprLength src range ifExpr thenExpr
+      let ifThenExprFits = ifThenExprLength <= Utils.MaxLineLength
+      let elseExprLength = calculateElseExprLength src range elseExpr
+      let elseExprFits = elseExprLength <= Utils.MaxLineLength
+      if ifThenExprFits && elseExprFits then
+        if not (isCompactFormat ifExpr thenExpr elseExpr) then
+          reportError src range
+            ("Both 'if-then-expr' and 'else-expr' fit in 80 " +
+             "columns")
+      elif not (isSeparatedFormat ifExpr thenExpr elseExpr) then
+        reportError src range "At least one part exceeds 80 columns"

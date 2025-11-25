@@ -55,12 +55,14 @@ let adjustByComment src prevRange nextRange expect actual =
     if subStr.Trim() = "" || lines.Length <= 1 then
       actual
     else
-      let findLineIndex pattern =
-        lines |> Array.tryFindIndex (fun line -> pattern (line.TrimStart()))
       let blockCommentStart =
-        findLineIndex (fun line -> line.StartsWith "(*")
+        lines
+        |> Array.tryFindIndex (fun line ->
+          (line.TrimStart()).StartsWith "(*")
       let docCommentStart =
-        findLineIndex (fun line -> line.StartsWith "///")
+        lines
+        |> Array.tryFindIndex (fun line ->
+          (line.TrimStart()).StartsWith "///")
       match blockCommentStart, docCommentStart with
       | Some startIdx, _ ->
         match tryFindBlockCommentEndAfter lines startIdx with
@@ -113,9 +115,7 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
 let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
   let SynBinding(headPat = pattern; expr = body; range = bindingRange;
                  trivia = trivia) = binding
-  if body.Range.StartLine <> body.Range.EndLine then
-    ()
-  else
+  if body.Range.StartLine = body.Range.EndLine then
     match trivia.EqualsRange with
     | Some eqRange ->
       if eqRange.EndLine < body.Range.StartLine then

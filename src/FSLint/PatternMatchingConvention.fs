@@ -59,7 +59,9 @@ let collectElemAndOptionalSeparatorRanges (src: ISourceText) elementPats =
     | [ elem ], [] -> List.rev (elem :: acc)
     | elem :: restElems, sep :: restSeps ->
       interleave restElems restSeps (sep :: elem :: acc)
-    | _ -> reportError src elementPats.Head.Range "Pattern ParsingFailure"
+    | _ ->
+      reportError src elementPats.Head.Range "Pattern ParsingFailure"
+      []
   interleave elementRanges separatorRanges []
 
 /// Checks cons operator in the context is properly surrounded by single spaces.
@@ -115,7 +117,7 @@ let checkRecordOperatorSpacing (src: ISourceText) = function
       if oprRange.IsSome then
         if id.idRange.EndColumn + 1 <> oprRange.Value.StartColumn
           || oprRange.Value.EndColumn + 1 <> pat.Range.StartColumn
-        then reportError src id.idRange "" "Need single space around '='"
+        then reportError src id.idRange "Need single space around '='"
         else ()
       else ()
     )

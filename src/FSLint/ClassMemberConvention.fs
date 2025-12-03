@@ -98,15 +98,18 @@ let checkMemberOrder (src: ISourceText) (members: SynMemberDefn list) =
       let nextCat = getMemberCategory next
       let prevScope = getMemberScope prev
       let nextScope = getMemberScope next
-      let message =
-        if prevCat <> nextCat then
-          sprintf "Wrong member order: %A should come before %A"
-            nextCat prevCat
-        elif prevScope <> nextScope then
-          "Wrong member order: static should come before instance members"
-        else
-          "Wrong member order: members should be ordered by access level"
-      reportError src next.Range message
+      if prevCat <> nextCat then
+        reportError src next.Range
+          ($"Wrong member order: {nextCat} should come before " +
+           $"{prevCat}")
+      elif prevScope <> nextScope then
+        reportError src next.Range
+          ("Wrong member order: static should come before instance " +
+           "members")
+      else
+        reportError src next.Range
+          ("Wrong member order: members should be ordered by access " +
+           "level")
   )
 
 let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =

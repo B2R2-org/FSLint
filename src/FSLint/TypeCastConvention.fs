@@ -18,7 +18,7 @@ let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
     let searchSubstring = line.Substring searchStartColumn
     let relativeSymbolStart = searchSubstring.IndexOf symbolStr
     if relativeSymbolStart = -1 then
-      Range.Zero
+      Range.range0
     else
       let absoluteSymbolStart = searchStartColumn + relativeSymbolStart
       let symbolEnd = absoluteSymbolStart + symbolStr.Length
@@ -27,12 +27,12 @@ let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
       ||> Range.mkRange ""
   with
   (* TODO: Cannot detect multi line *)
-  | :? System.ArgumentOutOfRangeException -> Range.Zero
+  | :? System.ArgumentOutOfRangeException -> Range.range0
 
 /// Checks the spacing around the upcast operator (:>) in infix expressions.
 let check src expr (targetType: SynType) =
   let symbolRange = collectCastSymbolRangeFromSrc src expr targetType
-  if symbolRange.Equals Range.Zero then ()
+  if symbolRange.Equals Range.range0 then ()
   elif expr.Range.EndColumn + 1 <> symbolRange.StartColumn
     || targetType.Range.StartColumn - 1 <> symbolRange.EndColumn
   then reportInfixError src symbolRange

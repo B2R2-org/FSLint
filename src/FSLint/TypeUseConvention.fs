@@ -187,8 +187,7 @@ let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
 
 let rec checkParamTypeSpacing src = function
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
-    let _, _, pats = List.unzip3 pats
-    pats |> List.iter (checkParamTypeSpacing src)
+    pats |> List.iter (fun field -> checkParamTypeSpacing src field.Pattern)
   | SynPat.LongIdent(argPats = SynArgPats.Pats pats) ->
     pats |> List.iter (checkParamTypeSpacing src)
   | SynPat.Tuple(elementPats = pats) ->

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>fslint</ToolCommandName>
     <PackageOutputPath>./build</PackageOutputPath>
@@ -45,7 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="43.9.303" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.100" />
   </ItemGroup>
 
 </Project>

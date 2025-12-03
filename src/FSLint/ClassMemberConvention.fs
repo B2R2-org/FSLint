@@ -114,7 +114,6 @@ let rec findSelfIdentifierInApp src patIdent acc = function
   | SynExpr.ComputationExpr(expr = expr)
   | SynExpr.ArrayOrListComputed(expr = expr) ->
     findSelfIdentifierInApp src patIdent acc expr
-  | SynExpr.LetOrUseBang(rhs = expr1; body = expr2)
   | SynExpr.Sequential(expr1 = expr1; expr2 = expr2)
   | SynExpr.Set(targetExpr = expr1; rhsExpr = expr2)
   | SynExpr.DotSet(targetExpr = expr1; rhsExpr = expr2)

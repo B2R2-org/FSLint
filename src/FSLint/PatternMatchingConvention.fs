@@ -20,9 +20,10 @@ let rec private collectRecordEdgeRange acc = function
     | (idRange, _, recordRange) :: _ -> idRange, Some range, Some recordRange
     | [] -> None, None, None
   | SynPat.Record(fieldPats, recordRange) ->
-    let (_, id), _, _ = List.head fieldPats
-    let _, _, pat = List.last fieldPats
-    collectRecordEdgeRange ((Some id.idRange, None, recordRange) :: acc) pat
+    let id = (List.head fieldPats).FieldName.LongIdent
+    let pat = (List.last fieldPats).Pattern
+    collectRecordEdgeRange ((Some id.Head.idRange, None, recordRange) :: acc)
+      pat
   | _ -> None, None, None
 
 let private checkFuncSpacing src typarDecls (idRange: range) = function
@@ -81,41 +82,45 @@ let checkRecordBracketSpacing src (range: range) (innerRange: range) =
 let checkRecordFuncSpacing src = function
   | SynPat.Record(fieldPats, _) ->
     fieldPats
-    |> List.iter (fun (_, _, pat) ->
-      match pat with
-      | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
-                         argPats = SynArgPats.Pats pats)
-        when FunctionCallConvention.isPascalCase (List.last id).idText ->
-        match pats with
-        | [ SynPat.Paren(range = range) ] ->
-          if (List.last id).idRange.EndColumn <> range.StartColumn then
-            reportError src range "No space between ident and paren"
-          else
-            ()
+    |> List.iter (function
+      | NamePatPairField(pat = pat) ->
+        match pat with
+        | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
+                           argPats = SynArgPats.Pats pats)
+          when FunctionCallConvention.isPascalCase (List.last id).idText ->
+          match pats with
+          | [ SynPat.Paren(range = range) ] ->
+            if (List.last id).idRange.EndColumn <> range.StartColumn then
+              reportError src range "No space between ident and paren"
+            else
+              ()
+          | _ -> ()
+        | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
+                           argPats = SynArgPats.Pats pats) ->
+          match pats with
+          | [ SynPat.Paren(range = range) ] ->
+            if (List.last id).idRange.EndColumn + 1 <> range.StartColumn then
+              reportError src range "Need single space between ident and paren"
+            else
+              ()
+          | _ -> ()
         | _ -> ()
-      | SynPat.LongIdent(longDotId = SynLongIdent(id = id)
-                         argPats = SynArgPats.Pats pats) ->
-        match pats with
-        | [ SynPat.Paren(range = range) ] ->
-          if (List.last id).idRange.EndColumn + 1 <> range.StartColumn then
-            reportError src range "Need single space between ident and paren"
-          else
-            ()
-        | _ -> ()
-      | _ -> ()
     )
   | _ -> ()
 
 /// Checks spacing around the '=' operator within record definitions.
 /// Ensures that the '=' operator inside records has proper spacing.
 let checkRecordOperatorSpacing (src: ISourceText) = function
-  | SynPat.Record(fieldPats, _) ->
-    fieldPats
-    |> List.iter (fun ((_, id), oprRange, pat) ->
-      if oprRange.IsSome then
-        if id.idRange.EndColumn + 1 <> oprRange.Value.StartColumn
-          || oprRange.Value.EndColumn + 1 <> pat.Range.StartColumn
-        then reportError src id.idRange "" "Need single space around '='"
+  | SynPat.Record(fields, _) ->
+    fields
+    |> List.iter (function
+      | NamePatPairField(fieldName = ident; equalsRange = symbolRange
+                         pat = pat) ->
+      if symbolRange.IsSome then
+        if ident.Range.EndColumn + 1 <> symbolRange.Value.StartColumn
+          || symbolRange.Value.EndColumn + 1 <> pat.Range.StartColumn
+        then
+          reportError src ident.Range "Need single space around '='"
         else ()
       else ()
     )
@@ -290,8 +295,7 @@ let rec checkBody (src: ISourceText) = function
     | SynArgPats.Pats(pats = pats) ->
       pats |> List.iter (checkBody src)
     | SynArgPats.NamePatPairs(pats = pats) ->
-      pats
-      |> List.unzip3 |> fun (_, _, pats) -> pats |> List.iter (checkBody src)
+      pats |> List.iter (fun pat -> checkBody src pat.Pattern)
   | SynPat.Paren(pat = pat) ->
     checkBody src pat
   | SynPat.Tuple(elementPats = elementPats) ->

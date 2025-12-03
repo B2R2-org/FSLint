@@ -47,8 +47,8 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
         dotRanges args
     PatternMatchingConvention.checkBody src pat
     for arg in args do checkPattern src LowerCamelCase true trivia arg
-  | SynPat.LongIdent(lid, _, _, SynArgPats.NamePatPairs(pats = pat), _, range)
-    ->
+  | SynPat.LongIdent(lid, _, _,
+    SynArgPats.NamePatPairs(pats = pat), _, range) ->
     let SynLongIdent(id = lid) = lid
     let name = (List.last lid).idText
     IdentifierConvention.check src PascalCase true name range
@@ -102,12 +102,8 @@ and checkExpression src = function
     let SynSimplePats.SimplePats(pats = pats) = args
     for pat in pats do checkSimplePattern src LowerCamelCase pat
     checkExpression src body
-  | SynExpr.LetOrUse(_, _, bindings, body, _, _) ->
+  | SynExpr.LetOrUse(bindings = bindings; body = body) ->
     checkBindings src LowerCamelCase bindings
-    checkExpression src body
-  | SynExpr.LetOrUseBang(rhs = rhs; body = body) ->
-    (* TODO: checkPattern for LetOrUseBang *)
-    checkExpression src rhs
     checkExpression src body
   | SynExpr.ForEach(pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
     PatternMatchingConvention.checkBody src pat

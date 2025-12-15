@@ -221,9 +221,6 @@ let rec checkSingleLine src = function
   | SynExpr.ArrayOrList _
   | SynExpr.ArrayOrListComputed _
   | SynExpr.InterpolatedString _
-  | SynExpr.Paren _
-  | SynExpr.Tuple _
-  | SynExpr.ArrayOrListComputed _
   | SynExpr.IfThenElse _
   | SynExpr.Record _
   | SynExpr.LongIdent _

@@ -26,6 +26,7 @@
     <Compile Include="TryWithConvention.fs" />
     <Compile Include="AccessModifierConvention.fs" />
     <Compile Include="ArgumentAssignmentConvention.fs" />
+    <Compile Include="NegationSimplificationConvention.fs" />
     <Compile Include="TupleConvention.fs" />
     <Compile Include="ParenConvention.fs" />
     <Compile Include="FunctionCallConvention.fs" />

@@ -55,12 +55,14 @@ let adjustByComment src prevRange nextRange expect actual =
     if subStr.Trim() = "" || lines.Length <= 1 then
       actual
     else
-      let findLineIndex pattern =
-        lines |> Array.tryFindIndex (fun line -> pattern (line.TrimStart()))
       let blockCommentStart =
-        findLineIndex (fun line -> line.StartsWith "(*")
+        lines
+        |> Array.tryFindIndex (fun line ->
+          (line.TrimStart()).StartsWith "(*")
       let docCommentStart =
-        findLineIndex (fun line -> line.StartsWith "///")
+        lines
+        |> Array.tryFindIndex (fun line ->
+          (line.TrimStart()).StartsWith "///")
       match blockCommentStart, docCommentStart with
       | Some startIdx, _ ->
         match tryFindBlockCommentEndAfter lines startIdx with
@@ -97,22 +99,15 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
   else
     ()
 
-let isTripleQuoteString = function
-  | SynExpr.Const(SynConst.String(synStringKind = SynStringKind.TripleQuote), _)
-    -> true
-  | _
-    -> false
-
 let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
   let SynBinding(expr = body; trivia = trivia) = binding
   match trivia.EqualsRange with
   | Some eqRange ->
     match body with
-    | _ when isTripleQuoteString body
-      && eqRange.StartLine = body.Range.StartLine ->
-      if body.Range.StartLine = body.Range.EndLine then
-        ()
-      else
+    | SynExpr.Const(SynConst.String(synStringKind = stringKind), _)
+      when stringKind = SynStringKind.TripleQuote
+      && eqRange.StartLine = body.Range.StartLine
+      && (body.Range.StartLine <> body.Range.EndLine) ->
         reportError src body.Range "Triple-quoted should be on the next line."
     | _ -> ()
   | None -> ()
@@ -120,9 +115,7 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
 let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
   let SynBinding(headPat = pattern; expr = body; range = bindingRange;
                  trivia = trivia) = binding
-  if body.Range.StartLine <> body.Range.EndLine then
-    ()
-  else
+  if body.Range.StartLine = body.Range.EndLine then
     match trivia.EqualsRange with
     | Some eqRange ->
       if eqRange.EndLine < body.Range.StartLine then
@@ -141,25 +134,27 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
           |> Array.filter (fun line -> line <> "")
         let oneLine = String.concat " " contentParts
         let totalLength = indent + oneLine.Length
-        if totalLength <= 80 then
+        if totalLength <= Utils.MaxLineLength then
           reportError src body.Range
-            "Unnecessary line break: declaration fits within 80 columns"
+            ("Unnecessary line break: declaration fits within 80 " +
+             "columns")
       else ()
     | None -> ()
 
-let isComputationExpr = function
-  | SynExpr.ComputationExpr _ -> true
-  | SynExpr.App(argExpr = SynExpr.ComputationExpr _) -> true
-  | _ -> false
-
 let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   let SynBinding(expr = body; trivia = trivia) = binding
-  match trivia.EqualsRange with
-  | Some eqRange ->
-    if isComputationExpr body && eqRange.EndLine = body.Range.StartLine then
+  if trivia.EqualsRange.IsSome then
+    match body with
+    | SynExpr.ComputationExpr _
+    | SynExpr.App(argExpr = SynExpr.ComputationExpr _)
+      when trivia.EqualsRange.Value.EndLine = body.Range.StartLine ->
       reportError src body.Range
-        "Computation expression should start on the next line after '='"
-  | None -> ()
+        ("Computation expression should start on the next line after " +
+         "'='")
+    | _ ->
+      ()
+  else
+    ()
 
 let check (src: ISourceText) decls =
   decls

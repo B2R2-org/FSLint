@@ -2,12 +2,13 @@ module B2R2.FSLint.ParenConvention
 
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open Diagnostics
 
 /// Checks proper spacing in empty paren.
 /// Ensures no space inside empty brackets (e.g., "()").
 let checkEmptySpacing src (range: range) =
   if range.EndColumn - range.StartColumn <> 2 then
-    reportError src range "Contains invalid whitespace"
+    reportWarn src range "Contains invalid whitespace"
   else
     ()
 
@@ -15,18 +16,15 @@ let checkEmptySpacing src (range: range) =
 /// Ensures single space after opening and before closing brackets.
 let checkBracketSpacing (src: ISourceText) (range: range) =
   let subStr = src.GetSubTextFromRange(range).Split '\n'
-  if subStr.Length = 1 then
-    if subStr[0].StartsWith "( " || subStr[0].EndsWith " )" then
-      reportError src range "Contains invalid whitespace"
-    else
-      ()
+  if subStr.Length = 1
+    && subStr[0].StartsWith "( " || subStr[0].EndsWith " )"
+  then reportWarn src range "Contains invalid whitespace"
   else
-    if (Array.head subStr).StartsWith "( " ||
-      ((Array.last subStr).EndsWith " )" &&
-      (Array.last subStr).TrimStart() <> ")") then
-      reportError src range "Contains invalid whitespace"
-    else
-      ()
+    if (Array.head subStr).StartsWith "( "
+      || ((Array.last subStr).EndsWith " )"
+      && (Array.last subStr).TrimStart() <> ")")
+    then reportWarn src range "Contains invalid whitespace"
+    else ()
 
 let rec checkExpr src = function
   | SynExpr.Paren(expr = expr; range = range) ->
@@ -44,7 +42,7 @@ let rec checkPat src = function
   | SynPat.Paren(pat, range) ->
     if range.StartColumn + 1 <> pat.Range.StartColumn
       || range.EndColumn - 1 <> pat.Range.EndColumn
-    then reportError src range "Contains invalid whitespace"
+    then reportWarn src range "Contains invalid whitespace"
     else ()
   | _ ->
     ()

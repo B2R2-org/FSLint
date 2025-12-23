@@ -1,8 +1,8 @@
 module B2R2.FSLint.IfThenElseConvention
 
-open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open Diagnostics
 
 let rec private containsMatchOrBar (expr: SynExpr) =
   match expr with
@@ -20,45 +20,41 @@ let rec private containsMatchOrBar (expr: SynExpr) =
 let private isMultiLineExpr (expr: SynExpr) =
   expr.Range.StartLine <> expr.Range.EndLine
 
-let private calculateIfThenExprLength
- (src: ISourceText) (ifRange: range) (ifExpr: SynExpr) (thenExpr: SynExpr) =
+let private calculateIfThenExprLength src (ifRange: range) ifExpr thenExpr =
   try
-    let ifText = src.GetSubTextFromRange(ifExpr.Range)
-    let thenText = src.GetSubTextFromRange(thenExpr.Range)
+    let ifText = (src: ISourceText).GetSubTextFromRange((ifExpr: SynExpr).Range)
+    let thenText = src.GetSubTextFromRange((thenExpr: SynExpr).Range)
     let indent = ifRange.StartColumn
     indent + 3 + ifText.Length + 6 + thenText.Length
-  with
-    _ -> System.Int32.MaxValue
+  with _ ->
+    System.Int32.MaxValue
 
-let private calculateElseExprLength
- (src: ISourceText) (ifRange: range) (elseExpr: SynExpr) =
+let private calculateElseExprLength src (ifRange: range) (elseExpr: SynExpr) =
   try
-    let elseText = src.GetSubTextFromRange(elseExpr.Range)
+    let elseText = (src: ISourceText).GetSubTextFromRange elseExpr.Range
     let indent = ifRange.StartColumn
     indent + 5 + elseText.Length
-  with
-    _ -> System.Int32.MaxValue
+  with _ ->
+    System.Int32.MaxValue
 
-let private isCompactFormat
- (ifExpr: SynExpr) (thenExpr: SynExpr) (elseExpr: SynExpr) =
-  let ifThenExprOneLine = ifExpr.Range.StartLine = thenExpr.Range.EndLine
+let private isCompactFormat ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
+  let ifThenExprOneLine =
+    (ifExpr: SynExpr).Range.StartLine = thenExpr.Range.EndLine
   let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
   ifThenExprOneLine && elseSeparated
 
-let private isSeparatedFormat
- (ifExpr: SynExpr) (thenExpr: SynExpr) (elseExpr: SynExpr) =
-  let ifCondOneLine = ifExpr.Range.StartLine = ifExpr.Range.EndLine
+let private isSeparatedFormat ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
+  let ifCondOneLine =
+    (ifExpr: SynExpr).Range.StartLine = ifExpr.Range.EndLine
   let thenExprSeparated = ifExpr.Range.EndLine < thenExpr.Range.StartLine
   let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
   ifCondOneLine && thenExprSeparated && elseSeparated
 
-let check
- (src: ISourceText) (ifExpr: SynExpr)
-  (thenExpr: SynExpr) (elseExpr: SynExpr option) (range: range) =
+let check src ifExpr thenExpr (elseExpr: SynExpr option) (range: range) =
   match elseExpr with
   | None -> ()
   | Some elseExpr ->
-    if ifExpr.Range.StartLine = thenExpr.Range.EndLine &&
+    if (ifExpr: SynExpr).Range.StartLine = (thenExpr: SynExpr).Range.EndLine &&
        thenExpr.Range.EndLine = elseExpr.Range.EndLine then
       ()
     elif isMultiLineExpr ifExpr ||
@@ -71,13 +67,16 @@ let check
     else
       let ifThenExprLength =
         calculateIfThenExprLength src range ifExpr thenExpr
-      let ifThenExprFits = ifThenExprLength <= Utils.MaxLineLength
+      let ifThenExprFits = ifThenExprLength <= MaxLineLength
       let elseExprLength = calculateElseExprLength src range elseExpr
-      let elseExprFits = elseExprLength <= Utils.MaxLineLength
+      let elseExprFits = elseExprLength <= MaxLineLength
       if ifThenExprFits && elseExprFits then
         if not (isCompactFormat ifExpr thenExpr elseExpr) then
-          reportError src range
-            ("Both 'if-then-expr' and 'else-expr' fit in 80 " +
-             "columns")
+          reportWarn src range
+            "Both 'if-then-expr' and 'else-expr' fit in 80 \"columns\""
+        else
+          ()
       elif not (isSeparatedFormat ifExpr thenExpr elseExpr) then
-        reportError src range "At least one part exceeds 80 columns"
+        reportWarn src range "At least one part exceeds 80 columns"
+      else
+        ()

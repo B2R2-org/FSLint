@@ -2,9 +2,7 @@ module B2R2.FSLint.TypeCastConvention
 
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
-
-let private reportInfixError src range =
-  reportError src range "There must be a space before and after the infix"
+open CustomReports
 
 let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
   (targetType: SynType) =
@@ -27,7 +25,7 @@ let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
       ||> Range.mkRange ""
   with
   (* TODO: Cannot detect multi line *)
-  | :? System.ArgumentOutOfRangeException -> Range.range0
+  :? System.ArgumentOutOfRangeException -> Range.range0
 
 /// Checks the spacing around the upcast operator (:>) in infix expressions.
 let check src expr (targetType: SynType) =

@@ -3,9 +3,8 @@ module B2R2.FSLint.TypeAnnotation
 open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
-
-let private reportTypeError src range =
-  reportError src range "Type annotation does not follow the convention."
+open CustomReports
+open Diagnostics
 
 let private checkColonSpace src (patRange: range) typeLen (range: range) =
   if range.EndColumn <> patRange.EndColumn + typeLen + 2 then
@@ -18,11 +17,11 @@ let private checkColonSpace src (patRange: range) typeLen (range: range) =
 let private checkTupleSpace src (path: SynTupleTypeSegment list) =
   let checkArray = function
     | SynTupleTypeSegment.Type(SynType.Array(_, elementType, typRange)) ->
-      if elementType.Range.EndColumn + 2 <> typRange.EndColumn then
-        reportTypeError src typRange
-      else
-        ()
-    | _ -> ()
+      if elementType.Range.EndColumn + 2 <> typRange.EndColumn
+      then reportTypeError src typRange
+      else ()
+    | _ ->
+      ()
   path
   |> List.windowed 3
   |> List.filter (function
@@ -47,37 +46,11 @@ let private checkTupleSpace src (path: SynTupleTypeSegment list) =
     else ()
   )
 
-let checkArraySpace (src: ISourceText) (typRange: range) =
+let private checkArraySpace (src: ISourceText) (typRange: range) =
   if (src.GetSubTextFromRange typRange).Contains " []" then
     reportTypeError src typRange
   else
     ()
-
-let checkPat src (pat: SynPat) range = function
-  | SynType.LongIdent(SynLongIdent([ id ], _, _)) ->
-    checkColonSpace src pat.Range id.idText.Length range
-  | SynType.LongIdent(SynLongIdent([ id1; id2 ], _, _)) ->
-    let typeLen = id1.idText.Length + id2.idText.Length + 1
-    checkColonSpace src pat.Range typeLen range
-  | SynType.App(_, _, _, _, _, _, typRange) ->
-    let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src pat.Range typeLen range
-  | SynType.Array(_, _, typRange) ->
-    let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkArraySpace src typRange
-    checkColonSpace src pat.Range typeLen range
-  | SynType.Var(_, typRange) ->
-    let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src pat.Range typeLen range
-  | SynType.Fun(_, _, typRange, _) ->
-    let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src pat.Range typeLen range
-  | SynType.HashConstraint(_, typRange) ->
-    let typeLen = typRange.EndColumn - typRange.StartColumn
-    checkColonSpace src pat.Range typeLen range
-  | SynType.Tuple(path = path) ->
-    checkTupleSpace src path
-  | typ -> warn $"TODO: [Type Annotation] {typ}"
 
 (* TODO: Need to change usage AST *)
 let checkFieldWidth (src: ISourceText) (range: range) =
@@ -96,15 +69,15 @@ let checkFieldWidth (src: ISourceText) (range: range) =
   |> fun (str, executeCheck) ->
     if executeCheck then
       if str.Contains "  " then
-        reportError src range "Contains invalid whitespace"
+        reportWarn src range "Contains invalid whitespace"
       elif str.Contains ":" && str.Contains " :: " |> not
         && (str.Contains ": " |> not || str.Contains " :") then
-        reportError src range "Wrong space :"
+        reportWarn src range "Wrong space :"
       elif str.Contains "*" && str.Contains " * " |> not then
-        reportError src range "Wrong space *"
+        reportWarn src range "Wrong space *"
       elif str.Contains " []" && str.Contains ": []" |> not
         && str.Contains ", []" |> not then
-        reportError src range "Wrong space []"
+        reportWarn src range "Wrong space []"
       else
         ()
     else
@@ -112,16 +85,16 @@ let checkFieldWidth (src: ISourceText) (range: range) =
       strArr
       |> Array.iter (fun str ->
         if str.TrimStart().Contains "  " then
-          reportError src range "Contains invalid whitespace"
+          reportWarn src range "Contains invalid whitespace"
         else
           ())
       if strArr[0].Contains ":" && strArr[0].Contains " :"
         && strArr[0].Contains " :: " |> not then
-        reportError src range "Wrong space :"
+        reportWarn src range "Wrong space :"
       else
         ()
 
-let checkFieldsWidth (src: ISourceText) (fields: SynField list) =
+let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
   fields
   |> List.map (fun field -> field.Range)
   |> List.pairwise
@@ -130,19 +103,19 @@ let checkFieldsWidth (src: ISourceText) (fields: SynField list) =
     |> fun range ->
       let str = src.GetSubTextFromRange range
       if front.StartLine = back.StartLine && str.Contains "  " then
-        reportError src back "Contains invalid whitespace"
+        reportWarn src back "Contains invalid whitespace"
       elif front.StartLine = back.StartLine && str.Contains " * " |> not
         && front.EndLine = back.StartLine then
-        reportError src range "Wrong space '*'"
+        reportWarn src range "Wrong space '*'"
       elif front.StartLine <> back.StartLine && str.Contains "* " |> not
         && front.EndLine = back.StartLine then
-        reportError src range "Wrong space '*'"
+        reportWarn src range "Wrong space '*'"
       else
         ()
   )
   fields
 
-let checkInlineSpacing src (frontCase, endCase) =
+let private checkInlineSpacing src (frontCase, endCase) =
   let SynUnionCase(caseType = frontCaseType) = frontCase
   let SynUnionCase(range = endRange; trivia = endTrivia) = endCase
   match endTrivia.BarRange, frontCaseType with
@@ -152,7 +125,7 @@ let checkInlineSpacing src (frontCase, endCase) =
     let expectedCaseStart = barRange.EndColumn + 1
     if barRange.StartColumn <> expectedBarStart ||
       endRange.StartColumn <> expectedCaseStart
-    then reportError src endRange "Contains invalid whitespace"
+    then reportWarn src endRange "Contains invalid whitespace"
     else ()
   | None, _ ->
     warn "Union case does not have a bar range."
@@ -164,7 +137,7 @@ let checkSynFields src fields =
   |> checkFieldsWidth src
   |> List.iter (fun field -> checkFieldWidth src field.Range)
 
-let checkFieldsInUnion src case =
+let private checkFieldsInUnion src case =
   let SynUnionCase(caseType = caseType) = case
   match caseType with
   | SynUnionCaseKind.Fields fields -> checkSynFields src fields
@@ -197,16 +170,16 @@ let rec checkAbstractSlot src (id: Ident) synType =
   | SynType.Fun(argType = argType; returnType = returnType; trivia = trivia) ->
     if argType.Range.EndLine <> trivia.ArrowRange.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
-    then reportError src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && (argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
       || returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn)
-    then reportError src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine <> returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
-    then reportError src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
     else ()
     checkAbstractSlot src id argType
     checkAbstractSlot src id returnType
@@ -232,3 +205,29 @@ let checkReturnInfo (src: ISourceText) pat returnInfo =
 
 let checkFunction src (pat: SynSimplePat) (typ: SynType) =
   Range.mkRange "" pat.Range.Start typ.Range.End |> checkFieldWidth src
+
+let checkPat src (pat: SynPat) range = function
+  | SynType.LongIdent(SynLongIdent([ id ], _, _)) ->
+    checkColonSpace src pat.Range id.idText.Length range
+  | SynType.LongIdent(SynLongIdent([ id1; id2 ], _, _)) ->
+    let typeLen = id1.idText.Length + id2.idText.Length + 1
+    checkColonSpace src pat.Range typeLen range
+  | SynType.App(_, _, _, _, _, _, typRange) ->
+    let typeLen = typRange.EndColumn - typRange.StartColumn
+    checkColonSpace src pat.Range typeLen range
+  | SynType.Array(_, _, typRange) ->
+    let typeLen = typRange.EndColumn - typRange.StartColumn
+    checkArraySpace src typRange
+    checkColonSpace src pat.Range typeLen range
+  | SynType.Var(_, typRange) ->
+    let typeLen = typRange.EndColumn - typRange.StartColumn
+    checkColonSpace src pat.Range typeLen range
+  | SynType.Fun(_, _, typRange, _) ->
+    let typeLen = typRange.EndColumn - typRange.StartColumn
+    checkColonSpace src pat.Range typeLen range
+  | SynType.HashConstraint(_, typRange) ->
+    let typeLen = typRange.EndColumn - typRange.StartColumn
+    checkColonSpace src pat.Range typeLen range
+  | SynType.Tuple(path = path) ->
+    checkTupleSpace src path
+  | typ -> warn $"TODO: [Type Annotation] {typ}"

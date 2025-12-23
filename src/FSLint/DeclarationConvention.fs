@@ -3,8 +3,9 @@ module B2R2.FSLint.DeclarationConvention
 open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open Diagnostics
 
-let tryFindBlockCommentEndAfter lines startIdx =
+let private tryFindBlockCommentEndAfter lines startIdx =
   lines
   |> Array.mapi (fun i line -> i, line)
   |> Array.skip (startIdx + 1)
@@ -13,7 +14,7 @@ let tryFindBlockCommentEndAfter lines startIdx =
     trimmed.StartsWith "*)" || line.TrimEnd().EndsWith "*)")
   |> Option.map fst
 
-let countLeadingDocComments lines startIdx =
+let private countLeadingDocComments lines startIdx =
   lines
   |> Array.mapi (fun i line -> i, line)
   |> Array.skip startIdx
@@ -25,7 +26,7 @@ let countLeadingDocComments lines startIdx =
     trimmed.StartsWith "///")
   |> Array.length
 
-let calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
+let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   let normalCase =
     match prevDecl, nextDecl with
     | SynModuleDecl.Attributes _, _
@@ -41,7 +42,7 @@ let calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
 /// Determines line breaks between declarations based on their types.
 /// Skips validation if compiler directives are present.
 /// Adjusts range when handling block comments (* *) or doc comments (///).
-let adjustByComment src prevRange nextRange expect actual =
+let private adjustByComment src prevRange nextRange expect actual =
   let createRangeBetweenDecl =
     Range.mkRange "" (Position.mkPos (prevRange: range).EndLine 0)
       (Position.mkPos (nextRange: range).StartLine 0)
@@ -83,7 +84,7 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
       |> src.GetSubTextFromRange
       |> fun subStr ->
         if subStr <> " " then
-          reportError src range.Value "Need space before '='."
+          reportWarn src range.Value "Need space before '='."
         else
           ()
     else
@@ -93,7 +94,7 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
        |> src.GetSubTextFromRange
        |> fun subStr ->
          if subStr <> " = " then
-           reportError src range.Value "Need space before and after '='."
+           reportWarn src range.Value "Need space before and after '='."
          else
            ()
   else
@@ -108,9 +109,11 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
       when stringKind = SynStringKind.TripleQuote
       && eqRange.StartLine = body.Range.StartLine
       && (body.Range.StartLine <> body.Range.EndLine) ->
-        reportError src body.Range "Triple-quoted should be on the next line."
-    | _ -> ()
-  | None -> ()
+        reportWarn src body.Range "Triple-quoted should be on the next line."
+    | _ ->
+      ()
+  | None ->
+    ()
 
 let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
   let SynBinding(headPat = pattern; expr = body; range = bindingRange;
@@ -135,11 +138,13 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
         let oneLine = String.concat " " contentParts
         let totalLength = indent + oneLine.Length
         if totalLength <= Utils.MaxLineLength then
-          reportError src body.Range
+          reportWarn src body.Range
             ("Unnecessary line break: declaration fits within 80 " +
              "columns")
-      else ()
-    | None -> ()
+      else
+        ()
+    | None ->
+      ()
 
 let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   let SynBinding(expr = body; trivia = trivia) = binding
@@ -148,7 +153,7 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
     | SynExpr.ComputationExpr _
     | SynExpr.App(argExpr = SynExpr.ComputationExpr _)
       when trivia.EqualsRange.Value.EndLine = body.Range.StartLine ->
-      reportError src body.Range
+      reportWarn src body.Range
         ("Computation expression should start on the next line after " +
          "'='")
     | _ ->
@@ -159,14 +164,14 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
 let check (src: ISourceText) decls =
   decls
   |> List.pairwise
-  |> List.iter (fun ((prevDecl: SynModuleDecl), nextDecl) ->
+  |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
     if prevDecl.IsLet && nextDecl.IsLet then
       let expectedSpacing = calculateSpacingBetweenDecls src prevDecl nextDecl
       let actualSpacing =
         nextDecl.Range.StartLine - prevDecl.Range.EndLine
         |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
       if actualSpacing <> expectedSpacing then
-        reportError src nextDecl.Range "Wrong newLine appear."
+        reportWarn src nextDecl.Range "Wrong newLine appear."
       else
         ()
     else

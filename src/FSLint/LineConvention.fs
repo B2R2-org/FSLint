@@ -3,6 +3,7 @@ module B2R2.FSLint.LineConvention
 open System
 open System.Text.RegularExpressions
 open FSharp.Compiler.Text
+open Diagnostics
 
 let private trailingWhiteSpace = Regex @"\s$"
 
@@ -10,7 +11,7 @@ let [<Literal>] private WindowsLineEnding = "\r\n"
 
 let checkWindowsLineEndings (txt: string) =
   if txt.Contains WindowsLineEnding then
-    raiseWithError "Windows line endings are not allowed. Use LF instead."
+    raiseWithWarn "Windows line endings are not allowed. Use LF instead."
   else
     ()
 
@@ -20,13 +21,13 @@ let checkControlChar (txt: string) =
     |> String.filter Char.IsControl
     |> String.iter (fun c ->
       Console.WriteLine $"Control char: {c} (0x{int c:X2})")
-    raiseWithError "File contains control characters. Please remove them."
+    raiseWithWarn "File contains control characters. Please remove them."
   else
     ()
 
 let check (txt: string) =
   checkWindowsLineEndings txt
-  match Utils.getCurrentLintContext () with
+  match currentLintContext.Value with
   | Some context ->
     let src = context.Source
     txt.Split([| "\n" |], StringSplitOptions.None)
@@ -37,7 +38,7 @@ let check (txt: string) =
           Range.mkRange ""
             (Position.mkPos lineNum Utils.MaxLineLength)
             (Position.mkPos lineNum line.Length)
-        reportError src range
+        reportWarn src range
           $"Line {lineNum} exceeds {Utils.MaxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         let trailingStart = line.TrimEnd().Length
@@ -45,7 +46,7 @@ let check (txt: string) =
           Range.mkRange ""
             (Position.mkPos lineNum trailingStart)
             (Position.mkPos lineNum line.Length)
-        reportError src range
+        reportWarn src range
           $"Line {lineNum} contains trailing whitespace."
       else
         checkControlChar line
@@ -57,11 +58,11 @@ let check (txt: string) =
         Console.WriteLine line
         Console.WriteLine(
           "|" + String.replicate (Utils.MaxLineLength - 2) "-" + "|")
-        raiseWithError $"Line {i + 1} exceeds {Utils.MaxLineLength} characters."
+        raiseWithWarn $"Line {i + 1} exceeds {Utils.MaxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         Console.WriteLine line
         Console.WriteLine(String.replicate (line.Length - 1) " " + "^")
-        raiseWithError $"Line {i + 1} contains trailing whitespace."
+        raiseWithWarn $"Line {i + 1} contains trailing whitespace."
       else
         checkControlChar line
     )

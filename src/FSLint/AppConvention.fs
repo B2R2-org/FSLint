@@ -1,38 +1,34 @@
 module B2R2.FSLint.AppConvention
 
+open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
+open Diagnostics
 
-let private reportInfixError src range =
-  reportError src range "There must be a space before and after the infix"
-
-let isUnaryOperator (src: ISourceText) (operatorRange: range) =
+let private isUnaryOperator (src: ISourceText) (operatorRange: range) =
   try
     let line = src.GetLineString(operatorRange.StartLine - 1)
     let beforeOperator = line.Substring(0, operatorRange.StartColumn).TrimEnd()
     if beforeOperator.Length > 0 then
       let lastChar = beforeOperator[beforeOperator.Length - 1]
-      System.Char.IsLetterOrDigit lastChar || lastChar = ')' || lastChar = ']'
+      Char.IsLetterOrDigit lastChar || lastChar = ')' || lastChar = ']'
     else
       false
   with
     _ -> false
 
-let isOperator src = function
-  | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = trivias)
-                      range = range) ->
-    let isOperator =
-      trivias
-      |> List.exists (function
-        | Some(IdentTrivia.OriginalNotation "=") -> false
-        | Some(IdentTrivia.OriginalNotation _) -> true
-        | _ -> false
-      )
-    isOperator && isUnaryOperator src range
+let private isOperator src = function
+  | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = triv); range = range) ->
+    triv
+    |> List.exists (function
+      | Some(IdentTrivia.OriginalNotation "=") -> false
+      | Some(IdentTrivia.OriginalNotation _) -> true
+      | _ -> false
+    ) && isUnaryOperator src range
   | _ -> false
 
-let isEquality = function
+let private isEquality = function
   | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = trivias)) ->
     trivias
     |> List.exists (function
@@ -41,7 +37,7 @@ let isEquality = function
     )
   | _ -> false
 
-let rec collectLastElementRange acc = function
+let rec private collectLastElementRange acc = function
   | SynExpr.App(argExpr = argExpr) ->
     match argExpr with
     | SynExpr.App _ -> collectLastElementRange acc argExpr
@@ -52,7 +48,7 @@ let rec collectLastElementRange acc = function
 
 /// Retrieve the range of the element to the left of the operator from the given
 /// source text. This is useful for analyzing expressions in the source code.
-let findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
+let private findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
   try
     let line = src.GetLineString(operatorRange.StartLine - 1)
     let beforeOperator = line.Substring(0, operatorRange.StartColumn)
@@ -73,57 +69,50 @@ let findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
   with
     _ -> None
 
-let shouldCheckFuncSpacing funcExpr (argExpr: SynExpr) =
-  let isLowerCaseFirstChar: string list -> bool = function
-    | firstName :: _
-      when firstName.Length > 0 && System.Char.IsLower(firstName[0]) -> true
-    | _ -> false
-  let rec shouldCheck = function
+let private shouldCheckFuncSpacing funcExpr (argExpr: SynExpr) =
+  if argExpr.IsArrayOrListComputed then false
+  else
+    match funcExpr with
     | SynExpr.DotGet _
     | SynExpr.App(funcExpr = SynExpr.DotGet _) -> false
     | SynExpr.Ident _ -> true
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = first :: rest)) ->
-      if rest.Length > 0 then
-        false
-      else
-        let names = first.idText :: List.map (fun (id: Ident) -> id.idText) rest
-        not (isLowerCaseFirstChar names)
-    | SynExpr.App(funcExpr = innerFunc) -> shouldCheck innerFunc
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ first ])) ->
+      first.idText.Length > 0 && not (Char.IsLower(first.idText[0]))
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = _ :: _ :: _)) -> false
+    | SynExpr.App(funcExpr = SynExpr.Ident _)
+    | SynExpr.App(funcExpr =
+      SynExpr.LongIdent(longDotId = SynLongIdent(id = [ _ ]))) -> true
     | _ -> false
-  not argExpr.IsArrayOrListComputed && shouldCheck funcExpr
 
-let ensureInfixSpacing src (subFuncRange: range) (subArgRange: range) argRange =
-  if (argRange: range).StartLine = subFuncRange.StartLine then
-    if argRange.StartColumn <> subFuncRange.EndColumn + 1 then
-      reportInfixError src argRange
-    else ()
+let private ensureInfixSpacing src funcRange (subArgRange: range) argRange =
+  if (argRange: range).StartLine = (funcRange: range).StartLine
+    && argRange.StartColumn <> funcRange.EndColumn + 1
+  then reportInfixError src argRange
   else ()
-  if subArgRange.StartLine = subFuncRange.StartLine then
-    if subFuncRange.StartColumn <> subArgRange.EndColumn + 1 then
-      reportInfixError src subFuncRange
-    else ()
+  if subArgRange.StartLine = funcRange.StartLine
+    && funcRange.StartColumn <> subArgRange.EndColumn + 1
+  then reportInfixError src funcRange
   else ()
 
-let ensureAddressOfSpacing src (exprRange: range) (opRange: range) =
-  if opRange.StartLine = exprRange.StartLine then
-    if opRange.EndColumn <> exprRange.StartColumn then
-      reportInfixError src opRange
-    else ()
+let private ensureAddressOfSpacing src (exprRange: range) (opRange: range) =
+  if opRange.StartLine = exprRange.StartLine
+    && opRange.EndColumn <> exprRange.StartColumn
+  then reportInfixError src opRange
   else ()
 
-let ensureFuncSpacing src (funcRange: range) (argRange: range) =
-  if (argRange.StartColumn - funcRange.EndColumn <> 1 &&
-    funcRange.StartLine = argRange.StartLine) &&
-    not (isUnaryOperator src funcRange)
-  then reportError src argRange "Func app must be separated by a single space."
+let private ensureFuncSpacing src (funcRange: range) (argRange: range) =
+  if (argRange.StartColumn - funcRange.EndColumn <> 1
+    && funcRange.StartLine = argRange.StartLine)
+    && not (isUnaryOperator src funcRange)
+  then reportWarn src argRange "Func app must be separated by a single space."
   else ()
 
 /// Validates spacing around (=) operators ensuring proper whitespace.
 /// Checks for exact spacing requirements in assignment expressions.
-let checkAssignSpacing src (subFuncRange: range) (subArgRange: range) argRange =
-  if subFuncRange.StartColumn <> subArgRange.EndColumn + 1
-    || subFuncRange.EndColumn <> (argRange: range).StartColumn - 1
-  then reportError src subFuncRange "Need a single space around eqaul operator."
+let private checkAssignSpacing src (fRange: range) (subArgRange: range) aRange =
+  if fRange.StartColumn <> subArgRange.EndColumn + 1
+    || fRange.EndColumn <> (aRange: range).StartColumn - 1
+  then reportWarn src fRange "Need a single space around eqaul operator."
   else ()
 
 /// Check proper spacing in infix applications.
@@ -175,7 +164,8 @@ let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
     | SynExpr.Paren _ | SynExpr.DotGet _ -> ()
     | _ ->
       warn $"[checkFuncAppSpacing]TODO: {funcExpr}"
-  else ()
+  else
+    ()
   match funcExpr with
   | SynExpr.App(isInfix = false; funcExpr = innerFunc; argExpr = innerArg) ->
     checkFuncSpacing src innerFunc innerArg
@@ -200,7 +190,7 @@ let checkUnaryOperatorSpacing (src: ISourceText) (expr: SynExpr) =
           if funcExpr.Range.EndLine = argExpr.Range.StartLine then
             let gap = argExpr.Range.StartColumn - funcExpr.Range.EndColumn
             if gap > 0 then
-              reportError src argExpr.Range
+              reportWarn src argExpr.Range
                 "No space allowed between unary operator and operand"
       | _ -> ()
     | _ -> ()

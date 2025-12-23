@@ -19,7 +19,13 @@
     <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <GlobalNamespaces>FSharp.Compiler.Syntax; FSharp.Compiler.Text</GlobalNamespaces>
+  </PropertyGroup>
+
   <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Diagnostics.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />

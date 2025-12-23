@@ -4,6 +4,7 @@ open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
+open Diagnostics
 
 let private getFieldRange (SynExprRecordField(fieldName = fieldName)) =
   match fst fieldName with
@@ -18,7 +19,7 @@ let private getExprRange (SynExprRecordField(expr = expr)) =
 
 /// Checks for correct spacing around ':' in record field definitions.
 /// Ensures the format `Field: type`.
-let checkFieldTypeSpacing (src: ISourceText) fields =
+let private checkFieldTypeSpacing (src: ISourceText) fields =
   List.iter (fun field ->
     let SynField(idOpt = idOpt; fieldType = fieldType; range = range) = field
     if idOpt.IsSome then
@@ -27,25 +28,25 @@ let checkFieldTypeSpacing (src: ISourceText) fields =
       ||> Range.mkRange ""
       |> fun colonRange ->
         if src.GetSubTextFromRange colonRange <> ": " then
-          reportError src colonRange "Contains invalid whitespace."
+          reportWarn src colonRange "Contains invalid whitespace."
     else ()
   ) fields
 
 /// Checks that the '=' and '{' in a record definition are on the same line.
 /// Ensures record definitions follow the convention: `type T = { ... }`
-let checkOpeningBracketPosition src (range: range) (trivia: SynTypeDefnTrivia) =
-  if trivia.EqualsRange.IsSome && range.StartLine <> range.EndLine then
+let private checkOpeningBracketPosition src range (trivia: SynTypeDefnTrivia) =
+  if trivia.EqualsRange.IsSome && (range: range).StartLine <> range.EndLine then
     if trivia.EqualsRange.Value.StartLine = range.StartLine then
-      reportError src range "Opening Bracket not inline with equal operator"
+      reportWarn src range "Opening Bracket not inline with equal operator"
     else
       ()
   else ()
 
-let checkFieldCompFlag (src: ISourceText) (range: range) (innerRange: range) =
+let private checkFieldCompFlag src (range: range) (innerRange: range) =
   (Position.mkPos (innerRange.EndLine + 1) 0,
    Position.mkPos range.EndLine 0)
   ||> Range.mkRange ""
-  |> src.GetSubTextFromRange
+  |> (src: ISourceText).GetSubTextFromRange
   |> fun subStr ->
     subStr.Split([| '\n' |], StringSplitOptions.None)
     |> fun strArr ->
@@ -53,11 +54,11 @@ let checkFieldCompFlag (src: ISourceText) (range: range) (innerRange: range) =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
       if flagEndIsWrong || flagStartIsWrong then
-        reportError src innerRange "Field not inline with bracket."
+        reportWarn src innerRange "Field not inline with bracket."
       else
         ()
 
-let checkFieldIsInlineWithBracket src (range: range) fields =
+let private checkFieldIsInlineWithBracket src (range: range) fields =
   fields
   |> List.map (fun (SynField(range = range)) -> range)
   |> List.reduce Range.unionRanges
@@ -66,15 +67,15 @@ let checkFieldIsInlineWithBracket src (range: range) fields =
       || range.EndLine <> innerRange.EndLine
     then
       try checkFieldCompFlag src range innerRange
-      with _ -> reportError src innerRange "Field not inline with bracket."
+      with _ -> reportWarn src innerRange "Field not inline with bracket."
     elif range.StartColumn + 2 <> innerRange.StartColumn
       || range.EndColumn - 2 <> innerRange.EndColumn
-    then reportError src range "Wrong spacing inside brackets"
+    then reportWarn src range "Wrong spacing inside brackets"
     else ()
 
-let checkBracketCompFlag src (fullRange: range) (fieldRange: range) exprRange =
-  if fullRange.StartLine <> fieldRange.StartLine then
-    reportError src fieldRange "Opening Bracket not inline with equal operator"
+let private checkBracketCompFlag src fullRange fieldRange exprRange =
+  if (fullRange: range).StartLine <> (fieldRange: range).StartLine then
+    reportWarn src fieldRange "Opening Bracket not inline with equal operator"
   elif (exprRange: range).EndLine <> fullRange.EndLine then
     (Position.mkPos (exprRange.EndLine + 1) 0,
      Position.mkPos fullRange.EndLine 0)
@@ -86,14 +87,14 @@ let checkBracketCompFlag src (fullRange: range) (fieldRange: range) exprRange =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndWrong = Array.last strArr |> String.IsNullOrEmpty |> not
       if flagStartWrong && flagEndWrong then
-        reportError src fullRange "Bracket should inline with record field."
+        reportWarn src fullRange "Bracket should inline with record field."
       else
         ()
 
 /// Checks for correct spacing and formatting in record field assignments,
 /// ensuring the format `{ field = expr }` is used instead of `{field = expr}`.
 /// Also validates bracket positioning and formatting in multi-line records.
-let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
+let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
   if range.StartLine = range.EndLine && not (List.isEmpty fields) then
     match getFieldRange (List.head fields), getExprRange (List.last fields) with
     | Some fieldRange, Some exprRange ->
@@ -103,7 +104,8 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         | _ -> fieldRange
       if fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
-      then reportError src range "Wrong spacing inside brackets"
+      then reportWarn src range "Wrong spacing inside brackets"
+      else ()
     | _ -> ()
   elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
     match getFieldRange (List.head fields), getExprRange (List.last fields) with
@@ -118,10 +120,10 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         try
           checkBracketCompFlag src range fieldRange exprRange
         with _ ->
-          reportError src exprRange "Bracket should inline with record field."
+          reportWarn src exprRange "Bracket should inline with record field."
       elif fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
-      then reportError src range "Wrong spacing inside brackets"
+      then reportWarn src range "Wrong spacing inside brackets"
       else ()
     | _ -> ()
   else
@@ -130,7 +132,7 @@ let checkBracketSpacingAndFormat src copyInfo fields (range: range) =
 /// Checks spacing around '=' operator in the given source code.
 /// Recursively analyzes the source for proper operator spacing.
 /// Returns information about spacing issues found.
-let rec checkOperatorSpacing src = function
+let rec private checkOperatorSpacing src = function
   | field :: rest ->
     let SynExprRecordField(equalsRange = equalsRange; expr = expr) = field
     match getFieldLastRange field, equalsRange, expr with
@@ -139,13 +141,13 @@ let rec checkOperatorSpacing src = function
         equalRange.EndColumn + 1 <> exprRange.Range.StartColumn &&
         fieldRange.StartLine = exprRange.Range.StartLine
       then
-        reportError src fieldRange "Need single space around '='"
+        reportWarn src fieldRange "Need single space around '='"
       else
         checkOperatorSpacing src rest
     | _ -> checkOperatorSpacing src rest
   | [] -> ()
 
-let collectFieldsInfo fields =
+let private collectFieldsInfo fields =
   fields
   |> List.choose (fun field ->
     let SynExprRecordField(fieldName = fieldName; expr = expr
@@ -161,13 +163,13 @@ let checkSeparatorSpacing src fields =
     match separatorInfo with
     | Some(separatorRange, Some _) ->
       if exprRange.EndColumn < separatorRange.StartColumn then
-        reportError src exprRange "No space before semicolon"
+        reportWarn src exprRange "No space before semicolon"
       elif i < (collectFieldsInfo fields).Length - 1 then
         let fieldRange, _, _ = (collectFieldsInfo fields)[i + 1]
         let spaceAfterSemicolon =
           fieldRange.StartColumn - separatorRange.EndColumn
         if spaceAfterSemicolon <> 1 then
-          reportError src separatorRange "Need single space after separator."
+          reportWarn src separatorRange "Need single space after separator."
         else
           ()
       else

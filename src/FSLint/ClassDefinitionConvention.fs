@@ -2,9 +2,7 @@ module B2R2.FSLint.ClassDefinition
 
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text
-
-let reportPascalCaseError src range =
-  reportError src range "No space between ident and paren"
+open Diagnostics
 
 let checkMultiLineIdentWithParen (src: ISourceText) (ctorRange: range) =
   src.GetLineString(ctorRange.StartLine - 1)
@@ -14,8 +12,7 @@ let checkMultiLineIdentWithParen (src: ISourceText) (ctorRange: range) =
       ()
     else
       let subStr = str.Substring(ctorRange.StartColumn - 1, 2)
-      if subStr.StartsWith ' ' then reportPascalCaseError src ctorRange
-      else ()
+      if subStr.StartsWith ' ' then reportPascalCaseError src ctorRange else ()
 
 let checkIdentifierWithParen (src: ISourceText) members =
   members
@@ -55,7 +52,7 @@ let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
   )
   |> List.iter (fun recurseIdx ->
     if src.GetLineString(recurseIdx - 1) <> "" then
-      reportError src range "Nested should be separated by exactly one space."
+      reportWarn src range "Nested should be separated by exactly one space."
     else
       ()
   )

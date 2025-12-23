@@ -3,9 +3,8 @@ module B2R2.FSLint.FunctionCallConvention
 open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
-
-let isPascalCase (methodName: string) =
-  methodName.Length > 0 && Char.IsUpper(methodName[0])
+open Diagnostics
+open Utils
 
 let private getHeadMethodName (idents: Ident list) =
   idents |> List.tryHead |> Option.map (fun ident -> ident.idText)
@@ -18,14 +17,8 @@ let private getMethodName = function
   | SynExpr.Ident ident -> Some ident.idText
   | _ -> None
 
-let reportPascalCaseError src range =
-  reportError src range "No space between ident and paren"
-
-let reportLowerCaseError src range =
-  reportError src range "Need single space between ident and paren"
-
 let private isSymbolOrPunctuation c =
-  System.Char.IsSymbol c || System.Char.IsPunctuation c
+  Char.IsSymbol c || Char.IsPunctuation c
 
 let private checkSpacingOrNot (src: ISourceText) (range: range) =
   try
@@ -38,14 +31,14 @@ let private checkSpacingOrNot (src: ISourceText) (range: range) =
   with
     _ -> true
 
-let getLineAfterExpr (src: ISourceText) (expr: SynExpr) =
+let private getLineAfterExpr (src: ISourceText) (expr: SynExpr) =
   let line = src.GetLineString(expr.Range.EndLine - 1)
   if expr.Range.EndColumn < line.Length then
     line.Substring(expr.Range.EndColumn).TrimStart()
   else
     ""
 
-let ensureMethodSpacing src flag funcExpr (expr: SynExpr) =
+let private ensureMethodSpacing src flag funcExpr (expr: SynExpr) =
   match getMethodName funcExpr with
   | Some methodName when methodName.Length > 0 ->
     if isPascalCase methodName && flag = ExprAtomicFlag.NonAtomic then
@@ -75,10 +68,12 @@ let checkIdent src (ident: Ident) argExpr =
     if isIdentPascalCase then
       if argExpr.Range.StartColumn <> expectedColumnForPascal then
         reportPascalCaseError src argExpr.Range
-      else ()
+      else
+        ()
     elif argExpr.Range.StartColumn <> expectedColumnForLower then
       reportLowerCaseError src argExpr.Range
-    else ()
+    else
+      ()
 
 let checkDotGet src expr id flag =
   match expr with
@@ -97,16 +92,19 @@ let checkDotGet src expr id flag =
           reportPascalCaseError src expr.Range
         elif prevIsPascalCase && not currentIsPascalCase && not isNonAtomic then
           reportLowerCaseError src expr.Range
-        else ()
-    | _ -> ()
+        else
+          ()
+    | _ ->
+      ()
 
 let checkNewKeywordSpacing src = function
   | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ])),
     (argExpr: SynExpr)
-    when id.idText = "new" && argExpr.IsParen &&
-         id.idRange.EndColumn <> argExpr.Range.StartColumn ->
-    reportError src argExpr.Range "Contains invalid whitespace."
-  | _ -> ()
+    when id.idText = "new" && argExpr.IsParen
+    && id.idRange.EndColumn <> argExpr.Range.StartColumn ->
+    reportWarn src argExpr.Range "Contains invalid whitespace."
+  | _ ->
+    ()
 
 /// Checks spacing between method ident and paren based on naming convention.
 /// Ensures that PascalCase have no space before paren
@@ -124,7 +122,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       checkTypeApp src expr typeRange argExpr
     | SynExpr.Ident ident when argExpr.IsParen ->
       checkIdent src ident argExpr
-    | _ -> ()
+    | _ ->
+      ()
     match argExpr with
     | SynExpr.Paren(expr = parenExpr; range = range) ->
       if checkSpacingOrNot src range then
@@ -135,7 +134,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
       checkMethodParenSpacing src parenExpr
     | SynExpr.Const(SynConst.Unit, _) ->
       checkByFlag ExprAtomicFlag.NonAtomic funcExpr
-    | _ -> ()
+    | _ ->
+      ()
   | SynExpr.App(flag = flag
                 funcExpr = funcExpr
                 argExpr = SynExpr.Const(SynConst.Unit, _)) ->
@@ -152,22 +152,24 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
     match expr with
     | SynExpr.App(flag = flag; argExpr = SynExpr.Const(SynConst.Unit, _)) ->
       checkDotGet src expr id flag
-    | _ -> ()
+    | _ ->
+      ()
     checkMethodParenSpacing src expr
   | SynExpr.Paren(expr = innerExpr) ->
     checkMethodParenSpacing src innerExpr
   | SynExpr.Tuple(exprs = exprs) ->
     exprs |> List.iter (checkMethodParenSpacing src)
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkDotGetSpacing src (expr: SynExpr) (dotRange: range) longDotId =
   if expr.Range.EndLine = dotRange.StartLine
     && expr.Range.EndColumn <> dotRange.StartColumn
-  then reportError src dotRange "Unexpected space before '.' in member access"
+  then reportWarn src dotRange "Unexpected space before '.' in member access"
   else ()
   match longDotId with
   | SynLongIdent(id = id) ->
     if dotRange.EndLine = id[0].idRange.StartLine
       && dotRange.EndColumn <> id[0].idRange.StartColumn
-    then reportError src dotRange "Unexpected space after '.' in member access"
+    then reportWarn src dotRange "Unexpected space after '.' in member access"
     else ()

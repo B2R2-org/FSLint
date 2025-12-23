@@ -2,31 +2,10 @@ module B2R2.FSLint.Program
 
 open System
 open System.IO
-open System.Text
-open System.Text.RegularExpressions
-open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
-open type IdentifierConvention.CaseStyle
-
-type CheckContext =
-  { ModuleAccess: AccessModifierConvention.AccessLevel }
-
-let defaultCheckContext =
-  { ModuleAccess = AccessModifierConvention.AccessLevel.Public }
-
-let parseFile txt (path: string) =
-  let checker = FSharpChecker.Create()
-  let src = SourceText.ofString txt
-  let projOptions, _ =
-    checker.GetProjectOptionsFromScript(path, src)
-    |> Async.RunSynchronously
-  let parsingOptions, _ =
-    checker.GetParsingOptionsFromProjectOptions projOptions
-  checker.ParseFile(path, src, parsingOptions)
-  |> Async.RunSynchronously
-  |> fun r -> src, r.ParseTree
+open Diagnostics
 
 let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.Attrib _
@@ -378,74 +357,67 @@ and checkBinding src case binding =
   checkExpression src body
 
 and checkBindings src case bindings =
-  for binding in bindings do
-    checkBinding src case binding
+  for binding in bindings do checkBinding src case binding
 
-and checkTypeDefnWithContext
- (src: ISourceText) (context: CheckContext) (typeDefn: SynTypeDefn) =
-  let (SynTypeDefn(typeInfo = componentInfo;
-                   typeRepr = repr;
-                   members = explicitMembers;
-                   range = range)) = typeDefn
-  let (SynComponentInfo(accessibility = typeAccess)) = componentInfo
+and checkTypeDefnWithContext src context typeDefn =
+  let SynTypeDefn(typeInfo = componentInfo
+                  typeRepr = repr
+                  members = explicitMembers
+                  range = range) = typeDefn
+  let SynComponentInfo(accessibility = typeAccess) = componentInfo
+  typeAccess |> Option.iter (fun _ ->
+    let explicitAccess = getAccessLevel typeAccess
+    if explicitAccess <= context.ModuleAccess then
+      let ctx =
+        { ScopeContext.ModuleAccess = context.ModuleAccess
+          ScopeContext.TypeAccess = None }
+      AccessModifierConvention.checkTypeModule src ctx typeAccess range)
   let effectiveTypeAccess =
     match typeAccess with
-    | Some _ -> AccessModifierConvention.getAccessLevel typeAccess
+    | Some _ -> getAccessLevel typeAccess
     | None -> context.ModuleAccess
-  match typeAccess with
-  | Some _ ->
-    let explicitAccess = AccessModifierConvention.getAccessLevel typeAccess
-    if explicitAccess <= context.ModuleAccess then
-      let scopeContext: AccessModifierConvention.ScopeContext =
-        { AccessModifierConvention.ModuleAccess = context.ModuleAccess
-          AccessModifierConvention.TypeAccess = None }
-      AccessModifierConvention.checkTypeInModule
-       src scopeContext typeAccess range
-  | None -> ()
-  let allMembers =
-    match repr with
-    | SynTypeDefnRepr.ObjectModel(_, reprMembers, _) -> reprMembers
-    | _ -> []
-  let allMembers = allMembers @ explicitMembers
-  let memberScopeContext: AccessModifierConvention.ScopeContext =
-    { AccessModifierConvention.ModuleAccess = context.ModuleAccess
-      AccessModifierConvention.TypeAccess = Some effectiveTypeAccess }
-  for memberDefn in allMembers do
-    AccessModifierConvention.checkTypeMember src memberScopeContext memberDefn
+  let memberScopeContext =
+    { ScopeContext.ModuleAccess = context.ModuleAccess
+      ScopeContext.TypeAccess = Some effectiveTypeAccess }
+  (match repr with
+   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
+     List.append members explicitMembers
+   | _ ->
+     explicitMembers)
+  |> List.iter (AccessModifierConvention.checkTypeMember src memberScopeContext)
   checkTypeDefn src typeDefn
 
-and checkDeclarationsWithContext
- (src: ISourceText) (context: CheckContext) (decls: SynModuleDecl list) =
+and checkDeclarationsWithContext src (context: CheckContext) decls =
   DeclarationConvention.check src decls
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule(
-      moduleInfo = info; decls = decls; range = range) ->
+    | SynModuleDecl.NestedModule(moduleInfo = info; decls = dls; range = rg) ->
       let SynComponentInfo(longId = lid; accessibility = access) = info
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
+      access
+      |> Option.iter (fun _ ->
+        let explicitAccess = getAccessLevel access
+        if explicitAccess <= context.ModuleAccess then
+          let scopeContext: ScopeContext =
+            { ModuleAccess = context.ModuleAccess
+              TypeAccess = None }
+          AccessModifierConvention.checkNestModule src scopeContext access rg
+        else
+          ()
+      )
       let effectiveModuleAccess =
         match access with
-        | Some _ -> AccessModifierConvention.getAccessLevel access
+        | Some _ -> getAccessLevel access
         | None -> context.ModuleAccess
-      match access with
-      | Some _ ->
-        let explicitAccess = AccessModifierConvention.getAccessLevel access
-        if explicitAccess <= context.ModuleAccess then
-          let scopeContext: AccessModifierConvention.ScopeContext =
-            { AccessModifierConvention.ModuleAccess = context.ModuleAccess
-              AccessModifierConvention.TypeAccess = None }
-          AccessModifierConvention.checkNestedModule
-           src scopeContext access range
-      | None -> ()
       let nestedContext = { ModuleAccess = effectiveModuleAccess }
-      checkDeclarationsWithContext src nestedContext decls
+      checkDeclarationsWithContext src nestedContext dls
     | SynModuleDecl.Let(_, bindings, range) ->
-      let scopeContext: AccessModifierConvention.ScopeContext =
-        { AccessModifierConvention.ModuleAccess = context.ModuleAccess
-          AccessModifierConvention.TypeAccess = None }
+      let scopeContext: ScopeContext =
+        { ModuleAccess = context.ModuleAccess
+          TypeAccess = None }
       for binding in bindings do
         AccessModifierConvention.checkLetBinding src scopeContext binding
       FunctionBodyConvention.checkBindings src range bindings
@@ -468,34 +440,20 @@ and checkDeclarationsWithContext
       failwith $"{nameof checkDeclarations} TODO: {decl}"
 
 and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
-  checkDeclarationsWithContext src defaultCheckContext decls
+  checkDeclarationsWithContext src { ModuleAccess = Public }  decls
 
-let tryCheck fn =
-  try
-    fn ()
-  with
-    LintException _ -> ()
-
-let tryCheckConvention (checkFn: unit -> unit) =
-  try
-    checkFn ()
-  with
-    LintException _ -> ()
-
-let safeCheck fn = tryCheck fn
-
-let checkWithAST src input =
-  match input with
+let checkWithAST src = function
   | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules)) ->
-    for m in modules do
-      let SynModuleOrNamespace(longId = lid;
-                                decls = decls;
-                                accessibility = access) = m
+    modules
+    |> List.iter (fun m ->
+      let SynModuleOrNamespace(longId = lid
+                               decls = decls
+                               accessibility = access) = m
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
-      let moduleAccess = AccessModifierConvention.getAccessLevel access
-      let context = { ModuleAccess = moduleAccess }
-      checkDeclarationsWithContext src context decls
+      { ModuleAccess = getAccessLevel access }
+      |> fun ctx -> checkDeclarationsWithContext src ctx decls
+    )
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 
@@ -505,95 +463,38 @@ let ensureNoBOM (bs: byte[]) =
   else
     bs
 
-let lintFile (linter: ILintable) (path: string) =
-  if not <| File.Exists path then exitWithError $"File '{path}' not found"
-  else printfn $"Linting file: {path}"
-  let bytes = File.ReadAllBytes path |> ensureNoBOM
-  let txt = System.Text.Encoding.UTF8.GetString bytes
-  linter.Lint(path, txt)
-
-let runLinter linter (path: string) =
-  try lintFile linter path
-  with LintException msg ->
-    System.Console.WriteLine msg
-    exit 1
-
-let linterForFsWithContext (context: Utils.LintContext option) =
+let linterForFsWithContext context =
   { new ILintable with
       member _.Lint(path, txt) =
-        Utils.setCurrentLintContext context
-        Utils.setCurrentFile path
-        match context with
-        | Some ctx ->
-          tryCheck (fun () -> LineConvention.check txt)
-          match parseFile txt path with
-          | src, parseTree ->
-            tryCheck (fun () -> checkWithAST src parseTree)
-          Utils.setCurrentLintContext None
-          (* Don't report errors here - let the caller handle it *)
-        | None ->
+        setCurrentLintContext context
+        setCurrentFile path
+        let runCheck fn =
+          try fn () with LintException _ when context.IsSome -> ()
+        runCheck (fun () ->
           LineConvention.check txt
-          parseFile txt path ||> checkWithAST }
+          parseFile txt path ||> checkWithAST)
+        setCurrentLintContext None }
 
 let linterForFs = linterForFsWithContext None
 
-let linterForProjSln =
-  { new ILintable with
-      member _.Lint(_path, txt) =
-        LineConvention.checkWindowsLineEndings txt }
-
-type LintOutcome =
-  { Index: int
-    Path: string
-    Ok: bool
-    Log: string
-    Errors: Utils.LintError list }
-
-/// Collects all .fs source files under the given root directory
-let getFsFiles (root: string) =
-  let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape
-  let exclusion =
-    [| Regex $"obj{sep}Debug{sep}"
-       Regex $"obj{sep}Release{sep}"
-       Regex $"CFG.Tests" |]
-  Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
-  |> Seq.filter
-    (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
-  |> Seq.sort
-  |> Seq.toArray
-
-/// Collects .fsproj and .sln project/solution files
-let getProjOrSlnFiles (root: string) =
-  seq {
-    yield!
-      Directory.EnumerateFiles(root, "*.fsproj", SearchOption.AllDirectories)
-    yield!
-      Directory.EnumerateFiles(root, "*.sln", SearchOption.AllDirectories)
-  }
-  |> Seq.sort
-  |> Seq.toArray
-
 /// Lints a single file, catching exceptions and returning a `LintOutcome`.
-let tryLintToBuffer
-  (index: int) (path: string): LintOutcome =
+let tryLintToBuffer (index: int) (path: string): LintOutcome =
   try
-    Utils.setCurrentFile path
+    setCurrentFile path
     let bytes = File.ReadAllBytes path |> ensureNoBOM
     let txt = System.Text.Encoding.UTF8.GetString bytes
     let src = SourceText.ofString txt
-    let context: Utils.LintContext =
+    let context =
       { Errors = []
         Source = src
         FilePath = path }
-    let linter = linterForFsWithContext (Some context)
-    linter.Lint(path, txt)
-    let errors = context.Errors
-    Utils.setCurrentLintContext None
+    linterForFsWithContext(Some context).Lint(path, txt)
+    setCurrentLintContext None
     { Index = index
       Path = path
-      Ok = List.isEmpty errors
+      Ok = List.isEmpty context.Errors
       Log = ""
-      Errors = errors }
+      Errors = context.Errors }
   with
     LintException msg ->
       { Index = index
@@ -604,52 +505,60 @@ let tryLintToBuffer
 
 /// Runs linting jobs in parallel for all given files
 let runParallelPreservingOrder (paths: string array) =
-  let jobs =
-    paths
-    |> Array.mapi (fun i p -> async { return tryLintToBuffer i p })
-  let results =
-    jobs
-    |> Async.Parallel
-    |> Async.RunSynchronously
-    |> Array.sortBy (fun r -> r.Index)
-  for result in results do
+  paths
+   |> Array.mapi (fun i p -> async { return tryLintToBuffer i p })
+  |> Async.Parallel
+  |> Async.RunSynchronously
+  |> Array.sortBy (fun r -> r.Index)
+  |> fun results ->
+    results
+    |> Array.iter (fun result ->
     if not result.Ok then
-      Console.WriteLine("")
-      Console.WriteLine($"--- File: {result.Path}")
-      Console.WriteLine($"Linting file: {result.Path}")
+      Console.WriteLine ""
+      Console.WriteLine $"--- File: {result.Path}"
+      Console.WriteLine $"Linting file: {result.Path}"
       if not (List.isEmpty result.Errors) then
-        Utils.reportErrors result.Errors result.Path
-        Console.WriteLine("Linting errors found")
-        Console.WriteLine("")
+        reportWarns result.Errors result.Path
+        Console.WriteLine "Linting errors found"
+        Console.WriteLine ""
       elif not (String.IsNullOrEmpty result.Log) then
-        Console.WriteLine(result.Log)
-        Console.WriteLine("Linting errors found")
-        Console.WriteLine("")
+        Console.WriteLine result.Log
+        Console.WriteLine "Linting errors found"
+        Console.WriteLine ""
+      else
+        ()
     else
-      Console.WriteLine($"Linting file: {result.Path}")
-  results |> Array.exists (fun r -> not r.Ok)
+      Console.WriteLine $"Linting file: {result.Path}"
+    )
+    results |> Array.exists (fun r -> not r.Ok)
+
+let linterForProjSln =
+  { new ILintable with
+      member _.Lint(_path, txt) = LineConvention.checkWindowsLineEndings txt }
 
 [<EntryPoint>]
 let main args =
-  if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
+  if args.Length < 1 then
+    exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
-    Utils.setCurrentFile args[0]
+    setCurrentFile args[0]
     let outcome = tryLintToBuffer 0 args[0]
     if not outcome.Ok then
-      Console.WriteLine($"--- File: {outcome.Path}")
-      Console.Write(outcome.Log)
-      if not (List.isEmpty outcome.Errors) then
-        Utils.reportErrors outcome.Errors outcome.Path
-    if outcome.Ok then 0 else 1
+      Console.WriteLine $"--- File: {outcome.Path}"
+      Console.Write outcome.Log
+      if outcome.Errors.IsEmpty then ()
+      else reportWarns outcome.Errors outcome.Path
+      1
+    else
+      0
   elif Directory.Exists args[0] then
-    let projOrSln = getProjOrSlnFiles args[0]
-    for p in projOrSln do
-      Utils.setCurrentFile p
+    getProjOrSlnFiles args[0]
+    |> Array.iter (fun p ->
+      setCurrentFile p
       let bytes = File.ReadAllBytes p |> ensureNoBOM
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
-    let fsFiles = getFsFiles args[0]
-    let hasErrors = runParallelPreservingOrder fsFiles
-    if hasErrors then 1 else 0
+    )
+    if getFsFiles args[0] |> runParallelPreservingOrder then 1 else 0
   else
     exitWithError $"File or directory '{args[0]}' not found"

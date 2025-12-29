@@ -1,11 +1,17 @@
 {
   "name": "fslint",
   "displayName": "FSLint",
-  "description": "F# code linter using FSLint",
+  "description": "F# Linter with real-time diagnostics",
   "version": "1.0.0",
-  "publisher": "your-publisher-name",
+  "publisher": "fslint",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fslint/fslint"
+  },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.80.0",
+    "node": ">=20.0.0"
   },
   "categories": [
     "Linters",
@@ -16,12 +22,6 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "languages": [
-      {
-        "id": "fsharp",
-        "extensions": [".fs", ".fsx", ".fsi"]
-      }
-    ],
     "configuration": {
       "type": "object",
       "title": "FSLint",
@@ -31,16 +31,11 @@
           "default": true,
           "description": "Enable/disable FSLint"
         },
-        "fslint.serverPath": {
-          "type": "string",
-          "default": "",
-          "description": "Custom path to FSLint language server executable"
-        },
         "fslint.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",
-          "description": "Traces the communication between VS Code and the language server"
+          "description": "Trace LSP communication"
         }
       }
     }
@@ -61,3 +56,4 @@
     "vscode-languageclient": "^9.0.0"
   }
 }
+

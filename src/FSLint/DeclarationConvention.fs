@@ -139,8 +139,7 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
         let totalLength = indent + oneLine.Length
         if totalLength <= Utils.MaxLineLength then
           reportWarn src body.Range
-            ("Unnecessary line break: declaration fits within 80 " +
-             "columns")
+            "Unnecessary line break: declaration fits within 80 columns"
       else
         ()
     | None ->

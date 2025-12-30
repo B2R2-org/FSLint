@@ -16,27 +16,48 @@ type LspServer(rpc: JsonRpc) =
       let startLine = max 0 (range.StartLine - 1)
       let startChar = max 0 range.StartColumn
       let endLine = max 0 (range.EndLine - 1)
-      let endChar = max 0 range.EndColumn
+      let endChar = max 1 range.EndColumn
+      let finalStartLine, finalStartChar, finalEndLine, finalEndChar =
+        if startLine > endLine || (startLine = endLine && startChar > endChar)
+        then endLine, endChar, startLine, startChar
+        else startLine, startChar, endLine, endChar
       let lspRange =
-        { Start = { Line = startLine; Character = startChar }
-          End = { Line = endLine; Character = endChar } }
+        { Start = { Line = finalStartLine; Character = finalStartChar }
+          End = { Line = finalEndLine; Character = finalEndChar } }
+      eprintfn "[RANGE] Converted (%d,%d)-(%d,%d) to LSP (%d,%d)-(%d,%d)"
+        range.StartLine range.StartColumn range.EndLine range.EndColumn
+        finalStartLine finalStartChar finalEndLine finalEndChar
       lspRange
     with ex ->
       eprintfn "[RANGE] ERROR converting range: %s" ex.Message
       { Start = { Line = 0; Character = 0 }
         End = { Line = 0; Character = 1 } }
+  // let toLspRange (range: range): LspRange =
+  //   try
+  //     let startLine = max 0 (range.StartLine - 1)
+  //     let startChar = max 0 range.StartColumn
+  //     let endLine = max 0 (range.EndLine - 1)
+  //     let endChar = max 0 range.EndColumn
+  //     let lspRange =
+  //       { Start = { Line = startLine; Character = startChar }
+  //         End = { Line = endLine; Character = endChar } }
+  //     lspRange
+  //   with ex ->
+  //     eprintfn "[RANGE] ERROR converting range: %s" ex.Message
+  //     { Start = { Line = 0; Character = 0 }
+  //       End = { Line = 0; Character = 1 } }
 
   let toLspDiagnostic (error: LintError): LspDiagnostic option =
     try
       let range = toLspRange error.Range
-      if range.start.line < 0 || range.``end``.line < 0 then
+      if range.Start.Line < 0 || range.End.Line < 0 then
         eprintfn "[DIAG] Invalid range for: %s" error.Message
         None
       else
-        Some { range = range
-               severity = 2
-               source = "FSLint"
-               message = error.Message }
+        Some { Range = range
+               Severity = 2
+               Source = "FSLint"
+               Message = error.Message }
     with ex ->
       eprintfn "[DIAG] ERROR creating diagnostic: %s - %s"
         error.Message ex.Message
@@ -93,25 +114,54 @@ type LspServer(rpc: JsonRpc) =
       let validDiagnostics =
         diagnostics
         |> Array.filter (fun diag ->
-          diag.range.start.line >= 0 &&
-          diag.range.start.character >= 0 &&
-          diag.range.``end``.line >= 0 &&
-          diag.range.``end``.character >= 0 &&
-          diag.range.start.line <= diag.range.``end``.line
+          diag.Range.Start.Line >= 0 &&
+          diag.Range.Start.Character >= 0 &&
+          diag.Range.End.Line >= 0 &&
+          diag.Range.End.Character >= 0 &&
+          (diag.Range.Start.Line < diag.Range.End.Line ||
+           (diag.Range.Start.Line = diag.Range.End.Line &&
+            diag.Range.Start.Character <= diag.Range.End.Character))
         )
       if validDiagnostics.Length < diagnostics.Length then
         eprintfn "[LSP] WARNING: Filtered %d invalid diagnostics"
           (diagnostics.Length - validDiagnostics.Length)
+        diagnostics
+        |> Array.filter (fun d -> not (Array.contains d validDiagnostics))
+        |> Array.iter (fun d ->
+          eprintfn "[LSP] FILTERED: %s at (%d,%d)-(%d,%d)"
+            d.Message
+            d.Range.Start.Line d.Range.Start.Character
+            d.Range.End.Line d.Range.End.Character
+        )
       eprintfn "[LSP] Publishing %d valid diagnostics" validDiagnostics.Length
-      let paramsDict = System.Collections.Generic.Dictionary<string, obj>()
-      paramsDict.["uri"] <- uri :> obj
-      paramsDict.["diagnostics"] <- validDiagnostics :> obj
-      eprintfn "[LSP] Sending notification with Dictionary"
-      rpc.NotifyAsync("textDocument/publishDiagnostics", paramsDict)
+      let diagnosticsArray = JArray()
+      for diag in validDiagnostics do
+        let diagObj =
+          JObject(
+            JProperty("range",
+              JObject(
+                JProperty("start",
+                  JObject(
+                    JProperty("line", diag.Range.Start.Line),
+                    JProperty("character", diag.Range.Start.Character))),
+                JProperty("end",
+                  JObject(
+                    JProperty("line", diag.Range.End.Line),
+                    JProperty("character", diag.Range.End.Character))))),
+            JProperty("severity", diag.Severity),
+            JProperty("source", diag.Source),
+            JProperty("message", diag.Message))
+        diagnosticsArray.Add(diagObj)
+      rpc.NotifyWithParameterObjectAsync(
+        "textDocument/publishDiagnostics",
+        JObject(
+          JProperty("uri", uri),
+          JProperty("diagnostics", diagnosticsArray)))
     with ex ->
       eprintfn "[LSP] ERROR publishing diagnostics: %s" ex.Message
       eprintfn "[LSP] STACK: %s" ex.StackTrace
       System.Threading.Tasks.Task.FromResult(())
+
 
   let scanWorkspace () =
     async {
@@ -121,7 +171,6 @@ type LspServer(rpc: JsonRpc) =
       | Some root ->
         try
           eprintfn "[SCAN] =========================================="
-          eprintfn "[SCAN] Starting workspace scan"
           eprintfn "[SCAN] Root: %s" root
           eprintfn "[SCAN] =========================================="
           if not (Directory.Exists(root)) then
@@ -132,14 +181,12 @@ type LspServer(rpc: JsonRpc) =
                                        SearchOption.AllDirectories)
               |> Seq.filter (fun path ->
                 not (path.Contains("node_modules") ||
-                      path.Contains("bin") ||
-                      path.Contains("obj") ||
-                      path.Contains(".git")))
+                     path.Contains("bin") ||
+                     path.Contains("obj") ||
+                     path.Contains(".git")))
               |> Seq.toList
-            eprintfn "[SCAN] Found %d F# files" fsFiles.Length
             for i, file in fsFiles |> List.mapi (fun i f -> i + 1, f) do
               try
-                eprintfn "[SCAN] [%d/%d] %s" i fsFiles.Length file
                 let diagnostics = lintFile file
                 let normalizedPath = file.Replace("\\", "/")
                 let uri =
@@ -148,12 +195,8 @@ type LspServer(rpc: JsonRpc) =
                   else
                     sprintf "file:///%s" normalizedPath
                 do! publishDiagnostics uri diagnostics |> Async.AwaitTask
-                eprintfn "[SCAN] Published %d diagnostics" diagnostics.Length
               with ex ->
                 eprintfn "[SCAN] ERROR processing %s: %s" file ex.Message
-            eprintfn "[SCAN] =========================================="
-            eprintfn "[SCAN] Completed: %d files analyzed" fsFiles.Length
-            eprintfn "[SCAN] =========================================="
         with ex ->
           eprintfn "[SCAN] FATAL ERROR: %s" ex.Message
           eprintfn "[SCAN] STACK: %s" ex.StackTrace
@@ -165,19 +208,31 @@ type LspServer(rpc: JsonRpc) =
     eprintfn "[LSP] Initialize"
     let rootUri = p.["rootUri"]
     if not (isNull rootUri) then
-      let uri = rootUri.ToString()
-      eprintfn "[LSP] Root URI: %s" uri
-      let path =
-        if uri.StartsWith("file:///") then
-          let rawPath = uri.Substring(8)
-          System.Uri.UnescapeDataString(rawPath).Replace("/", "\\")
-        elif uri.StartsWith("file://") then
-          let rawPath = uri.Substring(7)
-          System.Uri.UnescapeDataString(rawPath).Replace("/", "\\")
-        else
-          uri.Replace("/", "\\")
-      workspaceRoot <- Some path
-      eprintfn "[LSP] Workspace root: %s" path
+      let uriStr = rootUri.ToString()
+      eprintfn "[LSP] Raw Root URI: %s" uriStr
+      try
+        let decodedUri = System.Uri.UnescapeDataString(uriStr)
+        eprintfn "[LSP] Decoded URI: %s" decodedUri
+        let uri = Uri(decodedUri)
+        let localPath = uri.LocalPath
+        eprintfn "[LSP] Local path: %s" localPath
+        workspaceRoot <- Some localPath
+      with ex ->
+        eprintfn "[LSP] ERROR parsing URI: %s - %s" uriStr ex.Message
+        let path =
+          if uriStr.StartsWith("file:///") then
+            let rawPath = uriStr.Substring(8)
+            let decoded = System.Uri.UnescapeDataString(rawPath)
+            if decoded.Length >= 3 && decoded.[0] = '/' && decoded.[2] = ':'
+            then decoded.Substring(1).Replace("/", "\\")
+            else decoded.Replace("/", "\\")
+          elif uriStr.StartsWith("file://") then
+            let rawPath = uriStr.Substring(7)
+            System.Uri.UnescapeDataString(rawPath).Replace("/", "\\")
+          else
+            System.Uri.UnescapeDataString(uriStr)
+        eprintfn "[LSP] Workspace root (fallback): %s" path
+        workspaceRoot <- Some path
     else
       eprintfn "[LSP] WARNING: No rootUri"
     eprintfn "[LSP] =========================================="
@@ -203,7 +258,7 @@ type LspServer(rpc: JsonRpc) =
 
   [<JsonRpcMethod("initialized")>]
   member _.Initialized(p: JToken) =
-    try
+    task {
       eprintfn "[LSP] =========================================="
       eprintfn "[LSP] Initialized notification received"
       eprintfn "[LSP] Workspace root: %A" workspaceRoot
@@ -215,11 +270,8 @@ type LspServer(rpc: JsonRpc) =
         eprintfn "[LSP] Triggering workspace scan..."
         hasScannedWorkspace <- true
         scanWorkspace () |> Async.Start
-      null
-    with ex ->
-      eprintfn "[LSP] ERROR in Initialized: %s" ex.Message
-      eprintfn "[LSP] STACK: %s" ex.StackTrace
-      null
+      ()
+    }
 
   [<JsonRpcMethod("textDocument/didOpen")>]
   member _.DidOpen(p: JToken) =
@@ -229,7 +281,7 @@ type LspServer(rpc: JsonRpc) =
         let text = p.["textDocument"].["text"].ToString()
         eprintfn "[LSP] didOpen: %s" uri
         if not hasScannedWorkspace && workspaceRoot.IsSome then
-          eprintfn "[LSP] First didOpen - triggering workspace scan"
+          eprintfn "[LSP] WARNING: Initialized didn't scan, scanning now"
           hasScannedWorkspace <- true
           do! scanWorkspace ()
         let diagnostics = lintDocument uri text
@@ -261,10 +313,10 @@ type LspServer(rpc: JsonRpc) =
         match p.["text"] with
         | null -> ()
         | text ->
-            let content = text.ToString()
-            eprintfn "[LSP] didSave: %s" uri
-            let diagnostics = lintDocument uri content
-            do! publishDiagnostics uri diagnostics |> Async.AwaitTask
+          let content = text.ToString()
+          eprintfn "[LSP] didSave: %s" uri
+          let diagnostics = lintDocument uri content
+          do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didSave: %s" ex.Message
     } |> Async.StartAsTask :> System.Threading.Tasks.Task
@@ -305,9 +357,8 @@ let main _ =
     Console.SetOut(Console.Error)
     use rpc = new JsonRpc(stdout, stdin)
     rpc.TraceSource <-
-      new System.Diagnostics.TraceSource(
-        "FSLintLSP",
-        System.Diagnostics.SourceLevels.Information)
+      new Diagnostics.TraceSource(
+        "FSLintLSP", Diagnostics.SourceLevels.Information)
     let server = LspServer(rpc)
     rpc.AddLocalRpcTarget(server)
     rpc.StartListening()

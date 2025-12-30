@@ -1,0 +1,40 @@
+# Source
+src/**
+*.ts
+tsconfig.json
+build.sh
+test.fs
+test-copy.fs
+*.vsix
+webpack.config.js
+
+# Development
+.vscode/**
+.vscode-test/**
+.gitignore
+.git/**
+.DS_Store
+nul
+dist/**
+
+# node_modules - specific files
+**/README.md
+**/readme.md
+**/README
+**/License.txt
+**/LICENSE.txt
+**/CHANGELOG.md
+**/CHANGELOG
+**/HISTORY.md
+**/test/**
+**/tests/**
+**/example/**
+**/examples/**
+**/doc/**
+**/docs/**
+**/.github/**
+**/*.map
+**/tsconfig.json
+
+# Logs
+*.log

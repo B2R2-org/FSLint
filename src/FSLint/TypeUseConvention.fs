@@ -12,14 +12,14 @@ let private collectRangeOfFirstAndLastType (typeArgs: SynType list) =
 /// Checks that no whitespace in null type arguments.
 let private checkEmpty src (typeArgsRange: range) =
   if typeArgsRange.EndColumn - typeArgsRange.StartColumn <> 3
-  then reportWarn src typeArgsRange "Contains invalid whitespace"
+  then reportWarn src typeArgsRange "Remote whitespace in null type args"
   else ()
 
 /// Checks if there is a space between 'expr' and '<type>' in an expression,
 /// e.g., detects 'expr <type>' instead of the correct 'expr<type>'.
 let private checkFromExprToOpeningBracketSpacing src expr typeArgsRange =
   if (expr: SynExpr).Range.EndColumn <> (typeArgsRange: range).StartColumn
-  then reportWarn src typeArgsRange "Contains invalid whitespace"
+  then reportWarn src typeArgsRange "Remove whitespace before '<'"
   else ()
 
 /// Checks if there is a space between '<' and 'type' or 'type' and '>' in the
@@ -27,7 +27,7 @@ let private checkFromExprToOpeningBracketSpacing src expr typeArgsRange =
 let private checkBracketSpacing src typeArgsRange edgeRange =
   if (edgeRange: range).StartColumn - 1 <> (typeArgsRange: range).StartColumn
     || edgeRange.EndColumn + 1 <> typeArgsRange.EndColumn
-  then reportWarn src edgeRange "Contains invalid whitespace"
+  then reportWarn src edgeRange "Remove whitespace around bracket"
   else ()
 
 let private checkStarSeparator src (typeStr: string) typeRange =
@@ -35,7 +35,7 @@ let private checkStarSeparator src (typeStr: string) typeRange =
   let headEndsWithSpace = (Array.head parts).EndsWith " "
   let lastStartsWithSpace = (Array.last parts).StartsWith " "
   if not (headEndsWithSpace && lastStartsWithSpace) then
-    reportWarn src typeRange "Need single space between type."
+    reportWarn src typeRange "Use single whitespace between type"
   else
     ()
 
@@ -44,11 +44,11 @@ let private checkCommaSeparator src (typeStr: string) typeRange =
   let lastPart = Array.last parts
   if (lastPart.Length > 0 && lastPart[0] = ' ' &&
      (lastPart.Length = 1 || lastPart[1] <> ' ')) |> not then
-    reportWarn src typeRange "Need single space between type."
+    reportWarn src typeRange "Use single whitespace between type"
   else
     ()
   if (Array.head parts).EndsWith " " then
-    reportWarn src typeRange "No space allowed before comma."
+    reportWarn src typeRange "Remove whitespace before ','"
   else
     ()
 
@@ -85,7 +85,7 @@ let checkTypeAppParenSpacing src = function
       if id.Length <> 1 then
         if flag = ExprAtomicFlag.NonAtomic
           || typeRange.EndColumn <> parenRange.StartColumn then
-          reportWarn src parenRange "Contains invalid whitespace"
+          reportWarn src parenRange "Remove whitespace before '('"
         else ()
       else () (* This handle Type Reference convention *)
     | _ -> ()
@@ -99,7 +99,7 @@ let private checkLongIdentSpacing src typeArg =
     |> List.pairwise
     |> List.iter (fun (front, back) ->
       if front.EndColumn + 1 <> back.StartColumn then
-        reportWarn src back "Contains invalid whitespace"
+        reportWarn src back "Use single whitespace between LongIdent"
       else
         ()
     )
@@ -109,12 +109,12 @@ let private checkBracketRanges src (innerRange: range) lessRange greaterRange =
   match (lessRange: range option), (greaterRange: range option) with
   | Some lessRange, None ->
     if innerRange.StartColumn <> lessRange.EndColumn then
-      reportWarn src lessRange "Contains invalid whitespace"
+      reportWarn src lessRange "Remove whitespace after inner"
     else
       ()
   | None, Some greaterRange ->
     if innerRange.EndColumn <> greaterRange.StartColumn then
-      reportWarn src greaterRange "Contains invalid whitespace"
+      reportWarn src greaterRange "Remove whitespace after inner"
     else
       ()
   | Some lessRange, Some greaterRange ->
@@ -134,16 +134,16 @@ let rec checkTypeAbbrevWithAnnotation src = function
   | SynType.Fun(argType = argType; returnType = returnType; trivia = trivia) ->
     if argType.Range.EndLine <> trivia.ArrowRange.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
-    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Use single whitespace after '->'"
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && (argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
       || returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn)
-    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Use single whitespace around '->'"
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine <> returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
-    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Use single whitespace before '->'"
     else ()
     TypeAnnotation.checkFieldWidth src argType.Range
     TypeAnnotation.checkFieldWidth src returnType.Range
@@ -166,15 +166,14 @@ let private checkBarAlignment (src: ISourceText) (range: range) = function
         |> src.GetSubTextFromRange
         |> fun str ->
           if str <> "| " then
-            reportWarn src barRange "Contains invalid whitespace"
+            reportWarn src barRange "Use single whitespace after '|'"
           else
             ()
       else
-        reportWarn src range "Contains invalid whitespace"
+        reportWarn src range "Align '|' with type"
     else
       ()
-  | None ->
-    warn "Union case does not have a bar range."
+  | None -> warn "Exception: '|' range does not exist"
 
 let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
   match cases with

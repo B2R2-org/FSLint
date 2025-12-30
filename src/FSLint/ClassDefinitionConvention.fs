@@ -52,7 +52,7 @@ let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
   )
   |> List.iter (fun recurseIdx ->
     if src.GetLineString(recurseIdx - 1) <> "" then
-      reportWarn src range "Nested should be separated by exactly one space."
+      reportWarn src range "Add blank line before nested"
     else
       ()
   )

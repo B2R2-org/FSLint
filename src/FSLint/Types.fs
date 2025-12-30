@@ -34,7 +34,7 @@ and ScopeContext =
   { ModuleAccess: AccessModifierLevel
     TypeAccess: AccessModifierLevel option }
 
-type CheckContext =
+and CheckContext =
   { ModuleAccess: AccessModifierLevel }
 
 type LintError =
@@ -43,12 +43,12 @@ type LintError =
     LineContent: string
     ColumnIndicator: string }
 
-type LintContext =
+and LintContext =
   { mutable Errors: LintError list
     Source: ISourceText
     FilePath: string }
 
-type LintOutcome =
+and LintOutcome =
   { Index: int
     Path: string
     Ok: bool

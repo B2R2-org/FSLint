@@ -21,15 +21,12 @@ let checkElementSpacing src (elemAndSepRanges: Range list) =
     let elemRange = elemAndSepRanges[i]
     let separatorRange = elemAndSepRanges[i + 1]
     let nextElement = elemAndSepRanges[i + 2]
-    if elemRange.EndColumn <> separatorRange.StartColumn then
-      reportWarn src separatorRange
-      <| $"Separator must be attached to the preceding element"
+    if elemRange.EndColumn <> separatorRange.StartColumn
+    then reportWarn src separatorRange "Remove whitespace before ';'"
     elif separatorRange.EndColumn = nextElement.StartColumn
       || separatorRange.EndColumn + 1 <> nextElement.StartColumn
-    then
-      reportWarn src separatorRange "Exactly 1 space required after separator"
-    else
-      ()
+    then reportWarn src separatorRange "Use single whitespace after ';'"
+    else ()
 
 let checkBracketCompFlag (src: ISourceText) (elemRange: range) (range: range) =
   let added =
@@ -93,14 +90,14 @@ let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
 /// Ensures no space inside empty brackets (e.g., "[]" or "[||]" not "[ ]").
 let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
   if expr.IsEmpty && range.EndColumn - range.StartColumn <> enclosureWidth then
-    reportWarn src range "Contains Invalid Whitespace"
+    reportWarn src range "Remove whitespace in empty list/array"
   else
     ()
 
 /// Checks proper placement of opening bracket after `let` keyword.
 let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
   if src.GetLineString(range.StartLine - 1).TrimStart().StartsWith "let" then
-    reportWarn src range "Misplaced bracket after binding keyword"
+    reportWarn src range "Move bracket to next line after binding"
   else
     ()
 
@@ -130,7 +127,7 @@ let checkEdgeCompFlag (src: ISourceText) (elemRange: range) (range: range) =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
       if flagEndIsWrong || flagStartIsWrong then
-        reportWarn src elemRange "Bracket-edge element must be inline"
+        reportWarn src elemRange "Move element inline with bracket"
       else
         ()
 
@@ -147,7 +144,7 @@ let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
       && not isOnlyCommentInlineWithBracket)
       || endLineOfElem <> range.EndLine then
       try checkEdgeCompFlag src elemRange range
-      with _ -> reportWarn src elemRange "BracketEdge element must be inline"
+      with _ -> reportWarn src elemRange "Move element inline with bracket"
     else
       ()
 
@@ -158,7 +155,7 @@ let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
     for line in range.StartLine .. range.EndLine - 1 do
       let lineString = (src: ISourceText).GetLineString line
       if lineString.LastIndexOf ";" + 1 = lineString.Length then
-        reportWarn src range "Contains Invalid Separator"
+        reportWarn src range "Remove trailing ';'"
       else
         ()
   else
@@ -168,7 +165,7 @@ let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
         |> fun idx -> if isPat then idx + range.StartColumn else idx
       range.EndColumn - lastIdxOfSeparator
     if distClosingBracketToLastSeparator < distFstElemToOpeningBracket + 1 then
-      reportWarn src range "Contains Invalid Separator"
+      reportWarn src range "Remove trailing ';'"
     else
       ()
 

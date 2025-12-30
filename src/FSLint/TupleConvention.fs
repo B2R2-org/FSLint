@@ -57,10 +57,10 @@ let check src exprs commaRanges =
   |> List.iter (fun (commaRange, fstElemRange, sndElemRange) ->
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
-      reportWarn src commaRange "No space allowed before comma"
+      reportWarn src commaRange "Remove whitespace before ','"
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
-      reportWarn src commaRange "Need to space after comma"
+      reportWarn src commaRange "Use single whitespace after ','"
     else
       ()
   )
@@ -73,10 +73,10 @@ let checkPat src pats commaRanges =
   |> List.iter (fun (commaRange, fstElemRange, sndElemRange) ->
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
-      reportWarn src commaRange "No space allowed before comma"
+      reportWarn src commaRange "Remove whitespace before ','"
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
-      reportWarn src commaRange "Need to space after comma"
+      reportWarn src commaRange "Use single whitespace after ','"
     else
       ()
   )

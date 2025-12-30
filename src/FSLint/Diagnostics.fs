@@ -92,34 +92,34 @@ module CustomReports =
 
   let reportRedundant src range scopeType =
     reportWarn src range
-      $"Redundant 'private' modifier: restricted by enclosing {scopeType}"
+      $"Remove Redundant 'private' (restricted by {scopeType})"
 
   let reportInfixError src range =
-    reportWarn src range "There must be a space before and after the infix"
+    reportWarn src range "Use whitespace around operator"
 
   let reportRangeOperatorError src range =
-    reportWarn src range "Spaces required around range operator"
+    reportWarn src range "Use whitespace around '..'"
 
   let reportBracketSpacingError src range =
-    reportWarn src range "Wrong spacing inside brackets"
+    reportWarn src range "Use single whitespace inside brackets"
 
   let reportSingleElementPerLineError src range =
-    reportWarn src range "Only one element per line allowed"
+    reportWarn src range "Use one element per line"
 
   let reportPascalCaseError src range =
-    reportWarn src range "No space between ident and paren"
+    reportWarn src range "Remove whitespace before '('"
 
   let reportLowerCaseError src range =
-    reportWarn src range "Need single space between ident and paren"
+    reportWarn src range "Add whitespace before '('"
 
   let reportBarAndPatternError src range =
-    reportWarn src range "Need single space between bar and pattern."
+    reportWarn src range "Add space after '|'"
 
   let reportBarAndMatchError src range =
-    reportWarn src range "Bar '|' not aligned with 'match' keyword."
+    reportWarn src range "Align '|' with 'match'"
 
   let reportArrowError src range =
-    reportWarn src range "Need a single space around arrow."
+    reportWarn src range "Use whitespace around '->'"
 
   let reportTypeError src range =
-    reportWarn src range "Type annotation does not follow the convention."
+    reportWarn src range "Fix type annotation format"

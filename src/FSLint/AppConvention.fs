@@ -104,7 +104,7 @@ let private ensureFuncSpacing src (funcRange: range) (argRange: range) =
   if (argRange.StartColumn - funcRange.EndColumn <> 1
     && funcRange.StartLine = argRange.StartLine)
     && not (isUnaryOperator src funcRange)
-  then reportWarn src argRange "Func app must be separated by a single space."
+  then reportWarn src argRange "Use single whitespace in function application"
   else ()
 
 /// Validates spacing around (=) operators ensuring proper whitespace.
@@ -112,7 +112,7 @@ let private ensureFuncSpacing src (funcRange: range) (argRange: range) =
 let private checkAssignSpacing src (fRange: range) (subArgRange: range) aRange =
   if fRange.StartColumn <> subArgRange.EndColumn + 1
     || fRange.EndColumn <> (aRange: range).StartColumn - 1
-  then reportWarn src fRange "Need a single space around eqaul operator."
+  then reportWarn src fRange "Use single whitespace around '='"
   else ()
 
 /// Check proper spacing in infix applications.
@@ -191,7 +191,7 @@ let checkUnaryOperatorSpacing (src: ISourceText) (expr: SynExpr) =
             let gap = argExpr.Range.StartColumn - funcExpr.Range.EndColumn
             if gap > 0 then
               reportWarn src argExpr.Range
-                "No space allowed between unary operator and operand"
+                "Remove whitespace in unary operator and operand"
       | _ -> ()
     | _ -> ()
   | _ -> ()

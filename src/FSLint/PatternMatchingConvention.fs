@@ -26,12 +26,12 @@ let private checkFuncSpacing src typarDecls (idRange: range) = function
       | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
       | _ -> idRange
     if idRange.EndColumn <> range.StartColumn then
-      reportWarn src range "Contains invalid whitespace"
+      reportWarn src range "Remove whitespace after function"
     else
       ()
   | SynArgPats.NamePatPairs(trivia = trivia) ->
     if idRange.EndColumn <> trivia.ParenRange.StartColumn then
-      reportWarn src trivia.ParenRange "Contains invalid whitespace"
+      reportWarn src trivia.ParenRange "Remove whitespace after function"
     else
       ()
   | _ ->
@@ -65,7 +65,7 @@ let private collectElemAndOptSeparatorRanges (src: ISourceText) elementPats =
 let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   if (lhsRange: range).EndColumn + 1 <> colonRange.StartColumn
     || (rhsRange: range).StartColumn - 1 <> colonRange.EndColumn
-  then reportWarn src colonRange "Cons must be surrounded by single spaces"
+  then reportWarn src colonRange "Use single whitespace around cons"
   else ()
 
 /// Checks if the given pattern contains record with incorrect bracket spacing,
@@ -73,7 +73,7 @@ let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
 let private checkRecordBracketSpacing src (range: range) (innerRange: range) =
   if range.StartColumn + 2 <> innerRange.StartColumn
     || range.EndColumn - 2 <> innerRange.EndColumn
-  then reportWarn src range "Wrong spacing inside brackets"
+  then reportWarn src range "Use single whitespace next to brackets"
   else ()
 
 /// Checks for incorrect spacing in record pattern matching.
@@ -89,7 +89,7 @@ let private checkRecordFuncSpacing src = function
           match pats with
           | [ SynPat.Paren(range = range) ] ->
             if (List.last id).idRange.EndColumn <> range.StartColumn then
-              reportWarn src range "No space between ident and paren"
+              reportWarn src range "Remove whitespace before '('"
             else
               ()
           | _ ->
@@ -99,7 +99,7 @@ let private checkRecordFuncSpacing src = function
           match pats with
           | [ SynPat.Paren(range = range) ] ->
             if (List.last id).idRange.EndColumn + 1 <> range.StartColumn then
-              reportWarn src range "Need single space between ident and paren"
+              reportWarn src range "Use single whitespace before '('"
             else
               ()
           | _ ->
@@ -121,7 +121,7 @@ let private checkRecordOperatorSpacing (src: ISourceText) = function
       if symbolRange.IsSome then
         if ident.Range.EndColumn + 1 <> symbolRange.Value.StartColumn
           || symbolRange.Value.EndColumn + 1 <> pat.Range.StartColumn
-        then reportWarn src ident.Range "Need single space around '='"
+        then reportWarn src ident.Range "Use single whitespace around '='"
         else ()
       else
         ()
@@ -135,7 +135,7 @@ let private checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
     src.GetSubTextFromRange field.Range
     |> fun subStr ->
       if subStr.Contains ';' then
-        reportWarn src field.Range "Contains Invalid Separator"
+        reportWarn src field.Range "Remove trailing ';'"
       else
         ()
   else
@@ -149,13 +149,13 @@ let private checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
         |> Seq.choose id
         |> Seq.iter (fun index ->
           if index > 0 && subStr[index - 1] = ' ' then
-            reportWarn src field.Range "No space before semicolon"
+            reportWarn src field.Range "Remove whitespace before ';'"
           elif index < subStr.Length - 1 then
             match subStr[index + 1] with
             | ' ' when index < subStr.Length - 2 && subStr.[index + 2] = ' ' ->
-              reportWarn src field.Range "Need single space around semicolon"
+              reportWarn src field.Range "Use single whitespace around ';'"
             | ' ' -> ()
-            | _ -> reportWarn src field.Range "Missing space after semicolon"
+            | _ -> reportWarn src field.Range "Add whitespace after ';'"
           else
             ()
         )
@@ -175,7 +175,7 @@ let rec private checkRecordInPattern src (idRange: range) = function
         |> checkRecordBracketSpacing src range
       | _ -> ()
       if not field.IsParen && idRange.EndColumn + 1 <> field.Range.StartColumn
-      then reportWarn src field.Range "Only need a single space"
+      then reportWarn src field.Range "Use single whitespace"
       else ()
       checkRecordFuncSpacing src field
       checkRecordOperatorSpacing src field
@@ -200,7 +200,7 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
   | [ id ]
     when id.idText = "new" && argPats.Patterns.Head.IsParen &&
          id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
-    reportWarn src argPats.Patterns.Head.Range "Contains invalid whitespace."
+    reportWarn src argPats.Patterns.Head.Range "Remove whitespace after 'new'"
   | _ -> ()
 
 /// checks pattern cases with incorrect spacing or newlines.
@@ -214,7 +214,7 @@ let private checkPatternSpacing src clauses =
       match outerTrivia with
       | Some range ->
         if pat.Range.StartLine <> range.StartLine then
-          reportWarn src pat.Range "Bar is not inline with Pattern."
+          reportWarn src pat.Range "Move '|' inline with pattern"
         elif pat.Range.StartColumn - 2 <> range.StartColumn then
           reportBarAndPatternError src range
         else
@@ -317,7 +317,7 @@ and private checkArrayOrList src isArray elementPats (range: range) =
   if elementPats.IsEmpty then
     let enclosureWidth = if isArray then 4 else 2
     if range.EndColumn - range.StartColumn <> enclosureWidth then
-      reportWarn src range "Contains Invalid Whitespace"
+      reportWarn src range "Remove whitespace in brackets"
     else
       ()
   else

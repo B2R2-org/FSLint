@@ -11,7 +11,7 @@ let checkNamePatPairs src (longIdents: list<NamePatPairField>) =
     eRange |> Option.iter (fun range ->
       if fN.Range.EndColumn + 1 <> range.StartColumn
         || pat.Range.StartColumn <> range.EndColumn + 1
-      then Diagnostics.reportWarn src range "Need single space around '='"
+      then Diagnostics.reportWarn src range "Use single whitespace around '='"
       else ()
     )
   )

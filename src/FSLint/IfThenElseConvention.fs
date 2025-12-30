@@ -72,11 +72,10 @@ let check src ifExpr thenExpr (elseExpr: SynExpr option) (range: range) =
       let elseExprFits = elseExprLength <= MaxLineLength
       if ifThenExprFits && elseExprFits then
         if not (isCompactFormat ifExpr thenExpr elseExpr) then
-          reportWarn src range
-            "Both 'if-then-expr' and 'else-expr' fit in 80 \"columns\""
+          reportWarn src range "Use compact format (fits in 80 columns)"
         else
           ()
       elif not (isSeparatedFormat ifExpr thenExpr elseExpr) then
-        reportWarn src range "At least one part exceeds 80 columns"
+        reportWarn src range "Use separated format (exceeds 80 columns)"
       else
         ()

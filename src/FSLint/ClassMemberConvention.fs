@@ -164,13 +164,13 @@ let checkMemberOrder src (members: SynMemberDefn list) =
       let nextScope = getMemberScope next
       if prevCat <> nextCat then
         reportWarn src next.Range
-          $"Wrong member order: {nextCat} should come before \"{prevCat}\""
+          $"Move {nextCat} before {prevCat}"
       elif prevScope <> nextScope then
         reportWarn src next.Range
-          "Wrong member order: static should come before instance members"
+          "Move static member before instance members"
       else
         reportWarn src next.Range
-          "Wrong member order: members should be ordered by access level"
+          "Fix member order by access level"
     else
       ()
   )
@@ -186,7 +186,7 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
       let lineStr = src.GetLineString(dotRange.StartLine - 1)
       if str = "``" then
         if lineStr.LastIndexOf "``" + 2 <> parenRange.StartColumn then
-          reportWarn src dotRange "Contains invalid whitespace"
+          reportWarn src dotRange "Remove whitespace after '``'"
         else ()
         false
       else
@@ -202,11 +202,11 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
     | SynPat.Wild _ :: wild when wild.Length <> 0 ->
-      reportWarn src id.idRange "Member must be followed by paren."
+      reportWarn src id.idRange "Add '()' after member"
     | SynPat.Paren _ :: paren when paren.Length <> 0 ->
-      reportWarn src id.idRange "Member must be followed by paren."
+      reportWarn src id.idRange "Add '()' after member"
     | SynPat.Named _ :: named when named.Length <> 0 ->
-      reportWarn src id.idRange "Member must be followed by paren."
+      reportWarn src id.idRange "Add '()' after member"
     | [ SynPat.Paren(range = range) ] ->
       let lastId = List.last longId
       if checkBackticMethodSpacing src dotRanges range then
@@ -238,11 +238,11 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
     | SynPat.Wild _ :: wild when wild.Length <> 0 ->
-      reportWarn src id.idRange "Static member must be followed by paren."
+      reportWarn src id.idRange "Add '()' after static member"
     | SynPat.Paren _ :: paren when paren.Length <> 0 ->
-      reportWarn src id.idRange "Static member must be followed by paren."
+      reportWarn src id.idRange "Add '()' after static member"
     | SynPat.Named _ :: named when named.Length <> 0 ->
-      reportWarn src id.idRange "Static member must be followed by paren."
+      reportWarn src id.idRange "Add '()' after static member"
     | [ SynPat.Paren(range = range) ] ->
       let idRange =
         match typarDecls with
@@ -258,7 +258,7 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
       match args with
       | [ SynPat.Paren(range = argRange) ] ->
         if range.EndColumn + 1 <> argRange.StartColumn then
-          reportWarn src argRange "Infix and Paren need a single space."
+          reportWarn src argRange "Add single whitespace between Infix and '('"
         else ()
       | _ -> ()
     | _ -> warn $"[checkStaticMemberSpacing]TODO: {longId}"
@@ -268,7 +268,7 @@ let checkSelfIdentifierUsage (src: ISourceText) pat body =
   match pat with
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty && id.Head.idText = "__" ->
-      reportWarn src id.Head.idRange "Avoid usage '__'"
+      reportWarn src id.Head.idRange "Change '__' to 'this'"
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty
       && (id.Head.idText = "this" || id.Head.idText = "self") ->

@@ -28,7 +28,7 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
       ||> Range.mkRange ""
       |> fun colonRange ->
         if src.GetSubTextFromRange colonRange <> ": " then
-          reportWarn src colonRange "Contains invalid whitespace."
+          reportWarn src colonRange "Use ': ' between field and type"
     else ()
   ) fields
 
@@ -37,7 +37,7 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
 let private checkOpeningBracketPosition src range (trivia: SynTypeDefnTrivia) =
   if trivia.EqualsRange.IsSome && (range: range).StartLine <> range.EndLine then
     if trivia.EqualsRange.Value.StartLine = range.StartLine then
-      reportWarn src range "Opening Bracket not inline with equal operator"
+      reportWarn src range "Move '{' to next line from '='"
     else
       ()
   else ()
@@ -54,7 +54,7 @@ let private checkFieldCompFlag src (range: range) (innerRange: range) =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
       if flagEndIsWrong || flagStartIsWrong then
-        reportWarn src innerRange "Field not inline with bracket."
+        reportWarn src innerRange "Move Field to inline with bracket"
       else
         ()
 
@@ -67,15 +67,15 @@ let private checkFieldIsInlineWithBracket src (range: range) fields =
       || range.EndLine <> innerRange.EndLine
     then
       try checkFieldCompFlag src range innerRange
-      with _ -> reportWarn src innerRange "Field not inline with bracket."
+      with _ -> reportWarn src innerRange "Move Field to inline with bracket"
     elif range.StartColumn + 2 <> innerRange.StartColumn
       || range.EndColumn - 2 <> innerRange.EndColumn
-    then reportWarn src range "Wrong spacing inside brackets"
+    then reportWarn src range "Use single whitespace before/after brackets"
     else ()
 
 let private checkBracketCompFlag src fullRange fieldRange exprRange =
   if (fullRange: range).StartLine <> (fieldRange: range).StartLine then
-    reportWarn src fieldRange "Opening Bracket not inline with equal operator"
+    reportWarn src fieldRange "Move '{' to inline with '='"
   elif (exprRange: range).EndLine <> fullRange.EndLine then
     (Position.mkPos (exprRange.EndLine + 1) 0,
      Position.mkPos fullRange.EndLine 0)
@@ -87,7 +87,7 @@ let private checkBracketCompFlag src fullRange fieldRange exprRange =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndWrong = Array.last strArr |> String.IsNullOrEmpty |> not
       if flagStartWrong && flagEndWrong then
-        reportWarn src fullRange "Bracket should inline with record field."
+        reportWarn src fullRange "Move field to inline with Bracket"
       else
         ()
 
@@ -104,7 +104,7 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         | _ -> fieldRange
       if fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
-      then reportWarn src range "Wrong spacing inside brackets"
+      then reportWarn src range "Use single whitespace before/after brackets"
       else ()
     | _ -> ()
   elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
@@ -120,10 +120,10 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         try
           checkBracketCompFlag src range fieldRange exprRange
         with _ ->
-          reportWarn src exprRange "Bracket should inline with record field."
+          reportWarn src exprRange "Move field to inline with Bracket"
       elif fieldRange.StartColumn - 2 <> range.StartColumn
         || exprRange.EndColumn + 2 <> range.EndColumn
-      then reportWarn src range "Wrong spacing inside brackets"
+      then reportWarn src range "Use single whitespace before/after brackets"
       else ()
     | _ -> ()
   else
@@ -141,7 +141,7 @@ let rec private checkOperatorSpacing src = function
         equalRange.EndColumn + 1 <> exprRange.Range.StartColumn &&
         fieldRange.StartLine = exprRange.Range.StartLine
       then
-        reportWarn src fieldRange "Need single space around '='"
+        reportWarn src fieldRange "Use single whitespace around '='"
       else
         checkOperatorSpacing src rest
     | _ -> checkOperatorSpacing src rest
@@ -163,13 +163,13 @@ let checkSeparatorSpacing src fields =
     match separatorInfo with
     | Some(separatorRange, Some _) ->
       if exprRange.EndColumn < separatorRange.StartColumn then
-        reportWarn src exprRange "No space before semicolon"
+        reportWarn src exprRange "Remove whitespace before ';'"
       elif i < (collectFieldsInfo fields).Length - 1 then
         let fieldRange, _, _ = (collectFieldsInfo fields)[i + 1]
         let spaceAfterSemicolon =
           fieldRange.StartColumn - separatorRange.EndColumn
         if spaceAfterSemicolon <> 1 then
-          reportWarn src separatorRange "Need single space after separator."
+          reportWarn src separatorRange "Add whitespace after ';'"
         else
           ()
       else

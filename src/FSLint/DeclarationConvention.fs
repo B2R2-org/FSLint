@@ -84,7 +84,7 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
       |> src.GetSubTextFromRange
       |> fun subStr ->
         if subStr <> " " then
-          reportWarn src range.Value "Need space before '='."
+          reportWarn src range.Value "Add whitespace before '='."
         else
           ()
     else
@@ -94,7 +94,7 @@ let checkEqualSpacing (src: ISourceText) (range: range option) =
        |> src.GetSubTextFromRange
        |> fun subStr ->
          if subStr <> " = " then
-           reportWarn src range.Value "Need space before and after '='."
+           reportWarn src range.Value "Add whitespace around '='."
          else
            ()
   else
@@ -109,7 +109,7 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
       when stringKind = SynStringKind.TripleQuote
       && eqRange.StartLine = body.Range.StartLine
       && (body.Range.StartLine <> body.Range.EndLine) ->
-        reportWarn src body.Range "Triple-quoted should be on the next line."
+        reportWarn src body.Range "Move '\"\"\"' to next line"
     | _ ->
       ()
   | None ->
@@ -138,8 +138,7 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
         let oneLine = String.concat " " contentParts
         let totalLength = indent + oneLine.Length
         if totalLength <= Utils.MaxLineLength then
-          reportWarn src body.Range
-            "Unnecessary line break: declaration fits within 80 columns"
+          reportWarn src body.Range "Remove unnecessary line break"
       else
         ()
     | None ->
@@ -152,9 +151,7 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
     | SynExpr.ComputationExpr _
     | SynExpr.App(argExpr = SynExpr.ComputationExpr _)
       when trivia.EqualsRange.Value.EndLine = body.Range.StartLine ->
-      reportWarn src body.Range
-        ("Computation expression should start on the next line after " +
-         "'='")
+      reportWarn src body.Range "Move computation expression to next line"
     | _ ->
       ()
   else
@@ -170,7 +167,7 @@ let check (src: ISourceText) decls =
         nextDecl.Range.StartLine - prevDecl.Range.EndLine
         |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
       if actualSpacing <> expectedSpacing then
-        reportWarn src nextDecl.Range "Wrong newLine appear."
+        reportWarn src nextDecl.Range "Use single blank line"
       else
         ()
     else

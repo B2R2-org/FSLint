@@ -69,15 +69,15 @@ let checkFieldWidth (src: ISourceText) (range: range) =
   |> fun (str, executeCheck) ->
     if executeCheck then
       if str.Contains "  " then
-        reportWarn src range "Contains invalid whitespace"
+        reportWarn src range "Remove consecutive whitespace"
       elif str.Contains ":" && str.Contains " :: " |> not
         && (str.Contains ": " |> not || str.Contains " :") then
-        reportWarn src range "Wrong space :"
+        reportWarn src range "Use ': '"
       elif str.Contains "*" && str.Contains " * " |> not then
-        reportWarn src range "Wrong space *"
+        reportWarn src range "Use ' * '"
       elif str.Contains " []" && str.Contains ": []" |> not
         && str.Contains ", []" |> not then
-        reportWarn src range "Wrong space []"
+        reportWarn src range "Remove whitespace before '[]'"
       else
         ()
     else
@@ -85,12 +85,12 @@ let checkFieldWidth (src: ISourceText) (range: range) =
       strArr
       |> Array.iter (fun str ->
         if str.TrimStart().Contains "  " then
-          reportWarn src range "Contains invalid whitespace"
+          reportWarn src range "Remove consecutive whitespace"
         else
           ())
       if strArr[0].Contains ":" && strArr[0].Contains " :"
         && strArr[0].Contains " :: " |> not then
-        reportWarn src range "Wrong space :"
+        reportWarn src range "Use ': ' or ' :: ' "
       else
         ()
 
@@ -103,13 +103,13 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
     |> fun range ->
       let str = src.GetSubTextFromRange range
       if front.StartLine = back.StartLine && str.Contains "  " then
-        reportWarn src back "Contains invalid whitespace"
+        reportWarn src back "Remove consecutive whitespace"
       elif front.StartLine = back.StartLine && str.Contains " * " |> not
         && front.EndLine = back.StartLine then
-        reportWarn src range "Wrong space '*'"
+        reportWarn src range "Use ' * '"
       elif front.StartLine <> back.StartLine && str.Contains "* " |> not
         && front.EndLine = back.StartLine then
-        reportWarn src range "Wrong space '*'"
+        reportWarn src range "Use ' * '"
       else
         ()
   )
@@ -125,10 +125,10 @@ let private checkInlineSpacing src (frontCase, endCase) =
     let expectedCaseStart = barRange.EndColumn + 1
     if barRange.StartColumn <> expectedBarStart ||
       endRange.StartColumn <> expectedCaseStart
-    then reportWarn src endRange "Contains invalid whitespace"
+    then reportWarn src endRange "Use single whitespace around '|'"
     else ()
   | None, _ ->
-    warn "Union case does not have a bar range."
+    warn "Exception: '|' range does not exist"
   | _ ->
     ()
 
@@ -170,16 +170,16 @@ let rec checkAbstractSlot src (id: Ident) synType =
   | SynType.Fun(argType = argType; returnType = returnType; trivia = trivia) ->
     if argType.Range.EndLine <> trivia.ArrowRange.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
-    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Use single whitespace around '->'"
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && (argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
       || returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn)
-    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Use single whitespace around '->'"
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine <> returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
-    then reportWarn src trivia.ArrowRange "Contains invalid whitespace"
+    then reportWarn src trivia.ArrowRange "Use single whitespace around '->'"
     else ()
     checkAbstractSlot src id argType
     checkAbstractSlot src id returnType

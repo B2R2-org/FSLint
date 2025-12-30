@@ -29,7 +29,7 @@ let private isInsideStringLiteral (src: ISourceText) (range: range) lineIdx =
 let checkNested (src: ISourceText) range lineNums =
   for lineNum in lineNums do
     if src.GetLineString(lineNum - 1) <> "" then
-      reportWarn src range "Nested should be separated by exactly one space."
+      reportWarn src range "Add blank line before nested"
     else ()
 
 let checkBlankLine (src: ISourceText) (range: range) lineNums =

@@ -14,7 +14,7 @@ let rec private collectBracketInfoInAppExpr = function
 let checkBracketSpacing src (innerRange: range) (range: range) =
   if range.StartColumn + 1 <> innerRange.StartColumn
     || range.EndColumn - 1 <> innerRange.EndColumn
-  then reportWarn src range "No space allowed in indexer"
+  then reportWarn src range "Remove whitespace in indexer"
   else ()
 
 let checkIndexRangeSpacing src = function
@@ -23,11 +23,11 @@ let checkIndexRangeSpacing src = function
     | Some e1, Some e2 when
       e1.Range.EndColumn <> opm.StartColumn
       || e2.Range.StartColumn <> opm.EndColumn ->
-      reportWarn src opm "No space allowed in indexer"
+      reportWarn src opm "Remove whitespace in indexer"
     | Some e1, None when e1.Range.EndColumn <> opm.StartColumn ->
-      reportWarn src opm "No space allowed in indexer"
+      reportWarn src opm "Remove whitespace in indexer"
     | None, Some e2 when e2.Range.StartColumn <> opm.EndColumn ->
-      reportWarn src opm "No space allowed in indexer"
+      reportWarn src opm "Remove whitespace in indexer"
     | _ ->
       ()
   | _ ->

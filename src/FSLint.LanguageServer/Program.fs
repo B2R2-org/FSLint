@@ -32,20 +32,6 @@ type LspServer(rpc: JsonRpc) =
       eprintfn "[RANGE] ERROR converting range: %s" ex.Message
       { Start = { Line = 0; Character = 0 }
         End = { Line = 0; Character = 1 } }
-  // let toLspRange (range: range): LspRange =
-  //   try
-  //     let startLine = max 0 (range.StartLine - 1)
-  //     let startChar = max 0 range.StartColumn
-  //     let endLine = max 0 (range.EndLine - 1)
-  //     let endChar = max 0 range.EndColumn
-  //     let lspRange =
-  //       { Start = { Line = startLine; Character = startChar }
-  //         End = { Line = endLine; Character = endChar } }
-  //     lspRange
-  //   with ex ->
-  //     eprintfn "[RANGE] ERROR converting range: %s" ex.Message
-  //     { Start = { Line = 0; Character = 0 }
-  //       End = { Line = 0; Character = 1 } }
 
   let toLspDiagnostic (error: LintError): LspDiagnostic option =
     try
@@ -122,6 +108,11 @@ type LspServer(rpc: JsonRpc) =
            (diag.Range.Start.Line = diag.Range.End.Line &&
             diag.Range.Start.Character <= diag.Range.End.Character))
         )
+      (* First catch *)
+      |> Array.groupBy (fun diag -> diag.Range.Start.Line)
+      |> Array.map (fun (line, diags) ->
+        diags |> Array.minBy (fun d -> d.Range.Start.Character)
+      )
       if validDiagnostics.Length < diagnostics.Length then
         eprintfn "[LSP] WARNING: Filtered %d invalid diagnostics"
           (diagnostics.Length - validDiagnostics.Length)

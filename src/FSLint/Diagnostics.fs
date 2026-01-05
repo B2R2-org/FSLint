@@ -110,7 +110,7 @@ module CustomReports =
     reportWarn src range "Remove whitespace before '('"
 
   let reportLowerCaseError src range =
-    reportWarn src range "Add whitespace before '('"
+    reportWarn src range "Use single whitespace before '('"
 
   let reportBarAndPatternError src range =
     reportWarn src range "Add space after '|'"
@@ -123,3 +123,6 @@ module CustomReports =
 
   let reportTypeError src range =
     reportWarn src range "Fix type annotation format"
+
+  let reportTrailingSeparator src range =
+    reportWarn src range "Remove trailing ';'"

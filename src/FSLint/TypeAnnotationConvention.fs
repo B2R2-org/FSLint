@@ -55,29 +55,51 @@ let private checkArraySpace (src: ISourceText) (typRange: range) =
 (* TODO: Need to change usage AST *)
 let checkFieldWidth (src: ISourceText) (range: range) =
   src.GetSubTextFromRange range
-  |> fun str ->
+  |> fun originStr ->
     if range.StartLine <> range.EndLine then
-      let strArr = str.Split([| '\n' |], StringSplitOptions.None)
+      let strArr = originStr.Split([| '\n' |], StringSplitOptions.None)
       if Array.exists(fun (str: string) ->
            str.TrimStart().StartsWith "///") strArr then
         strArr
         |> Array.skipWhile (fun line -> line.TrimStart().StartsWith "///")
         |> Array.map (fun line -> line.TrimStart())
         |> String.Concat, true
-      else str, false
-    else str, true
+      else originStr, false
+    else originStr, true
   |> fun (str, executeCheck) ->
     if executeCheck then
-      if str.Contains "  " then
-        reportWarn src range "Remove consecutive whitespace"
+      if str.TrimStart().Contains "  " then
+        (* Heuristic: Assuming a standardized structure *)
+        let indentSize = range.StartColumn + 2
+        let colonIdx = str.IndexOf ':' + indentSize
+        let spaceIdx = str.IndexOf "  " + indentSize
+        let warnRange =
+          (Position.mkPos range.StartLine spaceIdx,
+           Position.mkPos range.StartLine colonIdx)
+          ||> Range.mkRange ""
+        reportWarn src warnRange "Remove consecutive whitespace"
       elif str.Contains ":" && str.Contains " :: " |> not
         && (str.Contains ": " |> not || str.Contains " :") then
-        reportWarn src range "Use ': '"
+        if str.Contains "::" then
+          reportWarn src range "Use ': '"
+        else
+          let indentSize = range.StartColumn
+          let startIdx = str.IndexOf ':' + indentSize
+          let endIdx =
+            str[startIdx..].IndexOf(str[startIdx..].TrimStart()[0]) + startIdx
+            + indentSize
+          Range.mkRange "" (Position.mkPos range.StartLine startIdx)
+            (Position.mkPos range.StartLine endIdx)
+          |> fun rangeCreated -> reportWarn src rangeCreated "Use ': '"
       elif str.Contains "*" && str.Contains " * " |> not then
         reportWarn src range "Use ' * '"
       elif str.Contains " []" && str.Contains ": []" |> not
         && str.Contains ", []" |> not then
-        reportWarn src range "Remove whitespace before '[]'"
+        let idx = str.IndexOf " []"
+        (Position.mkPos range.StartLine (range.StartColumn + idx),
+         Position.mkPos range.StartLine (range.StartColumn + idx + 1))
+        ||> Range.mkRange ""
+        |> fun wRange -> reportWarn src wRange "Remove whitespace before '[]'"
       else
         ()
     else

@@ -12,7 +12,7 @@ let private collectRangeOfFirstAndLastType (typeArgs: SynType list) =
 /// Checks that no whitespace in null type arguments.
 let private checkEmpty src (typeArgsRange: range) =
   if typeArgsRange.EndColumn - typeArgsRange.StartColumn <> 3
-  then reportWarn src typeArgsRange "Remote whitespace in null type args"
+  then reportWarn src typeArgsRange "Remove whitespace in null type args"
   else ()
 
 /// Checks if there is a space between 'expr' and '<type>' in an expression,
@@ -54,21 +54,23 @@ let private checkCommaSeparator src (typeStr: string) typeRange =
 
 /// Checks whether the spacing between elements in the given type argument list
 /// is formatted correctly, distinguishing between ',' and '*' separators.
-let private checkTypeElementSpacing (src: ISourceText) typeArgs =
+let private checkTypeElementSpacing src (typeArgs: SynType list) =
   let getEffectiveTypeStr (src: ISourceText) (typeRange: range) =
     let lineStr = src.GetLineString(typeRange.StartLine - 1)
     if lineStr.EndsWith "," then lineStr[0..lineStr.Length - 2]
     else lineStr
+  let unionRange =
+    Range.unionRanges typeArgs.Head.Range (List.last typeArgs).Range
   (typeArgs: SynType list)
   |> List.iter (fun typeArg ->
     let typeRange = typeArg.Range
-    let typeStr = src.GetSubTextFromRange typeRange
+    let typeStr = (src: ISourceText).GetSubTextFromRange typeRange
     if typeStr.Contains '*' then
-      checkStarSeparator src typeStr typeRange
+      checkStarSeparator src typeStr unionRange
     else
       let effectiveTypeStr = getEffectiveTypeStr src typeRange
       if effectiveTypeStr.IndexOf ',' <> -1 then
-        checkCommaSeparator src effectiveTypeStr typeRange
+        checkCommaSeparator src effectiveTypeStr unionRange
       else
         ()
   )
@@ -85,7 +87,8 @@ let checkTypeAppParenSpacing src = function
       if id.Length <> 1 then
         if flag = ExprAtomicFlag.NonAtomic
           || typeRange.EndColumn <> parenRange.StartColumn then
-          reportWarn src parenRange "Remove whitespace before '('"
+          Range.mkRange "" typeRange.End parenRange.Start
+          |> reportPascalCaseError src
         else ()
       else () (* This handle Type Reference convention *)
     | _ -> ()

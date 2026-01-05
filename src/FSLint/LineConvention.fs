@@ -36,7 +36,7 @@ let check (txt: string) =
       if line.Length > MaxLineLength then
         let range =
           Range.mkRange ""
-            (Position.mkPos lineNum MaxLineLength)
+            (Position.mkPos lineNum (MaxLineLength - 1))
             (Position.mkPos lineNum line.Length)
         reportWarn src range
           $"Line {lineNum} exceeds {MaxLineLength} characters."
@@ -54,11 +54,11 @@ let check (txt: string) =
   | None ->
     txt.Split([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
-      if line.Length > Utils.MaxLineLength then
+      if line.Length > MaxLineLength then
         Console.WriteLine line
         Console.WriteLine(
-          "|" + String.replicate (Utils.MaxLineLength - 2) "-" + "|")
-        raiseWithWarn $"Line {i + 1} exceeds {Utils.MaxLineLength} characters."
+          "|" + String.replicate (MaxLineLength - 2) "-" + "|")
+        raiseWithWarn $"Line {i + 1} exceeds {MaxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         Console.WriteLine line
         Console.WriteLine(String.replicate (line.Length - 1) " " + "^")

@@ -37,14 +37,17 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
 let private checkOpeningBracketPosition src range (trivia: SynTypeDefnTrivia) =
   if trivia.EqualsRange.IsSome && (range: range).StartLine <> range.EndLine then
     if trivia.EqualsRange.Value.StartLine = range.StartLine then
-      reportWarn src range "Move '{' to next line from '='"
+      (src: ISourceText).GetLineString(range.StartLine - 1).Length
+      |> fun lastIdx ->
+        Range.mkRange "" range.Start (Position.mkPos range.StartLine lastIdx)
+      |> fun wRange -> reportWarn src wRange "Move '{' to next line"
     else
       ()
   else ()
 
-let private checkFieldCompFlag src (range: range) (innerRange: range) =
-  (Position.mkPos (innerRange.EndLine + 1) 0,
-   Position.mkPos range.EndLine 0)
+let private checkFieldCompFlag src fullRange innerRange ranges isOpenBracket =
+  (Position.mkPos ((innerRange: range).EndLine + 1) 0,
+   Position.mkPos (fullRange: range).EndLine 0)
   ||> Range.mkRange ""
   |> (src: ISourceText).GetSubTextFromRange
   |> fun subStr ->
@@ -53,25 +56,34 @@ let private checkFieldCompFlag src (range: range) (innerRange: range) =
       let flagStartIsWrong =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
-      if flagEndIsWrong || flagStartIsWrong then
-        reportWarn src innerRange "Move Field to inline with bracket"
-      else
-        ()
+      //let warnRange =
+      //reportWarn src warnRange "Move to inline with bracket"
+      //  (if isOpenBracket then List.head else List.last) ranges
+      flagEndIsWrong || flagStartIsWrong
 
-let private checkFieldIsInlineWithBracket src (range: range) fields =
+let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
   fields
   |> List.map (fun (SynField(range = range)) -> range)
-  |> List.reduce Range.unionRanges
-  |> fun innerRange ->
-    if range.StartLine <> innerRange.StartLine
-      || range.EndLine <> innerRange.EndLine
-    then
-      try checkFieldCompFlag src range innerRange
-      with _ -> reportWarn src innerRange "Move Field to inline with bracket"
-    elif range.StartColumn + 2 <> innerRange.StartColumn
-      || range.EndColumn - 2 <> innerRange.EndColumn
-    then reportWarn src range "Use single whitespace before/after brackets"
-    else ()
+  |> fun ranges ->
+    ranges
+    |> List.reduce Range.unionRanges
+    |> fun innerRange ->
+      let isOpenBracket = fullRange.StartLine <> innerRange.StartLine
+      if fullRange.StartLine <> innerRange.StartLine
+        || fullRange.EndLine <> innerRange.EndLine
+        && checkFieldCompFlag src fullRange innerRange ranges isOpenBracket
+      then
+        Range.mkRange "" (Position.mkPos fullRange.EndLine 0) fullRange.End
+        |> fun wRange -> reportWarn src wRange "Move to inline with bracket"
+      elif fullRange.StartColumn + 2 <> innerRange.StartColumn
+      then
+        Range.mkRange "" fullRange.Start innerRange.Start
+        |> fun wRange -> reportWarn src wRange "Use one whitespace after '{'"
+      elif fullRange.EndColumn - 2 <> innerRange.EndColumn
+      then
+        Range.mkRange "" innerRange.End fullRange.End
+        |> fun wRange -> reportWarn src wRange "Use one whitespace before '}'"
+      else ()
 
 let private checkBracketCompFlag src fullRange fieldRange exprRange =
   if (fullRange: range).StartLine <> (fieldRange: range).StartLine then
@@ -163,15 +175,24 @@ let checkSeparatorSpacing src fields =
     match separatorInfo with
     | Some(separatorRange, Some _) ->
       if exprRange.EndColumn < separatorRange.StartColumn then
-        reportWarn src exprRange "Remove whitespace before ';'"
+        Range.mkRange "" exprRange.End separatorRange.Start
+        |> fun wRange -> reportWarn src wRange "Remove whitespace before ';'"
       elif i < (collectFieldsInfo fields).Length - 1 then
         let fieldRange, _, _ = (collectFieldsInfo fields)[i + 1]
-        let spaceAfterSemicolon =
-          fieldRange.StartColumn - separatorRange.EndColumn
-        if spaceAfterSemicolon <> 1 then
-          reportWarn src separatorRange "Add whitespace after ';'"
-        else
-          ()
+        if fieldRange.StartColumn - separatorRange.EndColumn <> 1
+          && separatorRange.StartLine = separatorRange.EndLine
+        then
+          Range.mkRange "" fieldRange.Start separatorRange.End
+          |> fun wRange -> reportWarn src wRange "Add whitespace after ';'"
+        elif fieldRange.StartColumn - separatorRange.EndColumn <> 1
+          && separatorRange.StartLine <> separatorRange.EndLine
+        then
+          (separatorRange.Start,
+           Position.mkPos separatorRange.StartLine
+             (separatorRange.StartColumn + 1))
+          ||> Range.mkRange ""
+          |> reportTrailingSeparator src
+        else ()
       else
         ()
     | _ -> ()

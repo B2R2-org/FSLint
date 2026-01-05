@@ -4,41 +4,46 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text
 open Diagnostics
 
-let checkMultiLineIdentWithParen (src: ISourceText) (ctorRange: range) =
-  src.GetLineString(ctorRange.StartLine - 1)
+let checkMultiLineIdentWithParen (src: ISourceText) ctorRange spaceRange =
+  src.GetLineString((ctorRange: range).StartLine - 1)
   |> fun str ->
     if src.GetSubTextFromRange(ctorRange).TrimStart()[0] = str.TrimStart()[0]
     then
       ()
     else
       let subStr = str.Substring(ctorRange.StartColumn - 1, 2)
-      if subStr.StartsWith ' ' then reportPascalCaseError src ctorRange else ()
+      if subStr.StartsWith ' ' then reportPascalCaseError src spaceRange else ()
 
 let checkIdentifierWithParen (src: ISourceText) members =
   members
   |> List.iter (fun memberDefn ->
     match memberDefn with
     | SynMemberDefn.ImplicitCtor(accessibility = accessibility
-                                 ctorArgs = ctorArgs) ->
+                                 ctorArgs = ctorArgs
+                                 range = range) ->
       match accessibility with
       | Some(SynAccess.Internal idRange)
       | Some(SynAccess.Public idRange)
       | Some(SynAccess.Private idRange) ->
         if idRange.EndColumn <> ctorArgs.Range.StartColumn then
-          reportPascalCaseError src ctorArgs.Range
+          Range.mkRange "" idRange.End ctorArgs.Range.Start
+          |> fun wRange -> reportPascalCaseError src wRange
         else ()
       | _ ->
-        checkMultiLineIdentWithParen src ctorArgs.Range
+        Range.mkRange "" range.End ctorArgs.Range.Start
+        |> checkMultiLineIdentWithParen src ctorArgs.Range
     | SynMemberDefn.ImplicitInherit(inheritType = inheritType
                                     inheritArgs = inheritArgs) ->
       if inheritType.Range.EndColumn <> inheritArgs.Range.StartColumn then
-        reportPascalCaseError src inheritArgs.Range
+        Range.mkRange "" inheritType.Range.End inheritArgs.Range.Start
+        |> fun wRange -> reportPascalCaseError src wRange
       else
         ()
     | SynMemberDefn.Inherit(baseType = baseType; asIdent = ident)
       when baseType.IsSome && ident.IsSome ->
       if baseType.Value.Range.EndColumn <> ident.Value.idRange.StartColumn then
-        reportPascalCaseError src ident.Value.idRange
+        Range.mkRange "" baseType.Value.Range.End ident.Value.idRange.Start
+        |> fun wRange -> reportPascalCaseError src wRange
       else
         ()
     | _ -> ()

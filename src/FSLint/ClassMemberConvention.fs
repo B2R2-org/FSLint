@@ -201,30 +201,39 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
   match (longId: LongIdent) with
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
-    | SynPat.Wild _ :: wild when wild.Length <> 0 ->
-      reportWarn src id.idRange "Add '()' after member"
-    | SynPat.Paren _ :: paren when paren.Length <> 0 ->
-      reportWarn src id.idRange "Add '()' after member"
-    | SynPat.Named _ :: named when named.Length <> 0 ->
-      reportWarn src id.idRange "Add '()' after member"
+    | SynPat.Wild(range = range) :: wild when wild.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last wild).Range)
+        "Use non-curried parameter style"
+    | SynPat.Paren(range = range) :: paren when paren.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last paren).Range)
+        "Use non-curried parameter style"
+    | SynPat.Named(range = range) :: named when named.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last named).Range)
+        "Use non-curried parameter style"
     | [ SynPat.Paren(range = range) ] ->
       let lastId = List.last longId
       if checkBackticMethodSpacing src dotRanges range then
         if (extraId: Ident Option).IsSome
-          && isPascalCase extraId.Value.idText then
-          if extraId.Value.idRange.EndColumn <> range.StartColumn then
-            reportPascalCaseError src extraId.Value.idRange
-          else ()
-        elif (extraId: Ident Option).IsSome then
-          if extraId.Value.idRange.EndColumn <> range.StartColumn then
-            reportPascalCaseError src extraId.Value.idRange
-          else ()
+          && isPascalCase extraId.Value.idText
+          && extraId.Value.idRange.EndColumn <> range.StartColumn
+        then
+          Range.mkRange "" extraId.Value.idRange.End range.Start
+          |> reportPascalCaseError src
+        elif (extraId: Ident Option).IsSome
+          && extraId.Value.idRange.EndColumn <> range.StartColumn
+        then
+          Range.mkRange "" extraId.Value.idRange.End range.Start
+          |> reportPascalCaseError src
         elif isPascalCase lastId.idText
           && lastId.idRange.EndColumn <> range.StartColumn
-          then reportPascalCaseError src lastId.idRange
+        then
+          Range.mkRange "" lastId.idRange.End range.Start
+          |> reportPascalCaseError src
         elif isPascalCase lastId.idText |> not
           && lastId.idRange.EndColumn + 1 <> range.StartColumn
-          then reportLowerCaseError src lastId.idRange
+        then
+          Range.mkRange "" lastId.idRange.End range.Start
+          |> reportLowerCaseError src
         else ()
       else ()
     | _ -> ()
@@ -237,19 +246,23 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
   match longId with
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
-    | SynPat.Wild _ :: wild when wild.Length <> 0 ->
-      reportWarn src id.idRange "Add '()' after static member"
-    | SynPat.Paren _ :: paren when paren.Length <> 0 ->
-      reportWarn src id.idRange "Add '()' after static member"
-    | SynPat.Named _ :: named when named.Length <> 0 ->
-      reportWarn src id.idRange "Add '()' after static member"
+    | SynPat.Wild(range = range) :: wild when wild.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last wild).Range)
+        "Use non-curried parameter style"
+    | SynPat.Paren(range = range) :: paren when paren.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last paren).Range)
+        "Use non-curried parameter style"
+    | SynPat.Named(range = range) :: named when named.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last named).Range)
+        "Use non-curried parameter style"
     | [ SynPat.Paren(range = range) ] ->
       let idRange =
         match typarDecls with
         | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
         | _ -> id.idRange
       if idRange.EndColumn <> range.StartColumn then
-        reportPascalCaseError src id.idRange
+        Range.mkRange "" idRange.End range.Start
+        |> reportPascalCaseError src
       else ()
     | _ -> ()
   | _ when (idTrivia: list<option<IdentTrivia>>).Head.IsSome ->
@@ -258,7 +271,8 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
       match args with
       | [ SynPat.Paren(range = argRange) ] ->
         if range.EndColumn + 1 <> argRange.StartColumn then
-          reportWarn src argRange "Add single whitespace between Infix and '('"
+          let wRange = Range.mkRange "" range.End argRange.Start
+          reportWarn src wRange "Add single whitespace between Infix and '('"
         else ()
       | _ -> ()
     | _ -> warn $"[checkStaticMemberSpacing]TODO: {longId}"

@@ -1,7 +1,8 @@
-module FSLint.LanguageServer.Program
+module B2R2.FSLint.LanguageServer.Program
 
 open System
 open System.IO
+open System.Threading.Tasks
 open StreamJsonRpc
 open Newtonsoft.Json.Linq
 open FSharp.Compiler.Text
@@ -21,13 +22,8 @@ type LspServer(rpc: JsonRpc) =
         if startLine > endLine || (startLine = endLine && startChar > endChar)
         then endLine, endChar, startLine, startChar
         else startLine, startChar, endLine, endChar
-      let lspRange =
-        { Start = { Line = finalStartLine; Character = finalStartChar }
-          End = { Line = finalEndLine; Character = finalEndChar } }
-      eprintfn "[RANGE] Converted (%d,%d)-(%d,%d) to LSP (%d,%d)-(%d,%d)"
-        range.StartLine range.StartColumn range.EndLine range.EndColumn
-        finalStartLine finalStartChar finalEndLine finalEndChar
-      lspRange
+      { Start = { Line = finalStartLine; Character = finalStartChar }
+        End = { Line = finalEndLine; Character = finalEndChar } }
     with ex ->
       eprintfn "[RANGE] ERROR converting range: %s" ex.Message
       { Start = { Line = 0; Character = 0 }
@@ -104,9 +100,9 @@ type LspServer(rpc: JsonRpc) =
           diag.Range.Start.Character >= 0 &&
           diag.Range.End.Line >= 0 &&
           diag.Range.End.Character >= 0 &&
-          (diag.Range.Start.Line < diag.Range.End.Line ||
-           (diag.Range.Start.Line = diag.Range.End.Line &&
-            diag.Range.Start.Character <= diag.Range.End.Character))
+          (diag.Range.Start.Line < diag.Range.End.Line
+          || (diag.Range.Start.Line = diag.Range.End.Line
+          && diag.Range.Start.Character <= diag.Range.End.Character))
         )
       (* First catch *)
       |> Array.groupBy (fun diag -> diag.Range.Start.Line)
@@ -116,15 +112,6 @@ type LspServer(rpc: JsonRpc) =
       if validDiagnostics.Length < diagnostics.Length then
         eprintfn "[LSP] WARNING: Filtered %d invalid diagnostics"
           (diagnostics.Length - validDiagnostics.Length)
-        diagnostics
-        |> Array.filter (fun d -> not (Array.contains d validDiagnostics))
-        |> Array.iter (fun d ->
-          eprintfn "[LSP] FILTERED: %s at (%d,%d)-(%d,%d)"
-            d.Message
-            d.Range.Start.Line d.Range.Start.Character
-            d.Range.End.Line d.Range.End.Character
-        )
-      eprintfn "[LSP] Publishing %d valid diagnostics" validDiagnostics.Length
       let diagnosticsArray = JArray()
       for diag in validDiagnostics do
         let diagObj =
@@ -151,7 +138,7 @@ type LspServer(rpc: JsonRpc) =
     with ex ->
       eprintfn "[LSP] ERROR publishing diagnostics: %s" ex.Message
       eprintfn "[LSP] STACK: %s" ex.StackTrace
-      System.Threading.Tasks.Task.FromResult(())
+      Task.FromResult(())
 
 
   let scanWorkspace () =
@@ -197,12 +184,12 @@ type LspServer(rpc: JsonRpc) =
   member _.Initialize(p: JToken) =
     eprintfn "[LSP] =========================================="
     eprintfn "[LSP] Initialize"
-    let rootUri = p.["rootUri"]
+    let rootUri = p["rootUri"]
     if not (isNull rootUri) then
       let uriStr = rootUri.ToString()
       eprintfn "[LSP] Raw Root URI: %s" uriStr
       try
-        let decodedUri = System.Uri.UnescapeDataString(uriStr)
+        let decodedUri = Uri.UnescapeDataString(uriStr)
         eprintfn "[LSP] Decoded URI: %s" decodedUri
         let uri = Uri(decodedUri)
         let localPath = uri.LocalPath
@@ -213,15 +200,15 @@ type LspServer(rpc: JsonRpc) =
         let path =
           if uriStr.StartsWith("file:///") then
             let rawPath = uriStr.Substring(8)
-            let decoded = System.Uri.UnescapeDataString(rawPath)
+            let decoded = Uri.UnescapeDataString(rawPath)
             if decoded.Length >= 3 && decoded.[0] = '/' && decoded.[2] = ':'
             then decoded.Substring(1).Replace("/", "\\")
             else decoded.Replace("/", "\\")
           elif uriStr.StartsWith("file://") then
             let rawPath = uriStr.Substring(7)
-            System.Uri.UnescapeDataString(rawPath).Replace("/", "\\")
+            Uri.UnescapeDataString(rawPath).Replace("/", "\\")
           else
-            System.Uri.UnescapeDataString(uriStr)
+            Uri.UnescapeDataString(uriStr)
         eprintfn "[LSP] Workspace root (fallback): %s" path
         workspaceRoot <- Some path
     else
@@ -268,8 +255,8 @@ type LspServer(rpc: JsonRpc) =
   member _.DidOpen(p: JToken) =
     async {
       try
-        let uri = p.["textDocument"].["uri"].ToString()
-        let text = p.["textDocument"].["text"].ToString()
+        let uri = p["textDocument"].["uri"].ToString()
+        let text = p["textDocument"].["text"].ToString()
         eprintfn "[LSP] didOpen: %s" uri
         if not hasScannedWorkspace && workspaceRoot.IsSome then
           eprintfn "[LSP] WARNING: Initialized didn't scan, scanning now"
@@ -279,14 +266,14 @@ type LspServer(rpc: JsonRpc) =
         do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didOpen: %s" ex.Message
-    } |> Async.StartAsTask :> System.Threading.Tasks.Task
+    } |> Async.StartAsTask :> Task
 
   [<JsonRpcMethod("textDocument/didChange")>]
   member _.DidChange(p: JToken) =
     async {
       try
-        let uri = p.["textDocument"].["uri"].ToString()
-        let changes = p.["contentChanges"] :?> JArray
+        let uri = p["textDocument"].["uri"].ToString()
+        let changes = p["contentChanges"] :?> JArray
         if changes.Count > 0 then
           let text = changes.[changes.Count - 1].["text"].ToString()
           eprintfn "[LSP] didChange: %s" uri
@@ -294,14 +281,14 @@ type LspServer(rpc: JsonRpc) =
           do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didChange: %s" ex.Message
-    } |> Async.StartAsTask :> System.Threading.Tasks.Task
+    } |> Async.StartAsTask :> Task
 
   [<JsonRpcMethod("textDocument/didSave")>]
   member _.DidSave(p: JToken) =
     async {
       try
-        let uri = p.["textDocument"].["uri"].ToString()
-        match p.["text"] with
+        let uri = p["textDocument"].["uri"].ToString()
+        match p["text"] with
         | null -> ()
         | text ->
           let content = text.ToString()
@@ -310,22 +297,21 @@ type LspServer(rpc: JsonRpc) =
           do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didSave: %s" ex.Message
-    } |> Async.StartAsTask :> System.Threading.Tasks.Task
+    } |> Async.StartAsTask :> Task
 
   [<JsonRpcMethod("textDocument/didClose")>]
   member _.DidClose(p: JToken) =
     async {
       try
-        let uri = p.["textDocument"].["uri"].ToString()
+        let uri = p["textDocument"].["uri"].ToString()
         eprintfn "[LSP] didClose: %s" uri
         do! publishDiagnostics uri [||] |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didClose: %s" ex.Message
-    } |> Async.StartAsTask :> System.Threading.Tasks.Task
+    } |> Async.StartAsTask :> Task
 
   [<JsonRpcMethod("textDocument/inlayHint")>]
-  member _.InlayHint(p: JToken) =
-    System.Threading.Tasks.Task.FromResult(JArray() :> JToken)
+  member _.InlayHint(p: JToken) = Task.FromResult(JArray() :> JToken)
 
   [<JsonRpcMethod("shutdown")>]
   member _.Shutdown() =

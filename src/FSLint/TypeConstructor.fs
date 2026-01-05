@@ -1,5 +1,6 @@
 module B2R2.FSLint.TypeConstructor
 
+open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open Diagnostics
 
@@ -11,11 +12,13 @@ let checkConstructorSpacing src targetType = function
     | SynType.Var(typar = SynTypar(id, TyparStaticReq.None, false)) ->
       if isPascalCase id.idText then
         if id.idRange.EndColumn <> range.StartColumn then
-          reportWarn src range "Remove whitespace before '('"
+          Range.mkRange "" id.idRange.End range.Start
+          |> reportPascalCaseError src
         else
           ()
       elif id.idRange.EndColumn + 1 <> range.StartColumn then
-        reportWarn src range "Add whitespace before '('"
+        Range.mkRange "" id.idRange.End range.Start
+        |> reportLowerCaseError src
       else
         ()
     | SynType.Var _ as typ ->
@@ -24,8 +27,11 @@ let checkConstructorSpacing src targetType = function
       let id = List.last id
       if isPascalCase id.idText
         && id.idRange.EndColumn <> range.StartColumn
-      then reportWarn src range "Remove whitespace before '('"
-      else ()
+      then
+        Range.mkRange "" id.idRange.End range.Start
+        |> reportPascalCaseError src
+      else
+        ()
     | _ ->
       ()
   | _ ->

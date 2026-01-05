@@ -1,3 +1,9 @@
+!bin/**
+!bin/FSLint.LanguageServer.dll
+!bin/FSLint.LanguageServer.deps.json
+!bin/FSLint.LanguageServer.runtimeconfig.json
+!bin/FSharp.Compiler.Service.dll
+
 # Source
 src/**
 *.ts
@@ -16,25 +22,6 @@ webpack.config.js
 .DS_Store
 nul
 dist/**
-
-# node_modules - specific files
-**/README.md
-**/readme.md
-**/README
-**/License.txt
-**/LICENSE.txt
-**/CHANGELOG.md
-**/CHANGELOG
-**/HISTORY.md
-**/test/**
-**/tests/**
-**/example/**
-**/examples/**
-**/doc/**
-**/docs/**
-**/.github/**
-**/*.map
-**/tsconfig.json
 
 # Logs
 *.log

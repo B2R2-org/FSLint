@@ -90,7 +90,9 @@ let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
 /// Ensures no space inside empty brackets (e.g., "[]" or "[||]" not "[ ]").
 let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
   if expr.IsEmpty && range.EndColumn - range.StartColumn <> enclosureWidth then
-    reportWarn src range "Remove whitespace in empty list/array"
+    Range.shiftStart 0 (enclosureWidth / 2) range
+    |> Range.shiftEnd 0 (-enclosureWidth / 2)
+    |> fun range -> reportWarn src range "Remove whitespace in empty arraylist"
   else
     ()
 
@@ -155,7 +157,7 @@ let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
     for line in range.StartLine .. range.EndLine - 1 do
       let lineString = (src: ISourceText).GetLineString line
       if lineString.LastIndexOf ";" + 1 = lineString.Length then
-        reportWarn src range "Remove trailing ';'"
+        reportTrailingSeparator src range
       else
         ()
   else
@@ -165,7 +167,7 @@ let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
         |> fun idx -> if isPat then idx + range.StartColumn else idx
       range.EndColumn - lastIdxOfSeparator
     if distClosingBracketToLastSeparator < distFstElemToOpeningBracket + 1 then
-      reportWarn src range "Remove trailing ';'"
+      reportTrailingSeparator src range
     else
       ()
 

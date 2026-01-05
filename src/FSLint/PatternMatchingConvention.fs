@@ -26,12 +26,13 @@ let private checkFuncSpacing src typarDecls (idRange: range) = function
       | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
       | _ -> idRange
     if idRange.EndColumn <> range.StartColumn then
-      reportWarn src range "Remove whitespace after function"
+      reportPascalCaseError src <| Range.mkRange "" idRange.End range.Start
     else
       ()
   | SynArgPats.NamePatPairs(trivia = trivia) ->
     if idRange.EndColumn <> trivia.ParenRange.StartColumn then
-      reportWarn src trivia.ParenRange "Remove whitespace after function"
+      Range.mkRange "" idRange.End trivia.ParenRange.Start
+      |> reportPascalCaseError src
     else
       ()
   | _ ->
@@ -89,7 +90,8 @@ let private checkRecordFuncSpacing src = function
           match pats with
           | [ SynPat.Paren(range = range) ] ->
             if (List.last id).idRange.EndColumn <> range.StartColumn then
-              reportWarn src range "Remove whitespace before '('"
+              Range.mkRange "" (List.last id).idRange.End range.Start
+              |> reportPascalCaseError src
             else
               ()
           | _ ->
@@ -99,7 +101,8 @@ let private checkRecordFuncSpacing src = function
           match pats with
           | [ SynPat.Paren(range = range) ] ->
             if (List.last id).idRange.EndColumn + 1 <> range.StartColumn then
-              reportWarn src range "Use single whitespace before '('"
+              Range.mkRange "" (List.last id).idRange.End range.Start
+              |> reportLowerCaseError src
             else
               ()
           | _ ->
@@ -121,8 +124,11 @@ let private checkRecordOperatorSpacing (src: ISourceText) = function
       if symbolRange.IsSome then
         if ident.Range.EndColumn + 1 <> symbolRange.Value.StartColumn
           || symbolRange.Value.EndColumn + 1 <> pat.Range.StartColumn
-        then reportWarn src ident.Range "Use single whitespace around '='"
-        else ()
+        then
+          Range.mkRange "" ident.Range.End pat.Range.Start
+          |> reportInfixError src
+        else
+          ()
       else
         ()
     )
@@ -134,10 +140,8 @@ let private checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
   if field.Range.StartLine <> field.Range.EndLine then
     src.GetSubTextFromRange field.Range
     |> fun subStr ->
-      if subStr.Contains ';' then
-        reportWarn src field.Range "Remove trailing ';'"
-      else
-        ()
+      if subStr.Contains ';' then reportTrailingSeparator src field.Range
+      else ()
   else
     match field with
     | SynPat.Record(fieldPats, _) when fieldPats.Length > 1 ->

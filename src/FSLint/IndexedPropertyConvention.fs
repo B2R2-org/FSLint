@@ -23,11 +23,14 @@ let checkIndexRangeSpacing src = function
     | Some e1, Some e2 when
       e1.Range.EndColumn <> opm.StartColumn
       || e2.Range.StartColumn <> opm.EndColumn ->
-      reportWarn src opm "Remove whitespace in indexer"
+      Range.mkRange "" e1.Range.End e2.Range.Start
+      |> fun range -> reportWarn src range "Remove whitespace in indexer"
     | Some e1, None when e1.Range.EndColumn <> opm.StartColumn ->
-      reportWarn src opm "Remove whitespace in indexer"
+      Range.mkRange "" e1.Range.End opm.Start
+      |> fun range -> reportWarn src range "Remove whitespace in indexer"
     | None, Some e2 when e2.Range.StartColumn <> opm.EndColumn ->
-      reportWarn src opm "Remove whitespace in indexer"
+      Range.mkRange "" opm.End e2.Range.Start
+      |> fun range -> reportWarn src range "Remove whitespace in indexer"
     | _ ->
       ()
   | _ ->

@@ -6,6 +6,45 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
+let private generalOperator =
+  [ "+"
+    "-"
+    "*"
+    "/"
+    "%"
+    "**"
+    "="
+    "<>"
+    "<"
+    ">"
+    "<="
+    ">="
+    "&&"
+    "||"
+    "&&&"
+    "|||"
+    "^^^"
+    "~~~"
+    "<<<"
+    ">>>"
+    "|>"
+    "<|"
+    ">>"
+    "<<"
+    "@"
+    "::"
+    "|"
+    "->"
+    "<-"
+    ":>"
+    ":?>"
+    ":?"
+    "!"
+    ":="
+    ".."
+    ".." ]
+  |> Set.ofList
+
 let private isUnaryOperator (src: ISourceText) (operatorRange: range) =
   try
     let line = src.GetLineString(operatorRange.StartLine - 1)
@@ -18,11 +57,20 @@ let private isUnaryOperator (src: ISourceText) (operatorRange: range) =
   with
     _ -> false
 
+let private isCustomOperator (src: ISourceText) (funcRange: range) =
+  let symbol = src.GetSubTextFromRange funcRange |> fun s -> s.Trim()
+  if symbol.Length = 0 then
+    false
+  else
+    (symbol |> Seq.forall (fun c -> not (Char.IsLetterOrDigit c) && c <> '_'))
+    && not (Set.contains symbol generalOperator)
+
 let private isOperator src = function
   | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = triv); range = range) ->
     triv
     |> List.exists (function
-      | Some(IdentTrivia.OriginalNotation "=") -> false
+      | Some(IdentTrivia.OriginalNotation "=")
+        -> false
       | Some(IdentTrivia.OriginalNotation _) -> true
       | _ -> false
     ) && isUnaryOperator src range
@@ -87,11 +135,11 @@ let private shouldCheckFuncSpacing funcExpr (argExpr: SynExpr) =
 let private ensureInfixSpacing src funcRange (subArgRange: range) argRange =
   if (argRange: range).StartLine = (funcRange: range).StartLine
     && argRange.StartColumn <> funcRange.EndColumn + 1
-  then reportInfixError src argRange
+  then Range.mkRange "" funcRange.End argRange.Start |> reportInfixError src
   else ()
   if subArgRange.StartLine = funcRange.StartLine
     && funcRange.StartColumn <> subArgRange.EndColumn + 1
-  then reportInfixError src funcRange
+  then Range.mkRange "" subArgRange.End funcRange.Start |> reportInfixError src
   else ()
 
 let private ensureAddressOfSpacing src (exprRange: range) (opRange: range) =
@@ -104,15 +152,23 @@ let private ensureFuncSpacing src (funcRange: range) (argRange: range) =
   if (argRange.StartColumn - funcRange.EndColumn <> 1
     && funcRange.StartLine = argRange.StartLine)
     && not (isUnaryOperator src funcRange)
-  then reportWarn src argRange "Use single whitespace in function application"
+    && not (isCustomOperator src funcRange)
+  then
+    Range.mkRange "" funcRange.End argRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace in func app"
   else ()
 
 /// Validates spacing around (=) operators ensuring proper whitespace.
 /// Checks for exact spacing requirements in assignment expressions.
 let private checkAssignSpacing src (fRange: range) (subArgRange: range) aRange =
   if fRange.StartColumn <> subArgRange.EndColumn + 1
-    || fRange.EndColumn <> (aRange: range).StartColumn - 1
-  then reportWarn src fRange "Use single whitespace around '='"
+  then
+    Range.mkRange "" subArgRange.End fRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace after '='"
+  elif fRange.EndColumn <> (aRange: range).StartColumn - 1
+  then
+    Range.mkRange "" fRange.End aRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace before '='"
   else ()
 
 /// Check proper spacing in infix applications.
@@ -190,8 +246,13 @@ let checkUnaryOperatorSpacing (src: ISourceText) (expr: SynExpr) =
           if funcExpr.Range.EndLine = argExpr.Range.StartLine then
             let gap = argExpr.Range.StartColumn - funcExpr.Range.EndColumn
             if gap > 0 then
-              reportWarn src argExpr.Range
-                "Remove whitespace in unary operator and operand"
+              Range.mkRange "" funcExpr.Range.End argExpr.Range.Start
+              |> fun range ->
+              reportWarn src range "Remove whitespace after unary operator"
+            else
+              ()
+          else
+            ()
       | _ -> ()
     | _ -> ()
   | _ -> ()

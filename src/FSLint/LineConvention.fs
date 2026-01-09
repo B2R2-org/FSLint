@@ -39,15 +39,14 @@ let check (txt: string) =
             (Position.mkPos lineNum (MaxLineLength - 1))
             (Position.mkPos lineNum line.Length)
         reportWarn src range
-          $"Line {lineNum} exceeds {MaxLineLength} characters."
+          $"exceeds {MaxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         let trailingStart = line.TrimEnd().Length
         let range =
           Range.mkRange ""
             (Position.mkPos lineNum trailingStart)
             (Position.mkPos lineNum line.Length)
-        reportWarn src range
-          $"Remove trailing whitespace in Line {lineNum}"
+        reportWarn src range "Remove trailing whitespace"
       else
         checkControlChar line
     )

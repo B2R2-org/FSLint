@@ -4,6 +4,34 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open Diagnostics
 
+let checkAsSpacing src (idRange: range) (asRange: range) (selfRange: range) =
+  if idRange.EndLine = asRange.StartLine
+    && idRange.EndColumn + 1 <> asRange.StartColumn then
+      Range.mkRange "" idRange.End asRange.Start
+      |> fun range -> reportWarn src range "Use single whitespace before 'as'"
+  elif asRange.EndLine = selfRange.StartLine
+    && asRange.EndColumn + 1 <> selfRange.StartColumn then
+      Range.mkRange "" asRange.End selfRange.Start
+      |> fun range -> reportWarn src range "Use single whitespace after 'as'"
+  else
+    ()
+
+let checkEqualSpacing src (idRange: range) (reprRange: range) equalRange =
+  if Option.isNone equalRange then ()
+  else
+    if idRange.EndLine = (equalRange.Value: range).StartLine
+      && idRange.EndColumn + 1 <> equalRange.Value.StartColumn then
+      Range.mkRange "" idRange.End equalRange.Value.Start
+      |> fun range ->
+        reportWarn src range "Use single whitespace before '='"
+    elif reprRange.StartLine = equalRange.Value.EndLine
+      && equalRange.Value.EndColumn + 1 <> reprRange.StartColumn then
+      Range.mkRange "" equalRange.Value.End reprRange.Start
+      |> fun range ->
+        reportWarn src range "Use single whitespace after '='"
+    else
+      ()
+
 /// Checks if there is incorrect spacing in constructor calls.
 let checkConstructorSpacing src targetType = function
   | SynExpr.Const(SynConst.Unit, range)

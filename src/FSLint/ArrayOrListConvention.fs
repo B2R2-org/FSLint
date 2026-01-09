@@ -22,18 +22,22 @@ let checkElementSpacing src (elemAndSepRanges: Range list) =
     let separatorRange = elemAndSepRanges[i + 1]
     let nextElement = elemAndSepRanges[i + 2]
     if elemRange.EndColumn <> separatorRange.StartColumn
-    then reportWarn src separatorRange "Remove whitespace before ';'"
+    then
+      Range.mkRange "" separatorRange.Start elemRange.End
+      |> fun range -> reportWarn src range "Remove whitespace before ';'"
     elif separatorRange.EndColumn = nextElement.StartColumn
       || separatorRange.EndColumn + 1 <> nextElement.StartColumn
-    then reportWarn src separatorRange "Use single whitespace after ';'"
+    then
+      Range.mkRange "" separatorRange.End nextElement.Start
+      |> fun range -> reportWarn src range "Use single whitespace after ';'"
     else ()
 
-let checkBracketCompFlag (src: ISourceText) (elemRange: range) (range: range) =
+let checkBracketComp (src: ISourceText) (elemRange: range) fullrange warnRange =
   let added =
     if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then 2
     else 1
   (Position.mkPos (elemRange.EndLine + added) 0,
-    Position.mkPos range.EndLine 0)
+    Position.mkPos (fullrange: range).EndLine 0)
   ||> Range.mkRange ""
   |> src.GetSubTextFromRange
   |> fun subStr ->
@@ -43,20 +47,25 @@ let checkBracketCompFlag (src: ISourceText) (elemRange: range) (range: range) =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
       if flagEndIsWrong || flagStartIsWrong then
-        reportBracketSpacingError src range
+        reportBracketSpacingError src warnRange
       else
         ()
 
 /// Checks proper spacing inside brackets for list/array literals.
 /// Ensures single space after opening and before closing brackets.
 let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
-  let isEndBracketSpacingIncorrect =
-    (range: range).EndColumn - distFstElemToOpenBracket <> elemRange.EndColumn
-  let isStartBracketSpacingIncorrect =
-    range.StartColumn + distFstElemToOpenBracket <> elemRange.StartColumn
-  if isStartBracketSpacingIncorrect || isEndBracketSpacingIncorrect then
-    try checkBracketCompFlag src elemRange range
-    with _ -> reportBracketSpacingError src range
+  if (range: range).StartColumn + distFstElemToOpenBracket
+    <> elemRange.StartColumn then
+    Range.mkRange "" range.Start elemRange.Start
+    |> fun warnRange ->
+      try checkBracketComp src elemRange range warnRange
+      with _ -> reportBracketSpacingError src warnRange
+  elif (range: range).EndColumn - distFstElemToOpenBracket
+    <> elemRange.EndColumn then
+    Range.mkRange "" elemRange.End range.End
+    |> fun warnRange ->
+    try checkBracketComp src elemRange range warnRange
+    with _ -> reportBracketSpacingError src warnRange
   else
     ()
 
@@ -65,24 +74,36 @@ let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
 let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
   match fstElem with
   | SynExpr.Const(range = rangeOfFirstElem) ->
-    if opm.StartColumn = rangeOfFirstElem.EndColumn
-      || opm.EndColumn = rangeOfSecondElem.StartColumn
-    then reportRangeOperatorError src opm
+    if opm.StartColumn = rangeOfFirstElem.EndColumn then
+      Range.mkRange "" rangeOfFirstElem.End opm.Start
+      |> reportRangeOperatorError src
+    elif opm.EndColumn = rangeOfSecondElem.StartColumn then
+      Range.mkRange "" opm.End rangeOfSecondElem.Start
+      |> reportRangeOperatorError src
     else ()
   | SynExpr.Ident ident ->
-    if opm.StartColumn = ident.idRange.EndColumn
-      || opm.EndColumn = rangeOfSecondElem.StartColumn
-    then reportRangeOperatorError src opm
+    if opm.StartColumn = ident.idRange.EndColumn then
+      Range.mkRange "" ident.idRange.End opm.Start
+      |> reportRangeOperatorError src
+    elif opm.EndColumn = rangeOfSecondElem.StartColumn then
+      Range.mkRange "" opm.End rangeOfSecondElem.Start
+      |> reportRangeOperatorError src
     else ()
   | SynExpr.IndexRange(opm = stepOpm
                        range1 = rangeOfFirstElem
                        range2 = stepRange) ->
-    if stepOpm.StartColumn = rangeOfFirstElem.EndColumn
-      || stepOpm.EndColumn = stepRange.StartColumn
-    then reportRangeOperatorError src stepOpm
-    elif opm.StartColumn = stepRange.EndColumn
-      || opm.EndColumn = rangeOfSecondElem.StartColumn
-    then reportRangeOperatorError src opm
+    if stepOpm.StartColumn = rangeOfFirstElem.EndColumn then
+      Range.mkRange "" rangeOfFirstElem.End stepOpm.Start
+      |> reportRangeOperatorError src
+    elif stepOpm.EndColumn = stepRange.StartColumn then
+      Range.mkRange "" stepOpm.End stepRange.Start
+      |> reportRangeOperatorError src
+    elif opm.StartColumn = stepRange.EndColumn then
+      Range.mkRange "" stepRange.End opm.Start
+      |> reportRangeOperatorError src
+    elif opm.EndColumn = rangeOfSecondElem.StartColumn then
+      Range.mkRange "" opm.End rangeOfSecondElem.Start
+      |> reportRangeOperatorError src
     else ()
   | _ -> ()
 
@@ -152,24 +173,23 @@ let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
 
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.
-let checkTrailingSeparator src isPat distFstElemToOpeningBracket range =
-  if (range: range).StartLine <> range.EndLine then
-    for line in range.StartLine .. range.EndLine - 1 do
+let checkTrailingSeparator src fRange eRange =
+  if (fRange: range).StartLine <> fRange.EndLine then
+    for line in fRange.StartLine .. fRange.EndLine - 1 do
       let lineString = (src: ISourceText).GetLineString line
-      if lineString.LastIndexOf ";" + 1 = lineString.Length then
-        reportTrailingSeparator src range
+      let lastSepaIdx = lineString.LastIndexOf ";"
+      if lastSepaIdx + 1 = lineString.Length then
+        (Position.mkPos (line + 1) lastSepaIdx,
+         Position.mkPos (line + 1) lineString.Length)
+        ||> Range.mkRange ""
+        |> reportTrailingSeparator src
       else
         ()
   else
-    let distClosingBracketToLastSeparator =
-      let lastIdxOfSeparator =
-        src.GetSubTextFromRange(range).LastIndexOf ";"
-        |> fun idx -> if isPat then idx + range.StartColumn else idx
-      range.EndColumn - lastIdxOfSeparator
-    if distClosingBracketToLastSeparator < distFstElemToOpeningBracket + 1 then
-      reportTrailingSeparator src range
-    else
-      ()
+    let gap = Range.mkRange "" (eRange: range).End fRange.End
+    let lastToClosingBracket = gap |> src.GetSubTextFromRange
+    if lastToClosingBracket.Contains ';' then reportTrailingSeparator src gap
+    else ()
 
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
@@ -194,10 +214,10 @@ let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
         else
           rangeAdjusted
 
-let checkCommon src isArray fullRange elemRange =
+let checkCommon src isArray full elem =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
-  checkTrailingSeparator src false distFstElemToOpeningBracket fullRange
-  checkBracketSpacing src distFstElemToOpeningBracket elemRange fullRange
+  checkTrailingSeparator src full elem
+  checkBracketSpacing src distFstElemToOpeningBracket elem full
 
 let rec checkSingleLine src = function
   | SynExpr.Sequential _ as expr ->

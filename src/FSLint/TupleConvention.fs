@@ -49,18 +49,38 @@ let private adjustRangeByCommentInPat (src: ISourceText) rangeWithElems =
       comRange, fstElem.Range, sndElem.Range
   )
 
-let check src exprs commaRanges =
+let filterOutConsOperators exprs =
+  exprs
+  |> List.filter (function
+    | SynExpr.App(isInfix = true
+                  funcExpr = SynExpr.LongIdent(
+                    longDotId = SynLongIdent(
+                      id = [ id ]))) when id.idText = "op_ColonColon" ->
+      false
+    | _ -> true)
+
+let check (src: ISourceText) exprs commaRanges =
   exprs
   |> List.pairwise
   |> List.zip commaRanges
   |> adjustRangeByComment src
   |> List.iter (fun (commaRange, fstElemRange, sndElemRange) ->
+    let gapStr =
+      Range.unionRanges fstElemRange commaRange
+      |> src.GetSubTextFromRange
+    let symb = if gapStr.TrimEnd().EndsWith("::") then "'::'" else "','"
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
-      reportWarn src commaRange "Remove whitespace before ','"
+      Range.mkRange "" fstElemRange.End commaRange.Start
+      |> fun range ->
+        if symb = "'::'" then
+          reportWarn src range $"Use single whitespace before {symb}"
+        else
+          reportWarn src range "Remove whitespace before ','"
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
-      reportWarn src commaRange "Use single whitespace after ','"
+      Range.mkRange "" commaRange.End sndElemRange.Start
+      |> fun range -> reportWarn src range $"Use single whitespace after {symb}"
     else
       ()
   )
@@ -73,10 +93,12 @@ let checkPat src pats commaRanges =
   |> List.iter (fun (commaRange, fstElemRange, sndElemRange) ->
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
-      reportWarn src commaRange "Remove whitespace before ','"
+      Range.mkRange "" fstElemRange.End commaRange.Start
+      |> fun range -> reportWarn src range "Remove whitespace before ','"
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
-      reportWarn src commaRange "Use single whitespace after ','"
+      Range.mkRange "" commaRange.End sndElemRange.Start
+      |> fun range -> reportWarn src range "Use single whitespace after ','"
     else
       ()
   )

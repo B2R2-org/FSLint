@@ -111,7 +111,8 @@ let checkNewKeywordSpacing src = function
     (argExpr: SynExpr)
     when id.idText = "new" && argExpr.IsParen
     && id.idRange.EndColumn <> argExpr.Range.StartColumn ->
-    reportWarn src argExpr.Range "Remove whitespace"
+    Range.mkRange "" id.idRange.End argExpr.Range.Start
+    |> fun range -> reportWarn src range "Remove whitespace before '('"
   | _ ->
     ()
 
@@ -177,12 +178,15 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
 
 let checkDotGetSpacing src (expr: SynExpr) (dotRange: range) longDotId =
   if expr.Range.EndLine = dotRange.StartLine
-    && expr.Range.EndColumn <> dotRange.StartColumn
-  then reportWarn src dotRange "Remove space before '.'"
-  else ()
+    && expr.Range.EndColumn <> dotRange.StartColumn then
+    Range.mkRange "" expr.Range.End dotRange.Start
+    |> fun range -> reportWarn src range "Remove whitespace before '.'"
+  else
+    ()
   match longDotId with
   | SynLongIdent(id = id) ->
     if dotRange.EndLine = id[0].idRange.StartLine
-      && dotRange.EndColumn <> id[0].idRange.StartColumn
-    then reportWarn src dotRange "Remove space after '.'"
+      && dotRange.EndColumn <> id[0].idRange.StartColumn then
+      Range.mkRange "" dotRange.End id[0].idRange.Start
+      |> fun range -> reportWarn src range "Remove whitespace after '.'"
     else ()

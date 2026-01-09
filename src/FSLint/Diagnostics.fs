@@ -9,7 +9,7 @@ exception LintException of string
 module Diagnostics =
   let private outputLock = obj ()
 
-  let private currentFilePath = new Threading.AsyncLocal<string>()
+  let currentFilePath = new Threading.AsyncLocal<string>()
 
   let currentLintContext = new Threading.AsyncLocal<LintContext option>()
 
@@ -90,9 +90,8 @@ module Diagnostics =
 module CustomReports =
   open Diagnostics
 
-  let reportRedundant src range scopeType =
-    reportWarn src range
-      $"Remove Redundant 'private' (restricted by {scopeType})"
+  let reportRedundant src range =
+    reportWarn src range $"Remove Redundant 'private'"
 
   let reportInfixError src range =
     reportWarn src range "Use whitespace around operator"

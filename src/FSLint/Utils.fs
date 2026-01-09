@@ -17,6 +17,14 @@ let getAccessLevel = function
   | Some(SynAccess.Private _) -> Private
   | _ -> Public
 
+let extractComparisonOperator = function
+  | SynExpr.App(funcExpr = SynExpr.App(funcExpr = funcExpr)) ->
+    match funcExpr with
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ]))
+    | SynExpr.Ident(ident = id) -> Some id.idText
+    | _ -> None
+  | _ -> None
+
 /// Collects all .fs source files under the given root directory
 let getFsFiles (root: string) =
   let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape

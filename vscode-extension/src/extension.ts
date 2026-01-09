@@ -65,7 +65,7 @@ class FSLintCodeLensProvider implements vscode.CodeLensProvider {
       if (diag.message == 'Use single blank line') {
         codeLenses.push(
           new vscode.CodeLens(codeLensRange, {
-            title: `$${diag.message}`,
+            title: `${diag.message}`,
             command: ''
           })
         );

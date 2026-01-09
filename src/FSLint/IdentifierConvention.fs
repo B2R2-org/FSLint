@@ -21,7 +21,7 @@ let private caseCheck (src: ISourceText) style identifier (range: range) =
     else
       let identStartIdx =
         src.GetLineString(range.StartLine - 1).IndexOf identifier
-      let identEndIdx =  identStartIdx + identifier.Length
+      let identEndIdx = identStartIdx + identifier.Length
       let range =
         (Position.mkPos range.StartLine identStartIdx,
          Position.mkPos range.StartLine identEndIdx)

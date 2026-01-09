@@ -52,12 +52,9 @@ let checkIdentifierWithParen (src: ISourceText) members =
 let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
   typeDefns
   |> List.skip 1
-  |> List.map (fun (typeDefn: SynTypeDefn) ->
-    typeDefn.Range.StartLine - 1
-  )
+  |> List.map (fun (typeDefn: SynTypeDefn) -> typeDefn.Range.StartLine - 1)
   |> List.iter (fun recurseIdx ->
-    if src.GetLineString(recurseIdx - 1) <> "" then
-      reportWarn src range "Add blank line before nested"
-    else
-      ()
+    if src.GetLineString(recurseIdx - 1) <> ""
+    then reportWarn src range "Add blank line before nested"
+    else ()
   )

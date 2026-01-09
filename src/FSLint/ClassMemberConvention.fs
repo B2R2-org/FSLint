@@ -186,7 +186,10 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
       let lineStr = src.GetLineString(dotRange.StartLine - 1)
       if str = "``" then
         if lineStr.LastIndexOf "``" + 2 <> parenRange.StartColumn then
-          reportWarn src dotRange "Remove whitespace after '``'"
+          (Position.mkPos parenRange.StartLine (lineStr.LastIndexOf "``"),
+           parenRange.Start)
+          ||> Range.mkRange ""
+          |> fun range -> reportWarn src range "Remove whitespace after '``'"
         else ()
         false
       else
@@ -225,11 +228,13 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
           Range.mkRange "" extraId.Value.idRange.End range.Start
           |> reportPascalCaseError src
         elif isPascalCase lastId.idText
+          && extraId.IsNone
           && lastId.idRange.EndColumn <> range.StartColumn
         then
           Range.mkRange "" lastId.idRange.End range.Start
           |> reportPascalCaseError src
         elif isPascalCase lastId.idText |> not
+          && extraId.IsNone
           && lastId.idRange.EndColumn + 1 <> range.StartColumn
         then
           Range.mkRange "" lastId.idRange.End range.Start
@@ -271,11 +276,80 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
       match args with
       | [ SynPat.Paren(range = argRange) ] ->
         if range.EndColumn + 1 <> argRange.StartColumn then
-          let wRange = Range.mkRange "" range.End argRange.Start
-          reportWarn src wRange "Add single whitespace between Infix and '('"
+          Range.mkRange "" range.End argRange.Start
+          |> fun range ->
+            reportWarn src range "Add single whitespace between Infix and '('"
         else ()
       | _ -> ()
     | _ -> warn $"[checkStaticMemberSpacing]TODO: {longId}"
+  | _ -> ()
+
+let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
+  let idRange =
+    if Option.isSome (typ: Option<SynType>) then typ.Value.Range else id.idRange
+  let equalRange = (trivia: SynMemberDefnAutoPropertyTrivia).EqualsRange
+  match trivia.LeadingKeyword with
+  | SynLeadingKeyword.MemberVal(mRange, vRange) ->
+    if mRange.EndColumn + 1 <> vRange.StartColumn
+      && mRange.EndLine = vRange.StartLine then
+      Range.mkRange "" mRange.End vRange.Start
+      |> fun range ->
+        reportWarn src range "Use single whitespace between member val"
+    else
+      ()
+  | _ ->
+    ()
+  if Option.isSome equalRange then
+    if idRange.EndColumn + 1 <> equalRange.Value.StartColumn
+      && idRange.EndLine = equalRange.Value.StartLine then
+      Range.mkRange "" idRange.End equalRange.Value.Start
+      |> fun range -> reportWarn src range "Use single whitespace before '='"
+    elif equalRange.Value.EndColumn + 1 <> (expr: SynExpr).Range.StartColumn
+      && equalRange.Value.EndLine = expr.Range.StartLine then
+      Range.mkRange "" equalRange.Value.End expr.Range.Start
+      |> fun range -> reportWarn src range "Use single whitespace after '='"
+    else
+      ()
+  else
+    ()
+  if Option.isSome trivia.WithKeyword then
+    if expr.Range.EndColumn + 1 <> trivia.WithKeyword.Value.StartColumn
+      && expr.Range.EndLine = trivia.WithKeyword.Value.StartLine then
+      Range.mkRange "" expr.Range.End trivia.WithKeyword.Value.Start
+      |> fun range -> reportWarn src range "Use single whitespace before 'with'"
+    else
+      ()
+    if Option.isSome trivia.GetSetKeywords then
+      let getSetRange = trivia.GetSetKeywords.Value.Range
+      if trivia.WithKeyword.Value.EndLine = getSetRange.StartLine
+        && trivia.WithKeyword.Value.EndColumn + 1 <> getSetRange.StartColumn
+      then
+        Range.mkRange "" trivia.WithKeyword.Value.End getSetRange.Start
+        |> fun range ->
+          reportWarn src range "Use single whitespace after 'with'"
+      else
+        ()
+  else
+    ()
+  match trivia.GetSetKeywords with
+  | Some(GetSetKeywords.GetSet(getRange, setRange)) ->
+    if getRange.EndLine <> setRange.StartLine then
+      ()
+    else
+      let gap = Range.mkRange "" getRange.End setRange.Start
+      let gapStr = gap |> src.GetSubTextFromRange
+      if gap.EndColumn - gap.StartColumn <> 2 then
+        if gapStr.StartsWith ',' then
+          (Position.mkPos gap.StartLine (getRange.EndColumn + 1),
+           setRange.Start)
+          ||> Range.mkRange ""
+          |> fun range -> reportWarn src range "Use single whitespace after ','"
+        else
+          reportWarn src gap "Use ', '"
+      elif gap.EndColumn - gap.StartColumn = 2 && gapStr.EndsWith ',' then
+        reportWarn src gap "Use ', '"
+      else
+        ()
   | _ -> ()
 
 let checkSelfIdentifierUsage (src: ISourceText) pat body =

@@ -1,5 +1,6 @@
 module B2R2.FSLint.IfThenElseConvention
 
+open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open Diagnostics
@@ -27,7 +28,7 @@ let private calculateIfThenExprLength src (ifRange: range) ifExpr thenExpr =
     let indent = ifRange.StartColumn
     indent + 3 + ifText.Length + 6 + thenText.Length
   with _ ->
-    System.Int32.MaxValue
+    Int32.MaxValue
 
 let private calculateElseExprLength src (ifRange: range) (elseExpr: SynExpr) =
   try
@@ -35,13 +36,18 @@ let private calculateElseExprLength src (ifRange: range) (elseExpr: SynExpr) =
     let indent = ifRange.StartColumn
     indent + 5 + elseText.Length
   with _ ->
-    System.Int32.MaxValue
+    Int32.MaxValue
 
-let private isCompactFormat ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
-  let ifThenExprOneLine =
-    (ifExpr: SynExpr).Range.StartLine = thenExpr.Range.EndLine
-  let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
-  ifThenExprOneLine && elseSeparated
+let private isCompactFormat src ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
+  if (Range.unionRanges (ifExpr: SynExpr).Range elseExpr.Range
+      |> (src: ISourceText).GetSubTextFromRange
+      |> fun str -> str.ToCharArray() |> Array.contains '#') then
+    true
+  else
+    let ifThenExprOneLine =
+      (ifExpr: SynExpr).Range.StartLine = thenExpr.Range.EndLine
+    let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
+    ifThenExprOneLine && elseSeparated
 
 let private isSeparatedFormat ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
   let ifCondOneLine =
@@ -70,12 +76,8 @@ let check src ifExpr thenExpr (elseExpr: SynExpr option) (range: range) =
       let ifThenExprFits = ifThenExprLength <= MaxLineLength
       let elseExprLength = calculateElseExprLength src range elseExpr
       let elseExprFits = elseExprLength <= MaxLineLength
-      if ifThenExprFits && elseExprFits then
-        if not (isCompactFormat ifExpr thenExpr elseExpr) then
+      if ifThenExprFits && elseExprFits
+        && not (isCompactFormat src ifExpr thenExpr elseExpr) then
           reportWarn src range "Use compact format (fits in 80 columns)"
-        else
-          ()
-      elif not (isSeparatedFormat ifExpr thenExpr elseExpr) then
-        reportWarn src range "Use separated format (exceeds 80 columns)"
       else
         ()

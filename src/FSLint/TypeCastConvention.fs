@@ -2,7 +2,7 @@ module B2R2.FSLint.TypeCastConvention
 
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
-open CustomReports
+open Diagnostics
 
 let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
   (targetType: SynType) =
@@ -30,8 +30,12 @@ let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
 /// Checks the spacing around the upcast operator (:>) in infix expressions.
 let check src expr (targetType: SynType) =
   let symbolRange = collectCastSymbolRangeFromSrc src expr targetType
-  if symbolRange.Equals Range.range0 then ()
-  elif expr.Range.EndColumn + 1 <> symbolRange.StartColumn
-    || targetType.Range.StartColumn - 1 <> symbolRange.EndColumn
-  then reportInfixError src symbolRange
+  if symbolRange.Equals Range.range0 then
+    ()
+  elif expr.Range.EndColumn + 1 <> symbolRange.StartColumn then
+    Range.mkRange "" expr.Range.End symbolRange.Start
+    |> fun range -> reportWarn src range "Use whitespace before symbol"
+  elif targetType.Range.StartColumn - 1 <> symbolRange.EndColumn then
+    Range.mkRange "" symbolRange.End targetType.Range.Start
+    |> fun range -> reportWarn src range "Use whitespace after symbol"
   else ()

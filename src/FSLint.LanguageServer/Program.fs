@@ -12,6 +12,9 @@ open B2R2.FSLint.Diagnostics
 type LspServer(rpc: JsonRpc) =
   let mutable workspaceRoot: string option = None
   let mutable hasScannedWorkspace = false
+  let debounceTimers =
+    Collections.Concurrent.ConcurrentDictionary<string, Threading.Timer>()
+
   let toLspRange (range: range): LspRange =
     try
       let startLine = max 0 (range.StartLine - 1)
@@ -140,7 +143,6 @@ type LspServer(rpc: JsonRpc) =
       eprintfn "[LSP] STACK: %s" ex.StackTrace
       Task.FromResult(())
 
-
   let scanWorkspace () =
     async {
       match workspaceRoot with
@@ -162,19 +164,33 @@ type LspServer(rpc: JsonRpc) =
                      path.Contains("bin") ||
                      path.Contains("obj") ||
                      path.Contains(".git")))
-              |> Seq.toList
-            for i, file in fsFiles |> List.mapi (fun i f -> i + 1, f) do
-              try
-                let diagnostics = lintFile file
-                let normalizedPath = file.Replace("\\", "/")
-                let uri =
-                  if normalizedPath.[0] = '/' then
-                    sprintf "file://%s" normalizedPath
-                  else
-                    sprintf "file:///%s" normalizedPath
-                do! publishDiagnostics uri diagnostics |> Async.AwaitTask
-              with ex ->
-                eprintfn "[SCAN] ERROR processing %s: %s" file ex.Message
+              |> Seq.toArray
+            let batchSize = Environment.ProcessorCount
+            let batches =
+              fsFiles
+              |> Array.chunkBySize batchSize
+            for batch in batches do
+              let! results =
+                batch
+                |> Array.map (fun file ->
+                  async {
+                    try
+                      let diagnostics = lintFile file
+                      let normalizedPath = file.Replace("\\", "/")
+                      let uri =
+                        if normalizedPath.[0] = '/' then
+                          sprintf "file://%s" normalizedPath
+                        else
+                          sprintf "file:///%s" normalizedPath
+                      do! publishDiagnostics uri diagnostics |> Async.AwaitTask
+                      return Ok file
+                    with ex ->
+                      eprintfn "[SCAN] ERROR processing %s: %s" file ex.Message
+                      return Error(file, ex.Message)
+                  })
+                |> Async.Parallel
+              do! Async.Sleep 10
+            eprintfn "[SCAN] Completed workspace scan"
         with ex ->
           eprintfn "[SCAN] FATAL ERROR: %s" ex.Message
           eprintfn "[SCAN] STACK: %s" ex.StackTrace
@@ -255,15 +271,10 @@ type LspServer(rpc: JsonRpc) =
   member _.DidOpen(p: JToken) =
     async {
       try
-        let uri = p["textDocument"].["uri"].ToString()
-        let text = p["textDocument"].["text"].ToString()
-        eprintfn "[LSP] didOpen: %s" uri
         if not hasScannedWorkspace && workspaceRoot.IsSome then
           eprintfn "[LSP] WARNING: Initialized didn't scan, scanning now"
           hasScannedWorkspace <- true
           do! scanWorkspace ()
-        let diagnostics = lintDocument uri text
-        do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didOpen: %s" ex.Message
     } |> Async.StartAsTask :> Task
@@ -276,9 +287,18 @@ type LspServer(rpc: JsonRpc) =
         let changes = p["contentChanges"] :?> JArray
         if changes.Count > 0 then
           let text = changes.[changes.Count - 1].["text"].ToString()
-          eprintfn "[LSP] didChange: %s" uri
-          let diagnostics = lintDocument uri text
-          do! publishDiagnostics uri diagnostics |> Async.AwaitTask
+          match debounceTimers.TryGetValue(uri) with
+          | true, timer -> timer.Dispose()
+          | _ -> ()
+          let timer = new Threading.Timer(
+            (fun _ ->
+              async {
+                let diagnostics = lintDocument uri text
+                do! publishDiagnostics uri diagnostics |> Async.AwaitTask
+              } |> Async.Start
+            ),
+            null, 300, Threading.Timeout.Infinite)
+          debounceTimers.[uri] <- timer
       with ex ->
         eprintfn "[LSP] ERROR in didChange: %s" ex.Message
     } |> Async.StartAsTask :> Task
@@ -292,7 +312,6 @@ type LspServer(rpc: JsonRpc) =
         | null -> ()
         | text ->
           let content = text.ToString()
-          eprintfn "[LSP] didSave: %s" uri
           let diagnostics = lintDocument uri content
           do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
@@ -300,18 +319,7 @@ type LspServer(rpc: JsonRpc) =
     } |> Async.StartAsTask :> Task
 
   [<JsonRpcMethod("textDocument/didClose")>]
-  member _.DidClose(p: JToken) =
-    async {
-      try
-        let uri = p["textDocument"].["uri"].ToString()
-        eprintfn "[LSP] didClose: %s" uri
-        do! publishDiagnostics uri [||] |> Async.AwaitTask
-      with ex ->
-        eprintfn "[LSP] ERROR in didClose: %s" ex.Message
-    } |> Async.StartAsTask :> Task
-
-  [<JsonRpcMethod("textDocument/inlayHint")>]
-  member _.InlayHint(p: JToken) = Task.FromResult(JArray() :> JToken)
+  member _.DidClose(p: JToken) = Task.CompletedTask
 
   [<JsonRpcMethod("shutdown")>]
   member _.Shutdown() =

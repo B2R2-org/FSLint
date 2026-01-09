@@ -17,6 +17,17 @@ let private getFieldLastRange (SynExprRecordField(fieldName = fieldName)) =
 let private getExprRange (SynExprRecordField(expr = expr)) =
   expr |> Option.map (fun e -> e.Range)
 
+/// Checks if the given pattern contains record with incorrect bracket spacing,
+/// such as `{field}` instead of `{ field }`, within the specified range.
+let private checkBracketSpacing src (range: range) (innerRange: range) =
+  if range.StartColumn + 2 <> innerRange.StartColumn then
+    Range.mkRange "" range.Start innerRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace after '{'"
+  elif range.EndColumn - 2 <> innerRange.EndColumn then
+    Range.mkRange "" innerRange.End range.End
+    |> fun range -> reportWarn src range "Use single whitespace before '}'"
+  else ()
+
 /// Checks for correct spacing around ':' in record field definitions.
 /// Ensures the format `Field: type`.
 let private checkFieldTypeSpacing (src: ISourceText) fields =
@@ -56,9 +67,6 @@ let private checkFieldCompFlag src fullRange innerRange ranges isOpenBracket =
       let flagStartIsWrong =
         (Array.head strArr).TrimStart().StartsWith "#if" |> not
       let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
-      //let warnRange =
-      //reportWarn src warnRange "Move to inline with bracket"
-      //  (if isOpenBracket then List.head else List.last) ranges
       flagEndIsWrong || flagStartIsWrong
 
 let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
@@ -114,9 +122,12 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         match (copyInfo: option<SynExpr * _>) with
         | Some(expr, _) -> expr.Range
         | _ -> fieldRange
-      if fieldRange.StartColumn - 2 <> range.StartColumn
-        || exprRange.EndColumn + 2 <> range.EndColumn
-      then reportWarn src range "Use single whitespace before/after brackets"
+      if fieldRange.StartColumn - 2 <> range.StartColumn then
+        Range.mkRange "" range.Start fieldRange.Start
+        |> fun range -> reportWarn src range "Use single whitespace after '{"
+      elif exprRange.EndColumn + 2 <> range.EndColumn then
+        Range.mkRange "" exprRange.End range.End
+        |> fun range -> reportWarn src range "Use single whitespace before '}"
       else ()
     | _ -> ()
   elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
@@ -127,16 +138,19 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         | Some(expr, _) -> expr.Range
         | _ -> fieldRange
       if fieldRange.StartLine <> range.StartLine
-        || exprRange.EndLine <> range.EndLine
-      then
+        || exprRange.EndLine <> range.EndLine then
         try
           checkBracketCompFlag src range fieldRange exprRange
         with _ ->
           reportWarn src exprRange "Move field to inline with Bracket"
-      elif fieldRange.StartColumn - 2 <> range.StartColumn
-        || exprRange.EndColumn + 2 <> range.EndColumn
-      then reportWarn src range "Use single whitespace before/after brackets"
-      else ()
+      elif fieldRange.StartColumn - 2 <> range.StartColumn then
+        Range.mkRange "" range.Start fieldRange.Start
+        |> fun range -> reportWarn src range "Use single whitespace after '{'"
+      elif exprRange.EndColumn + 2 <> range.EndColumn then
+        Range.mkRange "" exprRange.End range.End
+        |> fun range -> reportWarn src range "Use single whitespace before '}'"
+      else
+        ()
     | _ -> ()
   else
     ()
@@ -149,11 +163,14 @@ let rec private checkOperatorSpacing src = function
     let SynExprRecordField(equalsRange = equalsRange; expr = expr) = field
     match getFieldLastRange field, equalsRange, expr with
     | Some fieldRange, Some equalRange, Some exprRange ->
-      if fieldRange.EndColumn + 1 <> equalRange.StartColumn ||
-        equalRange.EndColumn + 1 <> exprRange.Range.StartColumn &&
-        fieldRange.StartLine = exprRange.Range.StartLine
-      then
-        reportWarn src fieldRange "Use single whitespace around '='"
+      if fieldRange.EndColumn + 1 <> equalRange.StartColumn
+        && fieldRange.StartLine = exprRange.Range.StartLine then
+        Range.mkRange "" fieldRange.End equalRange.Start
+        |> fun range -> reportWarn src range "Use single whitespace before '='"
+      elif equalRange.EndColumn + 1 <> exprRange.Range.StartColumn
+        && fieldRange.StartLine = exprRange.Range.StartLine then
+        Range.mkRange "" equalRange.End exprRange.Range.Start
+        |> fun range -> reportWarn src range "Use single whitespace after '='"
       else
         checkOperatorSpacing src rest
     | _ -> checkOperatorSpacing src rest
@@ -197,6 +214,68 @@ let checkSeparatorSpacing src fields =
         ()
     | _ -> ()
   )
+
+let checkRecordPat (src: ISourceText) = function
+  | SynPat.Record(fieldPats = fieldPats; range = range)
+    when fieldPats.IsEmpty ->
+    Range.mkRange "" range.Start range.End
+    |> fun range -> reportWarn src range "Remove whitespace around '{}'"
+  | SynPat.Record(fieldPats = fieldPats; range = topRange) ->
+    AssignmentConvention.checkNamePatPairs src fieldPats
+    if fieldPats.Length = 1 then
+      let NamePatPairField(pat = pat
+                           range = range
+                           blockSeparator = sepa) = fieldPats.Head
+      if sepa.IsSome then sepa.Value |> fst |> reportTrailingSeparator src
+      else ()
+      TypeAnnotation.checkParamTypeSpacing src pat
+      checkBracketSpacing src topRange range
+    else
+      let startPat = List.head fieldPats
+      let lastPat = List.last fieldPats
+      let innerRange = Range.unionRanges startPat.Range lastPat.Range
+      let gap = Range.mkRange "" innerRange.End topRange.End
+      if (gap |> src.GetSubTextFromRange).Contains ';' then
+        reportTrailingSeparator src gap
+      else
+        ()
+      checkBracketSpacing src topRange innerRange
+      fieldPats
+      |> List.pairwise
+      |> List.iter (fun pairs ->
+        match pairs with
+        | NamePatPairField(pat = frontPat
+                           range = frontRange
+                           blockSeparator = frontSeparator),
+          NamePatPairField(pat = backPat
+                           range = backRange
+                           blockSeparator = backSeparator) ->
+          if frontRange.EndLine <> backRange.StartLine
+            && frontSeparator.IsSome then
+            reportTrailingSeparator src (frontSeparator.Value |> fst)
+          elif frontRange.EndLine <> backRange.StartLine
+            && backSeparator.IsSome then
+            reportTrailingSeparator src (backSeparator.Value |> fst)
+          if frontRange.EndLine = backRange.StartLine then
+            let frontSeparator = frontSeparator.Value |> fst
+            if frontRange.EndColumn <> frontSeparator.StartColumn then
+              Range.mkRange "" frontRange.End frontSeparator.Start
+              |> fun range ->
+                reportWarn src range "Remove whitespace before ';'"
+            elif frontSeparator.EndColumn + 1 <> backRange.StartColumn then
+              Range.mkRange "" frontSeparator.End backRange.Start
+              |> fun range ->
+                reportWarn src range "Use single whitespace after ';'"
+          TypeAnnotation.checkParamTypeSpacing src frontPat
+          TypeAnnotation.checkParamTypeSpacing src backPat
+      )
+      fieldPats
+      |> List.iter (function
+       | NamePatPairField(pat = pat; blockSeparator = blockSeparator) ->
+         TypeAnnotation.checkParamTypeSpacing src pat
+      )
+  | _ ->
+    ()
 
 /// Checks the format of record constructors.
 /// Ensures that the record fields conform to formatting conventions.

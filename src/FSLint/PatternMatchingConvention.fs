@@ -58,23 +58,33 @@ let private collectElemAndOptSeparatorRanges (src: ISourceText) elementPats =
     | elem :: restElems, sep :: restSeps ->
       interleave restElems restSeps (sep :: elem :: acc)
     | _ ->
-      reportWarn src elementPats.Head.Range "Pattern ParsingFailure"
+      warn $"[PatternMatching] Pattern ParsingFailure"
       []
   interleave elementRanges separatorRanges []
 
 /// Checks cons operator in the context is properly surrounded by single spaces.
 let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   if (lhsRange: range).EndColumn + 1 <> colonRange.StartColumn
-    || (rhsRange: range).StartColumn - 1 <> colonRange.EndColumn
-  then reportWarn src colonRange "Use single whitespace around cons"
+    && lhsRange.StartLine = colonRange.StartLine
+  then
+    Range.mkRange "" lhsRange.End colonRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace around cons"
+  elif (rhsRange: range).StartColumn - 1 <> colonRange.EndColumn
+    && rhsRange.StartLine = colonRange.StartLine
+  then
+    Range.mkRange "" colonRange.End rhsRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace around cons"
   else ()
 
 /// Checks if the given pattern contains record with incorrect bracket spacing,
 /// such as `{field}` instead of `{ field }`, within the specified range.
 let private checkRecordBracketSpacing src (range: range) (innerRange: range) =
-  if range.StartColumn + 2 <> innerRange.StartColumn
-    || range.EndColumn - 2 <> innerRange.EndColumn
-  then reportWarn src range "Use single whitespace next to brackets"
+  if range.StartColumn + 2 <> innerRange.StartColumn then
+    Range.mkRange "" range.Start innerRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace after '{'"
+  elif range.EndColumn - 2 <> innerRange.EndColumn then
+    Range.mkRange "" innerRange.End range.End
+    |> fun range -> reportWarn src range "Use single whitespace before '}'"
   else ()
 
 /// Checks for incorrect spacing in record pattern matching.
@@ -204,7 +214,8 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
   | [ id ]
     when id.idText = "new" && argPats.Patterns.Head.IsParen &&
          id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
-    reportWarn src argPats.Patterns.Head.Range "Remove whitespace after 'new'"
+    Range.mkRange "" id.idRange.End argPats.Patterns.Head.Range.Start
+    |> fun range -> reportWarn src range "Remove whitespace before '('"
   | _ -> ()
 
 /// checks pattern cases with incorrect spacing or newlines.
@@ -230,21 +241,64 @@ let private checkPatternSpacing src clauses =
     check src pat outerTrivia.BarRange
   )
 
-let private checkArrowBySrc (src: ISourceText) arrowRange isInline =
-  let checker = if isInline then " -> " else " ->"
-  let line = src.GetLineString((arrowRange: range).StartLine - 1)
-  if line.Contains checker then () else reportArrowError src arrowRange
-
 /// Checks for missing or extra spaces around '->' in match cases.
-let private checkArrowSpacing src clauses =
-  clauses
-  |> List.iter (fun (SynMatchClause(resultExpr = expr; trivia = trivia)) ->
-    match trivia.ArrowRange with
-    | Some arrowRange ->
-      checkArrowBySrc src arrowRange
-        (arrowRange.StartLine = expr.Range.StartLine)
-    | None -> ()
-  )
+let checkArrowSpacing src patRange whenExpr bodyRange (arrowRange: range) =
+  let patRange =
+    if Option.isSome (whenExpr: option<SynExpr>) then whenExpr.Value.Range
+    else patRange
+  if (patRange: range).EndLine = (bodyRange: range).StartLine then
+    if patRange.EndColumn + 1 <> arrowRange.StartColumn then
+      let gap = Range.mkRange "" patRange.End arrowRange.Start
+      let gapStr = gap |> (src: ISourceText).GetSubTextFromRange
+      if gapStr.TrimStart().StartsWith "(*" then
+        let commentIdxIngap = gapStr.IndexOf "(*"
+        if commentIdxIngap <> 1 then
+          let commentIdx = commentIdxIngap + patRange.EndColumn
+          Range.mkRange "" patRange.End
+            (Position.mkPos patRange.StartLine commentIdx)
+          |> fun range ->
+            reportWarn src range "Use single whitespace before '(*'"
+        else
+          ()
+      else
+        ()
+      if gapStr.TrimEnd().EndsWith "*)" then
+        let commentIdxIngap = gapStr.LastIndexOf "*)"
+        if arrowRange.StartColumn
+          <> patRange.EndColumn + commentIdxIngap + 3 then
+          let commentIdx = patRange.EndColumn + commentIdxIngap + 2
+          Range.mkRange "" (Position.mkPos patRange.StartLine commentIdx)
+            arrowRange.Start
+          |> fun range ->
+            reportWarn src range "Use single whitespace after '*)'"
+        else
+          ()
+      else
+        Range.mkRange "" patRange.End arrowRange.Start
+        |> fun range -> reportWarn src range "Use single whitespace before '->'"
+    elif arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
+      Range.mkRange "" arrowRange.End bodyRange.Start
+      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+    elif patRange.EndColumn = arrowRange.StartColumn
+      && arrowRange.EndColumn = bodyRange.StartColumn then
+      Range.mkRange "" patRange.End bodyRange.Start
+      |> fun range -> reportWarn src range "Use single whitespace around '->'"
+    else
+      ()
+  else
+    if patRange.EndLine = arrowRange.StartLine then
+      if patRange.EndColumn + 1 <> arrowRange.StartColumn then
+        let gap = Range.unionRanges patRange.EndRange arrowRange.StartRange
+        let gapStr = gap |> src.GetSubTextFromRange
+        if gapStr.Contains "(*" then ()
+        else
+          Range.mkRange "" patRange.End arrowRange.Start
+          |> fun range ->
+            reportWarn src range "Use single whitespace before '->'"
+    else
+      if arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
+        Range.mkRange "" arrowRange.End bodyRange.Start
+        |> fun range -> reportWarn src range "Use single whitespace after '->'"
 
 let checkParenTupleSpacing src (pats: SynPat list) =
   pats
@@ -287,9 +341,7 @@ let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
     )
   )
 
-let checkFormat src clauses =
-  checkPatternSpacing src clauses
-  checkArrowSpacing src clauses
+let checkFormat src clauses = checkPatternSpacing src clauses
 
 let rec checkBody (src: ISourceText) = function
   | SynPat.ArrayOrList(isArray, elementPats, range) ->

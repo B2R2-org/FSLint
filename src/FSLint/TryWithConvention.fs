@@ -6,18 +6,21 @@ open Diagnostics
 
 let check (src: ISourceText) (clauses: SynMatchClause list) =
   if clauses.Length = 1 then
-    let SynMatchClause(trivia = trivia) = clauses.Head
+    let SynMatchClause(pat = pat; trivia = trivia) = clauses.Head
     match trivia.BarRange with
-    | Some barR ->
+    | Some barR when not pat.IsOr ->
       let barLine = src.GetLineString(barR.StartLine - 1)
       let barText =
         barLine.Substring(barR.StartColumn, barR.EndColumn - barR.StartColumn)
       if barText.Trim() = "|" then
-        reportWarn src barR
-          "Remove unnecessary '|' for single exception case in try-with"
+        (Position.mkPos barR.StartLine barR.StartColumn,
+         Position.mkPos barR.StartLine barR.EndColumn)
+        ||> Range.mkRange ""
+        |> fun range ->
+          reportWarn src range "Remove '|' for single exception case"
       else
         ()
-    | None ->
+    | _ ->
       ()
   else
     ()

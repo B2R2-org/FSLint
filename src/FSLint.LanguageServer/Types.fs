@@ -1,4 +1,4 @@
-namespace FSLint.LanguageServer
+namespace B2R2.FSLint.LanguageServer
 
 type LspPosition =
   { Line: int

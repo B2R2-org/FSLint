@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/FSLint.Tests/B2R2.FSLint.Tests.fsproj" />
     <Project Path="src/FSLint/B2R2.FSLint.fsproj" />
+    <Project Path="src/FSLint.LanguageServer/B2R2.FSLint.LanguageServer.fsproj" />
   </Folder>
 </Solution>

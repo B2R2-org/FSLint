@@ -164,13 +164,13 @@ let checkMemberOrder src (members: SynMemberDefn list) =
       let nextScope = getMemberScope next
       if prevCat <> nextCat then
         reportWarn src next.Range
-          $"Wrong member order: {nextCat} should come before \"{prevCat}\""
+          $"Move {nextCat} before {prevCat}"
       elif prevScope <> nextScope then
         reportWarn src next.Range
-          "Wrong member order: static should come before instance members"
+          "Move static member before instance members"
       else
         reportWarn src next.Range
-          "Wrong member order: members should be ordered by access level"
+          "Fix member order by access level"
     else
       ()
   )
@@ -186,7 +186,10 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
       let lineStr = src.GetLineString(dotRange.StartLine - 1)
       if str = "``" then
         if lineStr.LastIndexOf "``" + 2 <> parenRange.StartColumn then
-          reportWarn src dotRange "Contains invalid whitespace"
+          (Position.mkPos parenRange.StartLine (lineStr.LastIndexOf "``"),
+           parenRange.Start)
+          ||> Range.mkRange ""
+          |> fun range -> reportWarn src range "Remove whitespace after '``'"
         else ()
         false
       else
@@ -201,30 +204,41 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
   match (longId: LongIdent) with
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
-    | SynPat.Wild _ :: wild when wild.Length <> 0 ->
-      reportWarn src id.idRange "Member must be followed by paren."
-    | SynPat.Paren _ :: paren when paren.Length <> 0 ->
-      reportWarn src id.idRange "Member must be followed by paren."
-    | SynPat.Named _ :: named when named.Length <> 0 ->
-      reportWarn src id.idRange "Member must be followed by paren."
+    | SynPat.Wild(range = range) :: wild when wild.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last wild).Range)
+        "Use non-curried parameter style"
+    | SynPat.Paren(range = range) :: paren when paren.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last paren).Range)
+        "Use non-curried parameter style"
+    | SynPat.Named(range = range) :: named when named.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last named).Range)
+        "Use non-curried parameter style"
     | [ SynPat.Paren(range = range) ] ->
       let lastId = List.last longId
       if checkBackticMethodSpacing src dotRanges range then
         if (extraId: Ident Option).IsSome
-          && isPascalCase extraId.Value.idText then
-          if extraId.Value.idRange.EndColumn <> range.StartColumn then
-            reportPascalCaseError src extraId.Value.idRange
-          else ()
-        elif (extraId: Ident Option).IsSome then
-          if extraId.Value.idRange.EndColumn <> range.StartColumn then
-            reportPascalCaseError src extraId.Value.idRange
-          else ()
+          && isPascalCase extraId.Value.idText
+          && extraId.Value.idRange.EndColumn <> range.StartColumn
+        then
+          Range.mkRange "" extraId.Value.idRange.End range.Start
+          |> reportPascalCaseError src
+        elif (extraId: Ident Option).IsSome
+          && extraId.Value.idRange.EndColumn <> range.StartColumn
+        then
+          Range.mkRange "" extraId.Value.idRange.End range.Start
+          |> reportPascalCaseError src
         elif isPascalCase lastId.idText
+          && extraId.IsNone
           && lastId.idRange.EndColumn <> range.StartColumn
-          then reportPascalCaseError src lastId.idRange
+        then
+          Range.mkRange "" lastId.idRange.End range.Start
+          |> reportPascalCaseError src
         elif isPascalCase lastId.idText |> not
+          && extraId.IsNone
           && lastId.idRange.EndColumn + 1 <> range.StartColumn
-          then reportLowerCaseError src lastId.idRange
+        then
+          Range.mkRange "" lastId.idRange.End range.Start
+          |> reportLowerCaseError src
         else ()
       else ()
     | _ -> ()
@@ -237,19 +251,23 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
   match longId with
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
-    | SynPat.Wild _ :: wild when wild.Length <> 0 ->
-      reportWarn src id.idRange "Static member must be followed by paren."
-    | SynPat.Paren _ :: paren when paren.Length <> 0 ->
-      reportWarn src id.idRange "Static member must be followed by paren."
-    | SynPat.Named _ :: named when named.Length <> 0 ->
-      reportWarn src id.idRange "Static member must be followed by paren."
+    | SynPat.Wild(range = range) :: wild when wild.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last wild).Range)
+        "Use non-curried parameter style"
+    | SynPat.Paren(range = range) :: paren when paren.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last paren).Range)
+        "Use non-curried parameter style"
+    | SynPat.Named(range = range) :: named when named.Length <> 0 ->
+      reportWarn src (Range.unionRanges range (List.last named).Range)
+        "Use non-curried parameter style"
     | [ SynPat.Paren(range = range) ] ->
       let idRange =
         match typarDecls with
         | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
         | _ -> id.idRange
       if idRange.EndColumn <> range.StartColumn then
-        reportPascalCaseError src id.idRange
+        Range.mkRange "" idRange.End range.Start
+        |> reportPascalCaseError src
       else ()
     | _ -> ()
   | _ when (idTrivia: list<option<IdentTrivia>>).Head.IsSome ->
@@ -258,17 +276,87 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
       match args with
       | [ SynPat.Paren(range = argRange) ] ->
         if range.EndColumn + 1 <> argRange.StartColumn then
-          reportWarn src argRange "Infix and Paren need a single space."
+          Range.mkRange "" range.End argRange.Start
+          |> fun range ->
+            reportWarn src range "Add single whitespace between Infix and '('"
         else ()
       | _ -> ()
     | _ -> warn $"[checkStaticMemberSpacing]TODO: {longId}"
+  | _ -> ()
+
+let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
+  let idRange =
+    if Option.isSome (typ: Option<SynType>) then typ.Value.Range else id.idRange
+  let equalRange = (trivia: SynMemberDefnAutoPropertyTrivia).EqualsRange
+  match trivia.LeadingKeyword with
+  | SynLeadingKeyword.MemberVal(mRange, vRange) ->
+    if mRange.EndColumn + 1 <> vRange.StartColumn
+      && mRange.EndLine = vRange.StartLine then
+      Range.mkRange "" mRange.End vRange.Start
+      |> fun range ->
+        reportWarn src range "Use single whitespace between member val"
+    else
+      ()
+  | _ ->
+    ()
+  if Option.isSome equalRange then
+    if idRange.EndColumn + 1 <> equalRange.Value.StartColumn
+      && idRange.EndLine = equalRange.Value.StartLine then
+      Range.mkRange "" idRange.End equalRange.Value.Start
+      |> fun range -> reportWarn src range "Use single whitespace before '='"
+    elif equalRange.Value.EndColumn + 1 <> (expr: SynExpr).Range.StartColumn
+      && equalRange.Value.EndLine = expr.Range.StartLine then
+      Range.mkRange "" equalRange.Value.End expr.Range.Start
+      |> fun range -> reportWarn src range "Use single whitespace after '='"
+    else
+      ()
+  else
+    ()
+  if Option.isSome trivia.WithKeyword then
+    if expr.Range.EndColumn + 1 <> trivia.WithKeyword.Value.StartColumn
+      && expr.Range.EndLine = trivia.WithKeyword.Value.StartLine then
+      Range.mkRange "" expr.Range.End trivia.WithKeyword.Value.Start
+      |> fun range -> reportWarn src range "Use single whitespace before 'with'"
+    else
+      ()
+    if Option.isSome trivia.GetSetKeywords then
+      let getSetRange = trivia.GetSetKeywords.Value.Range
+      if trivia.WithKeyword.Value.EndLine = getSetRange.StartLine
+        && trivia.WithKeyword.Value.EndColumn + 1 <> getSetRange.StartColumn
+      then
+        Range.mkRange "" trivia.WithKeyword.Value.End getSetRange.Start
+        |> fun range ->
+          reportWarn src range "Use single whitespace after 'with'"
+      else
+        ()
+  else
+    ()
+  match trivia.GetSetKeywords with
+  | Some(GetSetKeywords.GetSet(getRange, setRange)) ->
+    if getRange.EndLine <> setRange.StartLine then
+      ()
+    else
+      let gap = Range.mkRange "" getRange.End setRange.Start
+      let gapStr = gap |> src.GetSubTextFromRange
+      if gap.EndColumn - gap.StartColumn <> 2 then
+        if gapStr.StartsWith ',' then
+          (Position.mkPos gap.StartLine (getRange.EndColumn + 1),
+           setRange.Start)
+          ||> Range.mkRange ""
+          |> fun range -> reportWarn src range "Use single whitespace after ','"
+        else
+          reportWarn src gap "Use ', '"
+      elif gap.EndColumn - gap.StartColumn = 2 && gapStr.EndsWith ',' then
+        reportWarn src gap "Use ', '"
+      else
+        ()
   | _ -> ()
 
 let checkSelfIdentifierUsage (src: ISourceText) pat body =
   match pat with
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty && id.Head.idText = "__" ->
-      reportWarn src id.Head.idRange "Avoid usage '__'"
+      reportWarn src id.Head.idRange "Change '__' to 'this'"
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty
       && (id.Head.idText = "this" || id.Head.idText = "self") ->

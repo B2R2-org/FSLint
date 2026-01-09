@@ -41,6 +41,12 @@
       "type": "object",
       "title": "FSLint",
       "properties": {
+        "fslint.decorationStyle": {
+          "type": "string",
+          "enum": ["background", "underline", "both", "none"],
+          "default": "background",
+          "description": "How to display FSLint warnings"
+        },
         "fslint.enable": {
           "type": "boolean",
           "default": true,

@@ -13,14 +13,6 @@ let private getOppositeOperator = function
   | "op_LessThanOrEqual" -> Some("op_GreaterThan", "<=", ">")
   | _ -> None
 
-let private extractComparisonOperator = function
-  | SynExpr.App(funcExpr = SynExpr.App(funcExpr = funcExpr)) ->
-    match funcExpr with
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ]))
-    | SynExpr.Ident(ident = id) -> Some id.idText
-    | _ -> None
-  | _ -> None
-
 let private checkParenthesizedNegation (src: ISourceText) = function
   | SynExpr.App(funcExpr = SynExpr.Ident(ident = notId);
                 argExpr = SynExpr.Paren(expr = innerExpr);

@@ -6,18 +6,29 @@ import {
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
+let diagnosticCollection: vscode.DiagnosticCollection;
 
-function findBestRatio(columns: number): string {
-  // const HANGUL_FILLER = '\u3164';
-  const HANGUL_FILLER = '\u2007';
-  const HAIR_SPACE = '\u200A';
-
-  let result = '';
-  for (let i = 0; i < columns / 2; i++) {
-    result += HANGUL_FILLER + HAIR_SPACE;
+const warningDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('editorWarning.background'),
+  borderRadius: '2px',
+  light: {
+    backgroundColor: 'rgba(255, 100, 100, 0.15)',
+  },
+  dark: {
+    backgroundColor: 'rgba(255, 100, 100, 0.2)',
   }
-  return result;
-}
+});
+
+const errorDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('editorError.background'),
+  borderRadius: '2px',
+  light: {
+    backgroundColor: 'rgba(255, 100, 100, 0.15)',
+  },
+  dark: {
+    backgroundColor: 'rgba(255, 100, 100, 0.2)',
+  }
+});
 
 class FSLintCodeLensProvider implements vscode.CodeLensProvider {
   private _onDidChangeCodeLenses = new vscode.EventEmitter<void>();
@@ -42,67 +53,67 @@ class FSLintCodeLensProvider implements vscode.CodeLensProvider {
     const codeLenses: vscode.CodeLens[] = [];
 
     for (const diag of matchedDiagnostics) {
-      const startCol = diag.range.start.character;
-      const endCol = diag.range.end.character;
       const lineText = document.lineAt(diag.range.start.line).text;
       const leadingWhitespace = lineText.match(/^(\s*)/)?.[1].length || 0;
-      const arrows = '˅'.repeat(Math.max(1, Math.abs(endCol - startCol)));
-      const totalSpacing = Math.max(0, startCol - leadingWhitespace);
-      const spacing = '⠀'.repeat(totalSpacing);
+      const spacing = '⠀'.repeat(Math.max(0, diag.range.start.character - leadingWhitespace));
       const codeLensRange = new vscode.Range(
         diag.range.start.line,
         0,
         diag.range.start.line,
         0
       );
-
-      codeLenses.push(
-        new vscode.CodeLens(codeLensRange, {
-          title: `${spacing}${arrows} ${diag.message}`,
-          command: ''
-        })
-      );
+      if (diag.message == 'Use single blank line') {
+        codeLenses.push(
+          new vscode.CodeLens(codeLensRange, {
+            title: `${diag.message}`,
+            command: ''
+          })
+        );
+      } else {
+        codeLenses.push(
+          new vscode.CodeLens(codeLensRange, {
+            title: `${spacing}${diag.message}`,
+            command: ''
+          })
+        );
+      }
     }
     return codeLenses;
   }
 }
 
-const underlineDecorationType = vscode.window.createTextEditorDecorationType({
-  textDecoration: 'underline wavy',
-  borderColor: new vscode.ThemeColor('editorWarning.foreground'),
-  borderWidth: '0 0 2px 0',
-  borderStyle: 'none none wavy none'
-});
-
 function updateDecorations(editor: vscode.TextEditor) {
-  const currentPath = editor.document.uri.fsPath.toLowerCase().replace(/\\/g, '/');
-  const allDiagnostics = vscode.languages.getDiagnostics();
-  let matchedDiagnostics: vscode.Diagnostic[] = [];
+  if (!editor || editor.document.languageId !== 'fsharp') {
+    return;
+  }
 
-  for (const [uri, diags] of allDiagnostics) {
-    const diagPath = uri.fsPath.toLowerCase().replace(/\\/g, '/');
-    if (diagPath === currentPath) {
-      matchedDiagnostics = diags.filter(d => d.source === 'FSLint');
-      break;
+  const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+  const fslintDiagnostics = diagnostics.filter(d => d.source === 'FSLint');
+
+  const warnings: vscode.DecorationOptions[] = [];
+  const errors: vscode.DecorationOptions[] = [];
+
+  for (const diag of fslintDiagnostics) {
+    const decoration: vscode.DecorationOptions = {
+      range: diag.range,
+      hoverMessage: `FSLint: ${diag.message}`
+    };
+
+    if (diag.severity === vscode.DiagnosticSeverity.Error) {
+      errors.push(decoration);
+    } else {
+      warnings.push(decoration);
     }
   }
 
-  const underlines: vscode.DecorationOptions[] = [];
-
-  for (const diag of matchedDiagnostics) {
-    underlines.push({
-      range: diag.range,
-      hoverMessage: diag.message
-    });
-  }
-
-  editor.setDecorations(underlineDecorationType, underlines);
+  editor.setDecorations(warningDecoration, warnings);
+  editor.setDecorations(errorDecoration, errors);
 }
 
 export function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const serverPath = context.asAbsolutePath(
-    path.join('bin', process.platform === 'win32' ? 'FSLint.LanguageServer.exe' : 'FSLint.LanguageServer')
+    path.join('bin', process.platform === 'win32' ? 'B2R2.FSLint.LanguageServer.exe' : 'B2R2.FSLint.LanguageServer')
   );
 
   const fs = require('fs');
@@ -137,8 +148,8 @@ export function activate(context: vscode.ExtensionContext) {
   client.start().then(() => {    
     const updateEditor = (editor: vscode.TextEditor | undefined) => {
       if (editor && editor.document.languageId === 'fsharp') {
-        updateDecorations(editor);
         codeLensProvider.refresh();
+        updateDecorations(editor);
       }
     };
 
@@ -208,6 +219,5 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate(): Thenable<void> | undefined {
   console.log('[FSLINT] Deactivating extension...');
-  underlineDecorationType.dispose();
   return client?.stop();
 }

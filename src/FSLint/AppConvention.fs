@@ -257,6 +257,48 @@ let checkUnaryOperatorSpacing (src: ISourceText) (expr: SynExpr) =
     | _ -> ()
   | _ -> ()
 
+let checkLambdaArrowSpacing src pat body (trivia: SynExprLambdaTrivia) =
+  if Option.isSome trivia.ArrowRange then
+    if (pat: range).EndLine = trivia.ArrowRange.Value.StartLine
+      && pat.EndColumn + 1 <> trivia.ArrowRange.Value.StartColumn
+      && (body: range).StartColumn > pat.StartColumn
+      && pat.EndColumn - pat.StartColumn > 1 then
+      Range.mkRange "" pat.End trivia.ArrowRange.Value.Start
+      |> fun range -> reportWarn src range "Use single whitespace before '->'"
+    elif body.StartLine = trivia.ArrowRange.Value.StartLine
+      && body.StartColumn - 1 <> trivia.ArrowRange.Value.EndColumn
+      && body.StartColumn > trivia.ArrowRange.Value.EndColumn then
+      Range.mkRange "" trivia.ArrowRange.Value.End body.Start
+      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+    else
+      ()
+  else
+    ()
+
+let checkLambdaKeywordSpacing (src: ISourceText) lambdaRange argsRange =
+  if (argsRange: range).StartLine = (lambdaRange: range).StartLine then
+    let gap = Range.mkRange "" lambdaRange.Start argsRange.Start
+    let gapStr = gap |> src.GetSubTextFromRange
+    let keywordLen = if gapStr[0..3] = "func" then 8 else 3
+    let handleException = gapStr[keywordLen..gapStr.Length - 1]
+    if handleException.Length > 1 && handleException[1] <> ' ' then
+      ()
+    else
+      gapStr
+      |> String.filter (fun ch -> ch = ' ')
+      |> fun ws ->
+        if ws.Length <> 1 then
+          Range.mkRange ""
+            (Position.mkPos lambdaRange.StartLine
+            (lambdaRange.StartColumn + keywordLen))
+            argsRange.Start
+          |> fun range ->
+            reportWarn src range "Use single whitespace after Lambda"
+        else
+          ()
+  else
+    ()
+
 let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
   match funcExpr with
   | SynExpr.App(isInfix = subIsInfix; funcExpr = subFuncExpr
@@ -287,4 +329,6 @@ let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
 and traverseParen src isInfix = function
   | SynExpr.App(flag = flag; funcExpr = subFuncExpr; argExpr = subArgExpr) ->
     check src isInfix flag subFuncExpr subArgExpr
+  | SynExpr.Lambda(body = body) ->
+    traverseParen src isInfix body
   | _ -> ()

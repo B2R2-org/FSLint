@@ -43,10 +43,13 @@ let rec checkPat src = function
   | SynPat.Paren(pat, range) ->
     if range.StartColumn + 1 <> pat.Range.StartColumn then
       Range.mkRange "" range.Start pat.Range.Start
-      |> fun range -> reportWarn src range "Remove whitespace before '('"
+      |> fun range -> reportWarn src range "Remove whitespace after '('"
     elif range.EndColumn - 1 <> pat.Range.EndColumn then
       Range.mkRange "" pat.Range.End range.End
-      |> fun range -> reportWarn src range "Remove whitespace after ')'"
+      |> fun range -> reportWarn src range "Remove whitespace before ')'"
     else ()
+    checkPat src pat
+  | SynPat.Tuple(elementPats = elementPats) ->
+    List.iter (checkPat src) elementPats
   | _ ->
     ()

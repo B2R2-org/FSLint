@@ -48,6 +48,25 @@ let private checkGapBetweenArrays src (ranges: list<range>) =
       ()
   )
 
+let private checkCommaSpacing src (typeArgs: list<SynType>) commaRanges =
+  if typeArgs.Length > 1 then
+    List.pairwise typeArgs
+    |> List.zip commaRanges
+    |> List.iter (fun (range: range, (fst, snd)) ->
+      if fst.Range.EndColumn <> range.StartColumn
+        && fst.Range.EndLine = range.StartLine then
+        Range.mkRange "" fst.Range.End range.Start
+        |> fun range -> reportWarn src range "Remove whitespace before ','"
+      elif snd.Range.StartColumn - 1 <> range.EndColumn
+        && snd.Range.StartLine = range.EndLine then
+        Range.mkRange "" range.End snd.Range.Start
+        |> fun range -> reportWarn src range "Use single whitespace after ','"
+      else
+        ()
+    )
+  else
+    ()
+
 let rec private checkTupleSpacing src path =
   match path with
   | SynTupleTypeSegment.Type synType1 ::
@@ -117,12 +136,13 @@ and checkTypeInternal src synType =
   | SynType.App(typeName = typeName
                 lessRange = lessRange
                 greaterRange = greaterRange
+                commaRanges = commaRanges
                 typeArgs = typeArgs)
     when lessRange.IsSome && greaterRange.IsSome ->
+    checkCommaSpacing src typeArgs commaRanges
     checkExprToLessSpacing src typeName lessRange
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
-    checkTypeElementSpacing src typeArgs
     List.iter (checkTypeInternal src) typeArgs
   | _ -> ()
 
@@ -328,11 +348,12 @@ let extractColonPairs synType =
 let rec checkTypeAbbrevWithAnnotation src = function
   | SynType.App(lessRange = lessRange
                 typeArgs = typeArgs
-                greaterRange = greaterRange) ->
+                greaterRange = greaterRange
+                commaRanges = commaRanges) ->
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
     typeArgs |> List.iter (checkLongIdentSpacing src)
-    checkTypeElementSpacing src typeArgs
+    checkCommaSpacing src typeArgs commaRanges
   | SynType.Fun(argType = argType; returnType = returnType; trivia = trivia) ->
     if argType.Range.EndLine <> trivia.ArrowRange.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
@@ -394,7 +415,7 @@ let rec checkParamTypeSpacing src = function
   | SynPat.Paren(pat, _) ->
     checkFieldWidthByPat src pat
     checkParamTypeSpacing src pat
-  | SynPat.Typed(pat, targetType, range) as typed ->
+  | SynPat.Typed(pat, targetType, _) as typed ->
     checkTypeAbbrevWithAnnotation src targetType
     checkFieldWidthByPat src typed
     checkParamTypeSpacing src pat
@@ -465,12 +486,13 @@ let rec checkAbstractSlot src (id: Ident) (synType: SynType) =
   | SynType.App(typeName = typeName
                 lessRange = lessRange
                 greaterRange = greaterRange
+                commaRanges = commaRanges
                 typeArgs = typeArgs)
     when lessRange.IsSome && greaterRange.IsSome ->
       checkExprToLessSpacing src typeName lessRange
       collectRangeOfFirstAndLastType typeArgs
       |> checkBracketRanges src lessRange greaterRange
-      checkTypeElementSpacing src typeArgs
+      checkCommaSpacing src typeArgs commaRanges
       List.iter (checkTypeInternal src) typeArgs
   | _ ->
     ()

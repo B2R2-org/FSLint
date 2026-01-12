@@ -139,7 +139,7 @@ let checkBracketRanges src lessRange greaterRange (innerRange: range) =
   | _ ->
     ()
 
-let private checkBarAlignment (src: ISourceText) (range: range) = function
+let checkBarAlignment (src: ISourceText) (range: range) = function
   | Some(barRange: range) ->
     if range.StartColumn - 2 <> barRange.StartColumn then
       if range.StartLine <> range.EndLine then
@@ -152,7 +152,8 @@ let private checkBarAlignment (src: ISourceText) (range: range) = function
           else
             ()
       else
-        reportWarn src range "Align '|' with type"
+        Range.mkRange "" barRange.End range.Start
+        |> fun range -> reportWarn src range "Use single whitespace after '|'"
     else
       ()
   | None -> warn "Exception: '|' range does not exist"

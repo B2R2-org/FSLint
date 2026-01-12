@@ -3,6 +3,7 @@ module B2R2.FSLint.DeclarationConvention
 open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
 let private tryFindBlockCommentEndAfter lines startIdx =
@@ -168,7 +169,12 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
         let declText = src.GetSubTextFromRange fullRange
         let lines =
           declText.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
-        let indent = pattern.Range.StartColumn
+        let indent =
+          match trivia.LeadingKeyword with
+          | SynLeadingKeyword.StaticMember(staticRange = staticRange)
+          | SynLeadingKeyword.StaticMemberVal(staticRange = staticRange) ->
+            staticRange.StartColumn
+          | _ -> pattern.Range.StartColumn
         let contentParts =
           lines
           |> Array.map (fun line -> line.Trim())

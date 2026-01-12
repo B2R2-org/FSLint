@@ -95,10 +95,25 @@ and checkExpression src = function
     checkExpression src innerExpr
   | SynExpr.Typed(expr = expr) ->
     checkExpression src expr
-  | SynExpr.Lambda(args = args; body = body) ->
-    let SynSimplePats.SimplePats(pats = pats) = args
+  | SynExpr.Lambda(args = args
+                   body = body
+                   range = lambdaRange
+                   parsedData = parsedData
+                   trivia = trivia) as t ->
+    let SynSimplePats.SimplePats(pats = pats; range = patRange) = args
     for pat in pats do checkSimplePattern src LowerCamelCase pat
-    checkExpression src body
+    AppConvention.checkLambdaArrowSpacing src patRange body.Range trivia
+    AppConvention.checkLambdaKeywordSpacing src lambdaRange args.Range
+    if Option.isSome parsedData then
+      let pats, expr = parsedData.Value
+      for pat in pats do
+        ParenConvention.checkPat src pat
+        TypeAnnotation.checkFieldWidthByPat src pat
+        TypeAnnotation.checkParamTypeSpacing src pat
+      checkExpression src body
+      checkExpression src expr
+    else
+      checkExpression src body
   | SynExpr.LetOrUse(bindings = bindings; body = body) ->
     checkBindings src LowerCamelCase bindings
     checkExpression src body
@@ -295,9 +310,15 @@ and checkTypeDefnSimpleRepr src trivia = function
     for case in cases do
       let SynUnionCase(ident = SynIdent(ident = id); range = range) = case
       IdentifierConvention.check src PascalCase false id.idText range
-  | SynTypeDefnSimpleRepr.Enum(cases = cases) ->
+  | SynTypeDefnSimpleRepr.Enum(cases = cases) as t ->
     for case in cases do
-      let SynEnumCase(ident = SynIdent(ident = id); range = range) = case
+      let SynEnumCase(ident = SynIdent(ident = id)
+                      valueExpr = valueExpr
+                      range = range
+                      trivia = trivia) = case
+      TypeConstructor.checkEqualSpacing src id.idRange valueExpr.Range
+        (Some trivia.EqualsRange)
+      TypeUseConvention.checkBarAlignment src id.idRange trivia.BarRange
       IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
     TypeAnnotation.checkSynFields src fields
@@ -337,20 +358,26 @@ and checkTypeDefn src defn =
                   members = members
                   implicitConstructor = implicitConstructor
                   trivia = trivia) = defn
-  let SynComponentInfo(longId = lid; range = range; attributes = attrs) = info
+  let SynComponentInfo(longId = lid
+                       typeParams = typeParams
+                       range = range
+                       attributes = attrs) = info
   let name = (List.last lid).idText
-  if hasAttr "Measure" attrs then ()
-  else IdentifierConvention.check src PascalCase true name range
-  if implicitConstructor.IsSome then
-    ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
+  if Option.isSome typeParams then
+    ClassDefinition.checkSynTypar src range typeParams.Value
   else
     ()
+  ClassDefinition.checkAttributesLineSpacing src attrs trivia
+  if hasAttr "Measure" attrs then ()
+  else IdentifierConvention.check src PascalCase true name range
   if Option.isSome implicitConstructor then
+    ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
     match implicitConstructor with
     | Some(SynMemberDefn.ImplicitCtor(ctorArgs = ctorArgs
                                       selfIdentifier = selfIdentifier
                                       trivia = innerTriv))
       when ctorArgs.IsParen ->
+      ParenConvention.checkPat src ctorArgs
       if Option.isSome innerTriv.AsKeyword then
         TypeConstructor.checkAsSpacing src ctorArgs.Range
           innerTriv.AsKeyword.Value selfIdentifier.Value.idRange
@@ -414,7 +441,8 @@ and checkTypeDefnWithContext src context typeDefn =
   let SynTypeDefn(typeInfo = componentInfo
                   typeRepr = repr
                   members = explicitMembers) = typeDefn
-  let SynComponentInfo(accessibility = typeAccess) = componentInfo
+  let SynComponentInfo(typeParams = typeParams
+                       accessibility = typeAccess) = componentInfo
   typeAccess |> Option.iter (fun _ ->
     let explicitAccess = getAccessLevel typeAccess
     if explicitAccess <= context.ModuleAccess then

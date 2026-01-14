@@ -1,20 +1,11 @@
-!bin/**
-!bin/FSLint.LanguageServer.dll
-!bin/FSLint.LanguageServer.deps.json
-!bin/FSLint.LanguageServer.runtimeconfig.json
-!bin/FSharp.Compiler.Service.dll
-
-# Source
+# Source files (exclude)
 src/**
 *.ts
 tsconfig.json
 build.sh
-test.fs
-test-copy.fs
-*.vsix
 webpack.config.js
 
-# Development
+# Development (exclude)
 .vscode/**
 .vscode-test/**
 .gitignore
@@ -23,5 +14,5 @@ webpack.config.js
 nul
 dist/**
 
-# Logs
+# Logs (exclude)
 *.log

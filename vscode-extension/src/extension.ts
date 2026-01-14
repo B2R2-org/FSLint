@@ -113,7 +113,7 @@ function updateDecorations(editor: vscode.TextEditor) {
 export function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const serverPath = context.asAbsolutePath(
-    path.join('bin', process.platform === 'win32' ? 'B2R2.FSLint.LanguageServer.exe' : 'B2R2.FSLint.LanguageServer')
+    path.join('bin', 'B2R2.FSLint.LanguageServer.dll')
   );
 
   const fs = require('fs');
@@ -138,11 +138,15 @@ export function activate(context: vscode.ExtensionContext) {
   client = new LanguageClient(
     'fslint',
     'FSLint',
-    { command: serverPath,
-      args: [rootPath],
-      transport: TransportKind.stdio },
-    { documentSelector: [{ scheme: 'file', language: 'fsharp' }],
-      outputChannel: vscode.window.createOutputChannel('FSLint') }
+    {
+      command: 'dotnet',
+      args: [serverPath, rootPath],
+      transport: TransportKind.stdio
+    },
+    {
+      documentSelector: [{ scheme: 'file', language: 'fsharp' }],
+      outputChannel: vscode.window.createOutputChannel('FSLint')
+    }
   );
 
   client.start().then(() => {    

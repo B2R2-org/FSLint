@@ -7,180 +7,86 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type IfThenElseTests() =
 
-  [<TestMethod>]
-  member _.``[IfThenElse] Case 1 - both fit correctly``() =
-    let code =
-      """
-let x =
-  if cond then expr
-  else alternative
+  let goodElseExprExistTest =
+    """
+    if foo then printfn "good" else printfn "good2"
 """
-    linterForFs.Lint(Constants.FakeFsPath, code)
+
+  let badElseExprExistTest =
+    """
+    if foo then printfn "bad"
+"""
+
+  let goodElseExprExistTest2 =
+    """
+    if foo then printfn "good"
+    elif bar then printfn "good2"
+    else printfn "good3"
+"""
+
+  let badElseExprExistTest2 =
+    """
+    if foo then printfn "bad"
+    elif bar then printfn "bad2"
+"""
+
+  let goodKeywordSpacingTest =
+    """
+    if foo then printfn "good"
+    elif bar then printfn "good2"
+    else printfn "good3"
+"""
+
+  let badKeywordSpacingTest =
+    """
+    if foo then printfn "good"
+    elif  bar then printfn "good2"
+    else printfn "good3"
+"""
+
+  let badKeywordSpacingTest2 =
+    """
+    if foo  then printfn "good"
+    elif bar then printfn "good2"
+    else printfn "good3"
+"""
+
+  let badKeywordSpacingTest3 =
+    """
+    if foo then printfn "good"
+    elif  bar then printfn "good2"
+    else  printfn "good3"
+"""
 
   [<TestMethod>]
-  member _.``[IfThenElse] Case 1 - short names``() =
-    let code =
-      """
-let result =
-  if a then b
-  else c
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Case 1 - with function calls``() =
-    let code =
-      """
-let x =
-  if check () then getValue ()
-  else getDefault ()
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Case 2 - if-then-expr exceeds``() =
-    let code =
-      """
-let x =
-  if veryLongConditionNameThatDefinitelyMakesThisLineExceedEightyColumns then
-    result
-  else
-    alternative
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Case 2 - else-expr exceeds``() =
-    let code =
-      """
-let x =
-  if condition then
-    expr
-  else
-    veryLongAlternativeExpressionNameThatDefinitelyExceedsEightyColumnsForSure
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Case 2 - both exceed``() =
-    let code =
-      """
-let x =
-  if veryLongConditionNameThatExceedsEightyColumnsDefinitelyAndAbsolutely then
-    veryLongThenExpressionNameThatAlsoDefinitelyExceedsEightyColumnsForSure
-  else
-    veryLongElseAlternativeExpressionNameThatDefinitelyExceedsEightyColumns
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Case 3 - multiline condition``() =
-    let code =
-      """
-let x =
-  if cond1 &&
-     cond2 &&
-     cond3
-  then expr
-  else alt
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Exception - match in condition``() =
-    let code =
-      """
-let x =
-  if (match opt with
-      | Some _ -> true
-      | None -> false) then
-    result
-  else
-    alternative
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Exception - match in then expr``() =
-    let code =
-      """
-let x =
-  if cond then
-    match value with
-    | A -> 1
-    | B -> 2
-  else
-    alternative
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Exception - match in else expr``() =
-    let code =
-      """
-let x =
-  if cond then
-    result
-  else
-    match value with
-    | A -> 1
-    | B -> 2
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
-
-  [<TestMethod>]
-  member _.``[IfThenElse] Error - Case 1 but over-separated``() =
-    let code =
-      """
-let x =
-  if cond then
-    expr
-  else
-    alt
-"""
+  member _.``[IfThenElse] Else Expression not Exist Test``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodElseExprExistTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
-    ) |> ignore
+      linterForFs.Lint(Constants.FakeFsPath, badElseExprExistTest)
+     ) |> ignore
 
   [<TestMethod>]
-  member _.``[IfThenElse] Error - Case 2 but all on one line``() =
-    let code =
-      """let myResult =
-      if veryLongConditionNameThatDefinitely then valueExpression
-      else otherExpression
-      """
+  member _.``[IfThenElse] Else Expression not Exist Test(2)``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodElseExprExistTest2)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
-    ) |> ignore
+      linterForFs.Lint(Constants.FakeFsPath, badElseExprExistTest2)
+     ) |> ignore
 
   [<TestMethod>]
-  member _.``[IfThenElse] Error - Case 2 but expr not separated``() =
-    let code =
-      """let myVariable =
-      if veryLongConditionNameThatDefinitelyandSomewhat then resultExpression
-      else alternativeExpression
-      """
+  member _.``[IfThenElse] Keyword Spacing Test``() =
+    linterForFs.Lint(Constants.FakeFsPath, goodKeywordSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
-    ) |> ignore
+      linterForFs.Lint(Constants.FakeFsPath, badKeywordSpacingTest)
+     ) |> ignore
 
   [<TestMethod>]
-  member _.``[IfThenElse] Error - Case 2 but partial separation``() =
-    let code =
-      """let myLongVariableName =
-      if veryLongConditionNameThatDefinitely then resultExpression
-      else alternativeExpression
-      """
+  member _.``[IfThenElse] Keyword Spacing Test(2)``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
-    ) |> ignore
+      linterForFs.Lint(Constants.FakeFsPath, badKeywordSpacingTest2)
+     ) |> ignore
 
   [<TestMethod>]
-  member _.``[IfThenElse] Nested if-then-else``() =
-    let code =
-      """
-let x =
-  if outer then inner
-  else c
-"""
-    linterForFs.Lint(Constants.FakeFsPath, code)
+  member _.``[IfThenElse] Keyword Spacing Test(3)``() =
+    Assert.ThrowsException<LintException>(fun () ->
+      linterForFs.Lint(Constants.FakeFsPath, badKeywordSpacingTest3)
+     ) |> ignore

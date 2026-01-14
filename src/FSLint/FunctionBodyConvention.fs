@@ -21,8 +21,7 @@ let private countTripleQuotes (line: string) =
   count 0 0
 
 let private isInsideStringLiteral (src: ISourceText) (range: range) lineIdx =
-  let lines =
-    [ range.StartLine - 1 .. lineIdx ] |> List.map src.GetLineString
+  let lines = [ range.StartLine - 1 .. lineIdx ] |> List.map src.GetLineString
   let totalTripleQuotes = lines |> List.sumBy countTripleQuotes
   totalTripleQuotes % 2 = 1
 

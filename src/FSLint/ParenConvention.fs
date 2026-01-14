@@ -19,12 +19,12 @@ let checkBracketSpacing (src: ISourceText) (range: range) =
   let subStr = src.GetSubTextFromRange(range).Split '\n'
   if subStr.Length = 1
     && subStr[0].StartsWith "( " || subStr[0].EndsWith " )"
-  then reportWarn src range "Remove whitespace in brackets"
+  then reportBracketNoSpacingError src range
   else
     if (Array.head subStr).StartsWith "( "
       || ((Array.last subStr).EndsWith " )"
       && (Array.last subStr).TrimStart() <> ")")
-    then reportWarn src range "Remove whitespace in brackets"
+    then reportBracketNoSpacingError src range
     else ()
 
 let rec checkExpr src = function
@@ -43,10 +43,13 @@ let rec checkPat src = function
   | SynPat.Paren(pat, range) ->
     if range.StartColumn + 1 <> pat.Range.StartColumn then
       Range.mkRange "" range.Start pat.Range.Start
-      |> fun range -> reportWarn src range "Remove whitespace before '('"
+      |> reportFrontParenInnerSpacing src
     elif range.EndColumn - 1 <> pat.Range.EndColumn then
       Range.mkRange "" pat.Range.End range.End
-      |> fun range -> reportWarn src range "Remove whitespace after ')'"
+      |> reportBackParenInnerSpacing src
     else ()
+    checkPat src pat
+  | SynPat.Tuple(elementPats = elementPats) ->
+    List.iter (checkPat src) elementPats
   | _ ->
     ()

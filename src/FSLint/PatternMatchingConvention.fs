@@ -81,10 +81,10 @@ let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
 let private checkRecordBracketSpacing src (range: range) (innerRange: range) =
   if range.StartColumn + 2 <> innerRange.StartColumn then
     Range.mkRange "" range.Start innerRange.Start
-    |> fun range -> reportWarn src range "Use single whitespace after '{'"
+    |> reportLeftCurlyBraceSpacing src
   elif range.EndColumn - 2 <> innerRange.EndColumn then
     Range.mkRange "" innerRange.End range.End
-    |> fun range -> reportWarn src range "Use single whitespace before '}'"
+    |> reportRightCurlyBraceSpacing src
   else ()
 
 /// Checks for incorrect spacing in record pattern matching.
@@ -136,7 +136,7 @@ let private checkRecordOperatorSpacing (src: ISourceText) = function
           || symbolRange.Value.EndColumn + 1 <> pat.Range.StartColumn
         then
           Range.mkRange "" ident.Range.End pat.Range.Start
-          |> reportInfixError src
+          |> reportInfixSpacing src
         else
           ()
       else
@@ -163,13 +163,14 @@ let private checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
         |> Seq.choose id
         |> Seq.iter (fun index ->
           if index > 0 && subStr[index - 1] = ' ' then
-            reportWarn src field.Range "Remove whitespace before ';'"
+            reportSemiColonBeforeSpacing src field.Range
           elif index < subStr.Length - 1 then
             match subStr[index + 1] with
             | ' ' when index < subStr.Length - 2 && subStr.[index + 2] = ' ' ->
-              reportWarn src field.Range "Use single whitespace around ';'"
+              reportSemiColonAfterSpacing src field.Range
             | ' ' -> ()
-            | _ -> reportWarn src field.Range "Add whitespace after ';'"
+            | _ ->
+              reportSemiColonAfterSpacing src field.Range
           else
             ()
         )
@@ -215,7 +216,7 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
     when id.idText = "new" && argPats.Patterns.Head.IsParen &&
          id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argPats.Patterns.Head.Range.Start
-    |> fun range -> reportWarn src range "Remove whitespace before '('"
+    |> reportPascalCaseError src
   | _ -> ()
 
 /// checks pattern cases with incorrect spacing or newlines.
@@ -231,7 +232,8 @@ let private checkPatternSpacing src clauses =
         if pat.Range.StartLine <> range.StartLine then
           reportWarn src pat.Range "Move '|' inline with pattern"
         elif pat.Range.StartColumn - 2 <> range.StartColumn then
-          reportBarAndPatternError src range
+          Range.mkRange "" range.Start pat.Range.Start
+          |> reportBarAfterSpacing src
         else
           ()
       | None ->
@@ -275,10 +277,12 @@ let checkArrowSpacing src patRange whenExpr bodyRange (arrowRange: range) =
           ()
       else
         Range.mkRange "" patRange.End arrowRange.Start
-        |> fun range -> reportWarn src range "Use single whitespace before '->'"
+        |> reportArrowBeforeSpacing src
     elif arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
       Range.mkRange "" arrowRange.End bodyRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+      |> fun range ->
+        let str = (src: ISourceText).GetSubTextFromRange range
+        if str.Contains "(*" then () else reportArrowAfterSpacing src range
     elif patRange.EndColumn = arrowRange.StartColumn
       && arrowRange.EndColumn = bodyRange.StartColumn then
       Range.mkRange "" patRange.End bodyRange.Start
@@ -290,15 +294,18 @@ let checkArrowSpacing src patRange whenExpr bodyRange (arrowRange: range) =
       if patRange.EndColumn + 1 <> arrowRange.StartColumn then
         let gap = Range.unionRanges patRange.EndRange arrowRange.StartRange
         let gapStr = gap |> src.GetSubTextFromRange
-        if gapStr.Contains "(*" then ()
+        if gapStr.Contains "(*" then
+          ()
         else
           Range.mkRange "" patRange.End arrowRange.Start
-          |> fun range ->
-            reportWarn src range "Use single whitespace before '->'"
+          |> reportArrowBeforeSpacing src
+      else
+        ()
+    elif arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
+      Range.mkRange "" arrowRange.End bodyRange.Start
+      |> reportArrowAfterSpacing src
     else
-      if arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
-        Range.mkRange "" arrowRange.End bodyRange.Start
-        |> fun range -> reportWarn src range "Use single whitespace after '->'"
+      ()
 
 let checkParenTupleSpacing src (pats: SynPat list) =
   pats
@@ -373,7 +380,7 @@ and private checkArrayOrList src isArray elementPats (range: range) =
   if elementPats.IsEmpty then
     let enclosureWidth = if isArray then 4 else 2
     if range.EndColumn - range.StartColumn <> enclosureWidth then
-      reportWarn src range "Remove whitespace in brackets"
+      Range.mkRange "" range.Start range.End |> reportBracketNoSpacingError src
     else
       ()
   else

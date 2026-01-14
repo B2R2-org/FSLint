@@ -28,14 +28,15 @@ let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
   :? System.ArgumentOutOfRangeException -> Range.range0
 
 /// Checks the spacing around the upcast operator (:>) in infix expressions.
-let check src expr (targetType: SynType) =
+let check (src: ISourceText) expr (targetType: SynType) =
   let symbolRange = collectCastSymbolRangeFromSrc src expr targetType
+  let symbolStr = symbolRange |> src.GetSubTextFromRange
   if symbolRange.Equals Range.range0 then
     ()
   elif expr.Range.EndColumn + 1 <> symbolRange.StartColumn then
     Range.mkRange "" expr.Range.End symbolRange.Start
-    |> fun range -> reportWarn src range "Use whitespace before symbol"
+    |> fun range -> reportWarn src range $"Use whitespace before {symbolStr}"
   elif targetType.Range.StartColumn - 1 <> symbolRange.EndColumn then
     Range.mkRange "" symbolRange.End targetType.Range.Start
-    |> fun range -> reportWarn src range "Use whitespace after symbol"
+    |> fun range -> reportWarn src range $"Use whitespace after {symbolStr}"
   else ()

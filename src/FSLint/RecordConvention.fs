@@ -22,10 +22,10 @@ let private getExprRange (SynExprRecordField(expr = expr)) =
 let private checkBracketSpacing src (range: range) (innerRange: range) =
   if range.StartColumn + 2 <> innerRange.StartColumn then
     Range.mkRange "" range.Start innerRange.Start
-    |> fun range -> reportWarn src range "Use single whitespace after '{'"
+    |> reportLeftCurlyBraceSpacing src
   elif range.EndColumn - 2 <> innerRange.EndColumn then
     Range.mkRange "" innerRange.End range.End
-    |> fun range -> reportWarn src range "Use single whitespace before '}'"
+    |> reportRightCurlyBraceSpacing src
   else ()
 
 /// Checks for correct spacing around ':' in record field definitions.
@@ -40,6 +40,8 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
       |> fun colonRange ->
         if src.GetSubTextFromRange colonRange <> ": " then
           reportWarn src colonRange "Use ': ' between field and type"
+        else
+          ()
     else ()
   ) fields
 
@@ -86,11 +88,11 @@ let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
       elif fullRange.StartColumn + 2 <> innerRange.StartColumn
       then
         Range.mkRange "" fullRange.Start innerRange.Start
-        |> fun wRange -> reportWarn src wRange "Use one whitespace after '{'"
+        |> reportLeftCurlyBraceSpacing src
       elif fullRange.EndColumn - 2 <> innerRange.EndColumn
       then
         Range.mkRange "" innerRange.End fullRange.End
-        |> fun wRange -> reportWarn src wRange "Use one whitespace before '}'"
+        |> reportRightCurlyBraceSpacing src
       else ()
 
 let private checkBracketCompFlag src fullRange fieldRange exprRange =
@@ -110,6 +112,8 @@ let private checkBracketCompFlag src fullRange fieldRange exprRange =
         reportWarn src fullRange "Move field to inline with Bracket"
       else
         ()
+  else
+    ()
 
 /// Checks for correct spacing and formatting in record field assignments,
 /// ensuring the format `{ field = expr }` is used instead of `{field = expr}`.
@@ -124,10 +128,10 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         | _ -> fieldRange
       if fieldRange.StartColumn - 2 <> range.StartColumn then
         Range.mkRange "" range.Start fieldRange.Start
-        |> fun range -> reportWarn src range "Use single whitespace after '{"
+        |> reportLeftCurlyBraceSpacing src
       elif exprRange.EndColumn + 2 <> range.EndColumn then
         Range.mkRange "" exprRange.End range.End
-        |> fun range -> reportWarn src range "Use single whitespace before '}"
+        |> reportRightCurlyBraceSpacing src
       else ()
     | _ -> ()
   elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
@@ -145,10 +149,10 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
           reportWarn src exprRange "Move field to inline with Bracket"
       elif fieldRange.StartColumn - 2 <> range.StartColumn then
         Range.mkRange "" range.Start fieldRange.Start
-        |> fun range -> reportWarn src range "Use single whitespace after '{'"
+        |> reportLeftCurlyBraceSpacing src
       elif exprRange.EndColumn + 2 <> range.EndColumn then
         Range.mkRange "" exprRange.End range.End
-        |> fun range -> reportWarn src range "Use single whitespace before '}'"
+        |> reportRightCurlyBraceSpacing src
       else
         ()
     | _ -> ()
@@ -166,11 +170,11 @@ let rec private checkOperatorSpacing src = function
       if fieldRange.EndColumn + 1 <> equalRange.StartColumn
         && fieldRange.StartLine = exprRange.Range.StartLine then
         Range.mkRange "" fieldRange.End equalRange.Start
-        |> fun range -> reportWarn src range "Use single whitespace before '='"
+        |> reportEqaulBeforeSpacing src
       elif equalRange.EndColumn + 1 <> exprRange.Range.StartColumn
         && fieldRange.StartLine = exprRange.Range.StartLine then
         Range.mkRange "" equalRange.End exprRange.Range.Start
-        |> fun range -> reportWarn src range "Use single whitespace after '='"
+        |> reportEqaulAfterSpacing src
       else
         checkOperatorSpacing src rest
     | _ -> checkOperatorSpacing src rest
@@ -193,14 +197,14 @@ let checkSeparatorSpacing src fields =
     | Some(separatorRange, Some _) ->
       if exprRange.EndColumn < separatorRange.StartColumn then
         Range.mkRange "" exprRange.End separatorRange.Start
-        |> fun wRange -> reportWarn src wRange "Remove whitespace before ';'"
+        |> reportSemiColonBeforeSpacing src
       elif i < (collectFieldsInfo fields).Length - 1 then
         let fieldRange, _, _ = (collectFieldsInfo fields)[i + 1]
         if fieldRange.StartColumn - separatorRange.EndColumn <> 1
           && separatorRange.StartLine = separatorRange.EndLine
         then
           Range.mkRange "" fieldRange.Start separatorRange.End
-          |> fun wRange -> reportWarn src wRange "Add whitespace after ';'"
+          |> reportSemiColonAfterSpacing src
         elif fieldRange.StartColumn - separatorRange.EndColumn <> 1
           && separatorRange.StartLine <> separatorRange.EndLine
         then
@@ -256,16 +260,20 @@ let checkRecordPat (src: ISourceText) = function
           elif frontRange.EndLine <> backRange.StartLine
             && backSeparator.IsSome then
             reportTrailingSeparator src (backSeparator.Value |> fst)
+          else
+            ()
           if frontRange.EndLine = backRange.StartLine then
             let frontSeparator = frontSeparator.Value |> fst
             if frontRange.EndColumn <> frontSeparator.StartColumn then
               Range.mkRange "" frontRange.End frontSeparator.Start
-              |> fun range ->
-                reportWarn src range "Remove whitespace before ';'"
+              |> reportSemiColonBeforeSpacing src
             elif frontSeparator.EndColumn + 1 <> backRange.StartColumn then
               Range.mkRange "" frontSeparator.End backRange.Start
-              |> fun range ->
-                reportWarn src range "Use single whitespace after ';'"
+              |> reportSemiColonAfterSpacing src
+            else
+              ()
+          else
+            ()
           TypeAnnotation.checkParamTypeSpacing src frontPat
           TypeAnnotation.checkParamTypeSpacing src backPat
       )

@@ -30,23 +30,48 @@ let checkColonSpace src (idRange: range) (sigRange: range) =
         |> fun range -> reportWarn src range "Remove whitespace before ':'"
       elif gap <> 2 then
         reportWarn src patIdentRange "Use ': '"
+      else
+        ()
     else
       ()
   else
     ()
 
-let private checkGapBetweenArrays src (ranges: list<range>) =
+let private checkGapBetweenArrays (src: ISourceText) (ranges: list<range>) =
   ranges
   |>List.rev
   |> List.pairwise
   |> List.iter (fun (front, back) ->
-    if back.EndColumn - front.EndColumn <> 2 then
+    let gap = Range.mkRange "" front.End back.End
+    let str = gap |> src.GetSubTextFromRange
+    if back.EndColumn - front.EndColumn <> 2 && str.StartsWith ' ' then
       Range.mkRange "" front.End
         (Position.mkPos back.StartLine (back.EndColumn - 2))
       |> fun range -> reportWarn src range "Remove whitespace around '[]'"
+    elif back.EndColumn - front.EndColumn <> 2 && str.StartsWith '[' then
+      reportWarn src gap "Remove whitespace in '[]'"
     else
       ()
   )
+
+let private checkCommaSpacing src (typeArgs: list<SynType>) commaRanges =
+  if typeArgs.Length > 1 then
+    List.pairwise typeArgs
+    |> List.zip commaRanges
+    |> List.iter (fun (range: range, (fst, snd)) ->
+      if fst.Range.EndColumn <> range.StartColumn
+        && fst.Range.EndLine = range.StartLine then
+        Range.mkRange "" fst.Range.End range.Start
+        |> reportCommaBeforeSpacing src
+      elif snd.Range.StartColumn - 1 <> range.EndColumn
+        && snd.Range.StartLine = range.EndLine then
+        Range.mkRange "" range.End snd.Range.Start
+        |> reportCommaAfterSpacing src
+      else
+        ()
+    )
+  else
+    ()
 
 let rec private checkTupleSpacing src path =
   match path with
@@ -56,11 +81,11 @@ let rec private checkTupleSpacing src path =
     if synType1.Range.EndLine = starRange.StartLine
       && synType1.Range.EndColumn + 1 <> starRange.StartColumn then
       Range.mkRange "" synType1.Range.End starRange.Start
-      |> fun range -> reportWarn src range "Use ' * '"
+      |> reportStarFormat src
     elif starRange.EndLine = synType2.Range.StartLine
       && starRange.EndColumn + 1 <> synType2.Range.StartColumn then
       Range.mkRange "" synType2.Range.Start starRange.End
-      |> fun range -> reportWarn src range "Use ' * '"
+      |> reportStarFormat src
     else
       ()
     checkTypeInternal src synType1
@@ -72,12 +97,15 @@ let rec private checkTupleSpacing src path =
     checkTupleSpacing src rest
   | [] -> ()
 
-and checkArray src = function
+and checkArray (src: ISourceText) = function
   | SynType.Array(elementType = SynType.LongIdent(longDotId = id)
                   range = range) ->
-    if id.Range.EndColumn + 2 <> range.EndColumn then
-      Range.mkRange "" id.Range.End range.End
-      |> fun range -> reportWarn src range "Remove whitespace in array type"
+    let gap = Range.mkRange "" id.Range.End range.End
+    let str = gap |> src.GetSubTextFromRange
+    if id.Range.EndColumn + 2 <> range.EndColumn && str.StartsWith ' ' then
+      reportWarn src gap "Remove whitespace before '['"
+    elif id.Range.EndColumn + 2 <> range.EndColumn && str.StartsWith '[' then
+      reportWarn src gap "Remove whitespace in '[]'"
     else
       ()
   | _ -> ()
@@ -86,7 +114,7 @@ and checkExprToLessSpacing src (typeName: SynType) (lessRange: option<Range>) =
   if typeName.Range.EndLine = lessRange.Value.StartLine
     && typeName.Range.EndColumn <> lessRange.Value.StartColumn then
     Range.mkRange "" typeName.Range.End lessRange.Value.Start
-    |> fun range -> reportWarn src range "Remove whitespace before '<'"
+    |> reportLeftAngleSpacing src
   else
     ()
 
@@ -102,10 +130,10 @@ and checkTypeInternal src synType =
   | SynType.Paren(innerType = inner; range = range) ->
     if range.StartColumn + 1 <> inner.Range.StartColumn then
       Range.mkRange "" range.Start inner.Range.Start
-      |> fun range -> reportWarn src range "Remove whitespace after '('"
+      |> reportFrontParenInnerSpacing src
     elif inner.Range.EndColumn + 1 <> range.EndColumn then
       Range.mkRange "" inner.Range.End range.End
-      |> fun range -> reportWarn src range "Remove whitespace before ')'"
+      |> reportBackParenInnerSpacing src
     else
       ()
     checkTypeInternal src inner
@@ -117,12 +145,13 @@ and checkTypeInternal src synType =
   | SynType.App(typeName = typeName
                 lessRange = lessRange
                 greaterRange = greaterRange
+                commaRanges = commaRanges
                 typeArgs = typeArgs)
     when lessRange.IsSome && greaterRange.IsSome ->
+    checkCommaSpacing src typeArgs commaRanges
     checkExprToLessSpacing src typeName lessRange
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
-    checkTypeElementSpacing src typeArgs
     List.iter (checkTypeInternal src) typeArgs
   | _ -> ()
 
@@ -183,22 +212,20 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
           elif leftSpaces > rightSpaces then
             Range.mkRange "" front.End
               (Position.mkPos front.StartLine (front.EndColumn + leftSpaces))
-            |> fun range -> reportWarn src range "Remove consecutive whitespace"
+            |> reportConsecutiveSpacing src
           else
             Range.mkRange ""
               (Position.mkPos back.StartLine (back.StartColumn - rightSpaces))
               back.Start
-            |> fun range -> reportWarn src range "Remove consecutive whitespace"
+            |> reportConsecutiveSpacing src
         elif front.StartLine = back.StartLine && str.Contains " * " |> not
           && front.EndLine = back.StartLine
         then
-          Range.mkRange "" front.End back.Start
-          |> fun range -> reportWarn src range "Use ' * '"
+          Range.mkRange "" front.End back.Start |> reportStarFormat src
         elif front.StartLine <> back.StartLine && str.Contains "* " |> not
           && front.EndLine = back.StartLine
         then
-          Range.mkRange "" front.End back.Start
-          |> fun range -> reportWarn src range "Use ' * '"
+          Range.mkRange "" front.End back.Start |> reportStarFormat src
         elif front.StartLine <> back.StartLine
           && lastElemToDoubleCol.StartsWith "*"
         then
@@ -220,9 +247,13 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
       let fieldDecl = getFieldDeclaration src field
       if fieldDecl <> "" then
         if fieldDecl.Contains "  " then
-          reportWarn src field.Range "Remove consecutive whitespace"
+          reportConsecutiveSpacing src field.Range
         elif fieldDecl.Contains "*" && not (fieldDecl.Contains " * ") then
-          reportWarn src field.Range "Use ' * '"
+          reportStarFormat src field.Range
+        else
+          ()
+      else
+        ()
     )
 
 let private checkInlineSpacing src (frontCase, endCase) =
@@ -241,7 +272,7 @@ let private checkInlineSpacing src (frontCase, endCase) =
     then
       Range.mkRange "" endRange.Start
         (Position.mkPos endRange.StartLine barRange.EndColumn)
-      |> fun range -> reportWarn src range "Use single whitespace after '|'"
+      |> reportBarAfterSpacing src
     else ()
   | None, _ ->
     warn "Exception: '|' range does not exist"
@@ -328,39 +359,62 @@ let extractColonPairs synType =
 let rec checkTypeAbbrevWithAnnotation src = function
   | SynType.App(lessRange = lessRange
                 typeArgs = typeArgs
-                greaterRange = greaterRange) ->
+                greaterRange = greaterRange
+                commaRanges = commaRanges) ->
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
     typeArgs |> List.iter (checkLongIdentSpacing src)
-    checkTypeElementSpacing src typeArgs
+    checkCommaSpacing src typeArgs commaRanges
   | SynType.Fun(argType = argType; returnType = returnType; trivia = trivia) ->
     if argType.Range.EndLine <> trivia.ArrowRange.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
     then
       Range.mkRange "" trivia.ArrowRange.End returnType.Range.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+      |> reportArrowAfterSpacing src
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
     then
       Range.mkRange "" argType.Range.End trivia.ArrowRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace before '->'"
+      |> reportArrowBeforeSpacing src
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
     then
       Range.mkRange "" trivia.ArrowRange.End returnType.Range.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+      |> reportArrowAfterSpacing src
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine <> returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
     then
       Range.mkRange "" argType.Range.End trivia.ArrowRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace before '->'"
+      |> reportArrowBeforeSpacing src
     else ()
     checkTypeInternal src argType
     checkTypeInternal src returnType
   | _ -> ()
+
+let checkWithNullBarSpacing src (innerType: SynType) (barRange: range) =
+  let findNullKey =
+    let line = (src: ISourceText).GetLineString(barRange.EndLine - 1)
+    line.LastIndexOf "null"
+  let gap =
+    Range.mkRange "" barRange.End (Position.mkPos barRange.EndLine findNullKey)
+  let barToFrontOfNullStr = gap |> src.GetSubTextFromRange
+  if innerType.Range.EndLine <> barRange.StartLine
+    && (barToFrontOfNullStr.StartsWith "null"
+    || barToFrontOfNullStr.StartsWith "  ") then
+    reportBarAfterSpacing src gap
+  elif innerType.Range.EndLine = barRange.StartLine
+    && innerType.Range.EndColumn + 1 <> barRange.StartColumn then
+    Range.mkRange "" innerType.Range.End barRange.Start
+    |> reportBarBeforeSpacing src
+  elif innerType.Range.EndLine = barRange.StartLine
+    && (barToFrontOfNullStr.StartsWith "null"
+    || barToFrontOfNullStr.StartsWith "  ") then
+    reportBarAfterSpacing src gap
+  else
+    ()
 
 let checkPat src (pat: SynPat) = function
   | SynType.LongIdent(SynLongIdent([ id ], _, _)) ->
@@ -382,7 +436,11 @@ let checkPat src (pat: SynPat) = function
     checkColonSpace src pat.Range range
   | SynType.Tuple(path = path) ->
     checkTupleSpacing src path
-  | typ -> warn $"TODO: [Type Annotation] {typ}"
+  | SynType.WithNull(innerType = innerType; range = range; trivia = trivia) ->
+    checkColonSpace src pat.Range range
+    checkWithNullBarSpacing src innerType trivia.BarRange
+    checkTypeInternal src innerType
+  | typ -> warn $"TODO: [Type Annotation] filename: {typ.Range.FileName} {typ}"
 
 let rec checkParamTypeSpacing src = function
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
@@ -394,7 +452,7 @@ let rec checkParamTypeSpacing src = function
   | SynPat.Paren(pat, _) ->
     checkFieldWidthByPat src pat
     checkParamTypeSpacing src pat
-  | SynPat.Typed(pat, targetType, range) as typed ->
+  | SynPat.Typed(pat, targetType, _) as typed ->
     checkTypeAbbrevWithAnnotation src targetType
     checkFieldWidthByPat src typed
     checkParamTypeSpacing src pat
@@ -433,25 +491,25 @@ let rec checkAbstractSlot src (id: Ident) (synType: SynType) =
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
     then
       Range.mkRange "" trivia.ArrowRange.End returnType.Range.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+      |> reportArrowAfterSpacing src
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
     then
       Range.mkRange "" argType.Range.End trivia.ArrowRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace before '->'"
+      |> reportArrowBeforeSpacing src
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine = returnType.Range.StartLine
       && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
     then
       Range.mkRange "" trivia.ArrowRange.End returnType.Range.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '->'"
+      |> reportArrowAfterSpacing src
     elif argType.Range.EndLine = trivia.ArrowRange.StartLine
       && trivia.ArrowRange.EndLine <> returnType.Range.StartLine
       && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
     then
       Range.mkRange "" argType.Range.End trivia.ArrowRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace before '->'"
+      |> reportArrowBeforeSpacing src
     else
       ()
     checkAbstractSlot src id argType
@@ -465,12 +523,13 @@ let rec checkAbstractSlot src (id: Ident) (synType: SynType) =
   | SynType.App(typeName = typeName
                 lessRange = lessRange
                 greaterRange = greaterRange
+                commaRanges = commaRanges
                 typeArgs = typeArgs)
     when lessRange.IsSome && greaterRange.IsSome ->
       checkExprToLessSpacing src typeName lessRange
       collectRangeOfFirstAndLastType typeArgs
       |> checkBracketRanges src lessRange greaterRange
-      checkTypeElementSpacing src typeArgs
+      checkCommaSpacing src typeArgs commaRanges
       List.iter (checkTypeInternal src) typeArgs
   | _ ->
     ()

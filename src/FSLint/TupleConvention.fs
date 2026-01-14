@@ -76,7 +76,7 @@ let check (src: ISourceText) exprs commaRanges =
         if symb = "'::'" then
           reportWarn src range $"Use single whitespace before {symb}"
         else
-          reportWarn src range "Remove whitespace before ','"
+          reportCommaBeforeSpacing src range
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
       Range.mkRange "" commaRange.End sndElemRange.Start
@@ -94,11 +94,11 @@ let checkPat src pats commaRanges =
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
       Range.mkRange "" fstElemRange.End commaRange.Start
-      |> fun range -> reportWarn src range "Remove whitespace before ','"
+      |> reportCommaBeforeSpacing src
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
       Range.mkRange "" commaRange.End sndElemRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace after ','"
+      |> reportCommaAfterSpacing src
     else
       ()
   )

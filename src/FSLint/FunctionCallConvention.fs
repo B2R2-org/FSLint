@@ -19,8 +19,7 @@ let private getMethodName = function
   | SynExpr.Ident ident -> Some(ident.idText, ident.idRange)
   | _ -> None
 
-let private isSymbolOrPunctuation c =
-  Char.IsSymbol c || Char.IsPunctuation c
+let private isSymbolOrPunctuation c = Char.IsSymbol c || Char.IsPunctuation c
 
 let private checkSpacingOrNot (src: ISourceText) (range: range) =
   try
@@ -67,6 +66,8 @@ let checkTypeApp src expr (typeRange: range) argExpr =
       else
         ()
     | _ -> ()
+  else
+    ()
 
 let checkIdent src (ident: Ident) argExpr =
   if not ((getLineAfterExpr src argExpr).StartsWith("(")) then
@@ -82,6 +83,8 @@ let checkIdent src (ident: Ident) argExpr =
       |> reportLowerCaseError src
     else
       ()
+  else
+    ()
 
 let checkDotGet src expr id flag =
   match expr with
@@ -112,7 +115,7 @@ let checkNewKeywordSpacing src = function
     when id.idText = "new" && argExpr.IsParen
     && id.idRange.EndColumn <> argExpr.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argExpr.Range.Start
-    |> fun range -> reportWarn src range "Remove whitespace before '('"
+    |> reportPascalCaseError src
   | _ ->
     ()
 

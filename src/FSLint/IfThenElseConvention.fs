@@ -3,81 +3,54 @@ module B2R2.FSLint.IfThenElseConvention
 open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
-let rec private containsMatchOrBar (expr: SynExpr) =
-  match expr with
-  | SynExpr.Match _ | SynExpr.MatchBang _ | SynExpr.MatchLambda _ -> true
-  | SynExpr.Paren(expr = inner) -> containsMatchOrBar inner
-  | SynExpr.App(funcExpr = func; argExpr = arg) ->
-    containsMatchOrBar func || containsMatchOrBar arg
-  | SynExpr.Sequential(expr1 = e1; expr2 = e2) ->
-    containsMatchOrBar e1 || containsMatchOrBar e2
-  | SynExpr.IfThenElse(ifExpr = ie; thenExpr = te; elseExpr = ee) ->
-    containsMatchOrBar ie || containsMatchOrBar te ||
-    Option.map containsMatchOrBar ee |> Option.defaultValue false
-  | _ -> false
-
-let private isMultiLineExpr (expr: SynExpr) =
-  expr.Range.StartLine <> expr.Range.EndLine
-
-let private calculateIfThenExprLength src (ifRange: range) ifExpr thenExpr =
-  try
-    let ifText = (src: ISourceText).GetSubTextFromRange((ifExpr: SynExpr).Range)
-    let thenText = src.GetSubTextFromRange((thenExpr: SynExpr).Range)
-    let indent = ifRange.StartColumn
-    indent + 3 + ifText.Length + 6 + thenText.Length
-  with _ ->
-    Int32.MaxValue
-
-let private calculateElseExprLength src (ifRange: range) (elseExpr: SynExpr) =
-  try
-    let elseText = (src: ISourceText).GetSubTextFromRange elseExpr.Range
-    let indent = ifRange.StartColumn
-    indent + 5 + elseText.Length
-  with _ ->
-    Int32.MaxValue
-
-let private isCompactFormat src ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
-  if (Range.unionRanges (ifExpr: SynExpr).Range elseExpr.Range
-      |> (src: ISourceText).GetSubTextFromRange
-      |> fun str -> str.ToCharArray() |> Array.contains '#') then
-    true
+let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia =
+  if trivia.IfKeyword.EndLine = (ifExpr: SynExpr).Range.StartLine
+    && trivia.IfKeyword.EndColumn + 1 <> ifExpr.Range.StartColumn then
+    Range.mkRange "" trivia.IfKeyword.End ifExpr.Range.Start
+    |> fun range -> reportWarn src range "Use single whitespace after 'if'"
+  elif trivia.ThenKeyword.EndLine = ifExpr.Range.EndLine
+    && trivia.ThenKeyword.StartColumn - 1 <> ifExpr.Range.EndColumn then
+    Range.mkRange "" ifExpr.Range.End trivia.ThenKeyword.Start
+    |> fun range ->
+      let str = (src: ISourceText).GetSubTextFromRange range
+      if str.Contains "(*" then ()
+      else reportWarn src range "Use single whitespace before 'then'"
+  elif trivia.ThenKeyword.EndLine = (thenExpr: SynExpr).Range.StartLine
+    && trivia.ThenKeyword.EndColumn + 1 <> thenExpr.Range.StartColumn then
+    Range.mkRange "" trivia.ThenKeyword.End thenExpr.Range.Start
+    |> fun range ->
+      let str = (src: ISourceText).GetSubTextFromRange range
+      if str.Contains "(*" then ()
+      else reportWarn src range "Use single whitespace after 'then'"
+  elif Option.isSome trivia.ElseKeyword
+    && trivia.ElseKeyword.Value.EndLine = (elseExpr: SynExpr).Range.StartLine
+    && trivia.ElseKeyword.Value.EndColumn + 1 <> elseExpr.Range.StartColumn then
+    Range.mkRange "" trivia.ElseKeyword.Value.End elseExpr.Range.Start
+    |> fun range -> reportWarn src range "Use single space after 'else'"
   else
-    let ifThenExprOneLine =
-      (ifExpr: SynExpr).Range.StartLine = thenExpr.Range.EndLine
-    let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
-    ifThenExprOneLine && elseSeparated
+    ()
 
-let private isSeparatedFormat ifExpr (thenExpr: SynExpr) (elseExpr: SynExpr) =
-  let ifCondOneLine =
-    (ifExpr: SynExpr).Range.StartLine = ifExpr.Range.EndLine
-  let thenExprSeparated = ifExpr.Range.EndLine < thenExpr.Range.StartLine
-  let elseSeparated = thenExpr.Range.EndLine < elseExpr.Range.StartLine
-  ifCondOneLine && thenExprSeparated && elseSeparated
-
-let check src ifExpr thenExpr (elseExpr: SynExpr option) (range: range) =
-  match elseExpr with
-  | None -> ()
-  | Some elseExpr ->
-    if (ifExpr: SynExpr).Range.StartLine = (thenExpr: SynExpr).Range.EndLine &&
-       thenExpr.Range.EndLine = elseExpr.Range.EndLine then
-      ()
-    elif isMultiLineExpr ifExpr ||
-         isMultiLineExpr thenExpr ||
-         isMultiLineExpr elseExpr ||
-         containsMatchOrBar ifExpr ||
-         containsMatchOrBar thenExpr ||
-         containsMatchOrBar elseExpr then
-      ()
+let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
+  match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
+  | Some _ ->
+    checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
+  | None ->
+    let line =
+      (src: ISourceText).GetLineString (thenExpr: SynExpr).Range.EndLine
+    if line.TrimStart().StartsWith "elif" && Option.isSome elseExpr then
+      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
+    elif line.TrimStart().StartsWith "else" && Option.isSome elseExpr then
+      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
+    elif line.TrimStart().StartsWith "(*"
+      || line.TrimStart().StartsWith "///" then
+      Range.mkRange "" thenExpr.Range.Start (range: range).End
+      |> (src: ISourceText).GetSubTextFromRange
+      |> fun thenToEndStr ->
+        if thenToEndStr.Contains "else " then ()
+        elif thenToEndStr.Contains("else" + System.Environment.NewLine) then ()
+        else reportWarn src range "Add else expression"
     else
-      let ifThenExprLength =
-        calculateIfThenExprLength src range ifExpr thenExpr
-      let ifThenExprFits = ifThenExprLength <= MaxLineLength
-      let elseExprLength = calculateElseExprLength src range elseExpr
-      let elseExprFits = elseExprLength <= MaxLineLength
-      if ifThenExprFits && elseExprFits
-        && not (isCompactFormat src ifExpr thenExpr elseExpr) then
-          reportWarn src range "Use compact format (fits in 80 columns)"
-      else
-        ()
+      reportWarn src range "Add else expression"

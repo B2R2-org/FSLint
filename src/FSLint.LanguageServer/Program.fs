@@ -115,6 +115,8 @@ type LspServer(rpc: JsonRpc) =
       if validDiagnostics.Length < diagnostics.Length then
         eprintfn "[LSP] WARNING: Filtered %d invalid diagnostics"
           (diagnostics.Length - validDiagnostics.Length)
+      else
+        ()
       let diagnosticsArray = JArray()
       for diag in validDiagnostics do
         let diagObj =
@@ -275,6 +277,8 @@ type LspServer(rpc: JsonRpc) =
           eprintfn "[LSP] WARNING: Initialized didn't scan, scanning now"
           hasScannedWorkspace <- true
           do! scanWorkspace ()
+        else
+          ()
       with ex ->
         eprintfn "[LSP] ERROR in didOpen: %s" ex.Message
     } |> Async.StartAsTask :> Task
@@ -299,6 +303,8 @@ type LspServer(rpc: JsonRpc) =
             ),
             null, 300, Threading.Timeout.Infinite)
           debounceTimers.[uri] <- timer
+        else
+          ()
       with ex ->
         eprintfn "[LSP] ERROR in didChange: %s" ex.Message
     } |> Async.StartAsTask :> Task

@@ -20,23 +20,22 @@ let private checkEmpty src (typeArgsRange: range) =
 /// Checks if there is a space between 'expr' and '<type>' in an expression,
 /// e.g., detects 'expr <type>' instead of the correct 'expr<type>'.
 let checkFromExprToOpeningBracketSpacing src exprRange typeNameRange =
-  if (exprRange: range).EndColumn <> (typeNameRange: range).StartColumn
-  then
+  if (exprRange: range).EndColumn <> (typeNameRange: range).StartColumn then
     Range.mkRange "" exprRange.End typeNameRange.Start
-    |> fun range -> reportWarn src range "Remove whitespace before '<'"
-  else ()
+    |> reportLeftAngleSpacing src
+  else
+    ()
 
 /// Checks if there is a space between '<' and 'type' or 'type' and '>' in the
 /// given type argument range.
 let private checkBracketSpacing src (less: range) (greater: range) elemRange =
   if less.EndLine = (elemRange: range).StartLine
     && less.EndColumn <> elemRange.StartColumn then
-    Range.mkRange "" less.End elemRange.Start
-    |> fun range -> reportWarn src range "Remove whitespace after '<'"
+    Range.mkRange "" less.End elemRange.Start |> reportLeftAngleInnerSpacing src
   elif greater.EndLine = elemRange.EndLine
     && greater.StartColumn <> elemRange.EndColumn then
     Range.mkRange "" elemRange.End greater.Start
-    |> fun range -> reportWarn src range "Remove whitespace before '>'"
+    |> reportRightAngleInnerSpacing src
   else
     ()
 
@@ -58,7 +57,7 @@ let private checkCommaSeparator src (typeStr: string) typeRange =
   else
     ()
   if (Array.head parts).EndsWith " " then
-    reportWarn src typeRange "Remove whitespace before ','"
+    reportCommaBeforeSpacing src typeRange
   else
     ()
 
@@ -125,13 +124,13 @@ let checkBracketRanges src lessRange greaterRange (innerRange: range) =
   | Some lessRange, None ->
     if innerRange.StartColumn <> lessRange.EndColumn then
       Range.mkRange "" lessRange.End innerRange.Start
-      |> fun range -> reportWarn src range "Remove whitespace after '<'"
+      |> reportLeftAngleInnerSpacing src
     else
       ()
   | None, Some greaterRange ->
     if innerRange.EndColumn <> greaterRange.StartColumn then
       Range.mkRange "" innerRange.End greaterRange.Start
-      |> fun range -> reportWarn src range "Remove whitespace before '>'"
+      |> reportRightAngleInnerSpacing src
     else
       ()
   | Some lessRange, Some greaterRange ->
@@ -139,7 +138,7 @@ let checkBracketRanges src lessRange greaterRange (innerRange: range) =
   | _ ->
     ()
 
-let private checkBarAlignment (src: ISourceText) (range: range) = function
+let checkBarAlignment (src: ISourceText) (range: range) = function
   | Some(barRange: range) ->
     if range.StartColumn - 2 <> barRange.StartColumn then
       if range.StartLine <> range.EndLine then
@@ -147,12 +146,9 @@ let private checkBarAlignment (src: ISourceText) (range: range) = function
         |> Range.mkRange "" barRange.Start
         |> src.GetSubTextFromRange
         |> fun str ->
-          if str <> "| " then
-            reportWarn src barRange "Use single whitespace after '|'"
-          else
-            ()
+          if str <> "| " then reportBarAfterSpacing src barRange else ()
       else
-        reportWarn src range "Align '|' with type"
+        Range.mkRange "" barRange.End range.Start |> reportBarAfterSpacing src
     else
       ()
   | None -> warn "Exception: '|' range does not exist"

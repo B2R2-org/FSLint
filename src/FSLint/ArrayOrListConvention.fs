@@ -24,12 +24,12 @@ let checkElementSpacing src (elemAndSepRanges: Range list) =
     if elemRange.EndColumn <> separatorRange.StartColumn
     then
       Range.mkRange "" separatorRange.Start elemRange.End
-      |> fun range -> reportWarn src range "Remove whitespace before ';'"
+      |> reportSemiColonBeforeSpacing src
     elif separatorRange.EndColumn = nextElement.StartColumn
       || separatorRange.EndColumn + 1 <> nextElement.StartColumn
     then
       Range.mkRange "" separatorRange.End nextElement.Start
-      |> fun range -> reportWarn src range "Use single whitespace after ';'"
+      |> reportSemiColonAfterSpacing src
     else ()
 
 let checkBracketComp (src: ISourceText) (elemRange: range) fullrange warnRange =

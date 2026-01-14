@@ -110,11 +110,18 @@ let checkEqualSpacing src patRange (equalRange: range) bodyRange retInfo =
       if gapStr.Contains "(*" then ()
       else
         Range.mkRange "" patRange.End equalRange.Start
-        |> fun range ->
-          reportWarn src range "Use single whitespace before '='"
+        |> reportEqaulBeforeSpacing src
     elif equalRange.EndColumn + 1 <> bodyRange.StartColumn then
-      Range.mkRange "" equalRange.End bodyRange.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '='"
+      let checkComment =
+        let str =
+          Range.mkRange "" equalRange.End bodyRange.Start
+          |> src.GetSubTextFromRange
+        str.Contains "(*"
+      if checkComment then
+        ()
+      else
+        Range.mkRange "" equalRange.End bodyRange.Start
+        |> reportEqaulAfterSpacing src
     elif patRange.EndColumn = equalRange.StartColumn
       && equalRange.EndColumn = bodyRange.StartColumn then
       Range.mkRange "" patRange.End bodyRange.Start
@@ -126,15 +133,19 @@ let checkEqualSpacing src patRange (equalRange: range) bodyRange retInfo =
       if patRange.EndColumn + 1 <> equalRange.StartColumn then
         let gap = Range.unionRanges patRange.EndRange equalRange.StartRange
         let gapStr = gap |> src.GetSubTextFromRange
-        if gapStr.Contains "(*" then ()
+        if gapStr.Contains "(*" then
+          ()
         else
           Range.mkRange "" patRange.End equalRange.Start
-          |> fun range ->
-            reportWarn src range "Use single whitespace before '='"
+          |> reportEqaulBeforeSpacing src
+      else
+        ()
     else
       if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
         Range.mkRange "" equalRange.End bodyRange.Start
-        |> fun range -> reportWarn src range "Use single whitespace after '='"
+        |> reportEqaulAfterSpacing src
+      else
+        ()
 
 let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
   let SynBinding(expr = body; trivia = trivia) = binding
@@ -167,26 +178,70 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
             (Position.mkPos body.Range.EndLine
               (src.GetLineString(body.Range.EndLine - 1).Length))
         let declText = src.GetSubTextFromRange fullRange
-        let lines =
-          declText.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
+        let lines = declText.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
         let indent =
           match trivia.LeadingKeyword with
-          | SynLeadingKeyword.StaticMember(staticRange = staticRange)
-          | SynLeadingKeyword.StaticMemberVal(staticRange = staticRange) ->
-            staticRange.StartColumn
-          | _ -> pattern.Range.StartColumn
+          | SynLeadingKeyword.Do range
+          | SynLeadingKeyword.Extern range
+          | SynLeadingKeyword.Let range
+          | SynLeadingKeyword.LetRec(letRange = range)
+          | SynLeadingKeyword.And range
+          | SynLeadingKeyword.New range
+          | SynLeadingKeyword.Default range
+          | SynLeadingKeyword.DefaultVal(defaultRange = range)
+          | SynLeadingKeyword.Static range
+          | SynLeadingKeyword.StaticMember(staticRange = range)
+          | SynLeadingKeyword.StaticMemberVal(staticRange = range)
+          | SynLeadingKeyword.StaticAbstract(staticRange = range)
+          | SynLeadingKeyword.StaticAbstractMember(staticRange = range)
+          | SynLeadingKeyword.Member range
+          | SynLeadingKeyword.MemberVal(memberRange = range)
+          | SynLeadingKeyword.Abstract range
+          | SynLeadingKeyword.AbstractMember(abstractRange = range)
+          | SynLeadingKeyword.Override range
+          | SynLeadingKeyword.OverrideVal(overrideRange = range)
+          | SynLeadingKeyword.StaticDo(staticRange = range)
+          | SynLeadingKeyword.StaticLet(staticRange = range)
+          | SynLeadingKeyword.StaticLetRec(staticRange = range)
+          | SynLeadingKeyword.StaticVal(staticRange = range)
+          | SynLeadingKeyword.Use range
+          | SynLeadingKeyword.UseRec(useRange = range)
+          | SynLeadingKeyword.Val range ->
+            range.StartColumn
+          | _ ->
+            pattern.Range.StartColumn
         let contentParts =
           lines
           |> Array.map (fun line -> line.Trim())
           |> Array.filter (fun line -> line <> "")
         let oneLine = String.concat " " contentParts
         let totalLength = indent + oneLine.Length
-        if totalLength <= MaxLineLength then
-          reportWarn src body.Range "Remove unnecessary line break"
+        if totalLength <= MaxLineLength then reportNewLine src body.Range
+        else ()
       else
         ()
     | None ->
       ()
+  else
+    ()
+
+let checkAttributesLineSpacing src (attrs: SynAttributes) (moduleRange: range) =
+  let lastAttr = List.tryLast attrs
+  if Option.isSome lastAttr then
+    let gap = Range.unionRanges lastAttr.Value.Range moduleRange
+    let str = (src: ISourceText).GetSubTextFromRange gap
+    str.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
+    |> Array.map (fun line -> line.TrimStart())
+    |> Array.exists (fun line -> line.Contains "///" || line.Contains "(*")
+    |> fun comment ->
+      if comment then ()
+      elif lastAttr.Value.Range.EndLine + 1 <> moduleRange.StartLine
+        && lastAttr.Value.Range.StartLine <> moduleRange.StartLine then
+        Range.mkRange "" (Position.mkPos (moduleRange.StartLine - 1) 0)
+          moduleRange.Start
+        |> reportNewLine src
+      else
+        ()
   else
     ()
 

@@ -131,8 +131,10 @@ and checkExpression src = function
   | SynExpr.IfThenElse(ifExpr = ifExpr
                        thenExpr = thenExpr
                        elseExpr = elseExpr
-                       range = range) ->
-    IfThenElseConvention.check src ifExpr thenExpr elseExpr range
+                       range = range
+                       trivia = trivia) ->
+    NegationSimplificationConvention.check src ifExpr
+    IfThenElseConvention.check src ifExpr thenExpr elseExpr range trivia
     checkExpression src ifExpr
     checkExpression src thenExpr
     if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
@@ -253,6 +255,8 @@ and checkExpression src = function
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)
+  | SynExpr.FromParseError(expr, range) ->
+    failwith $"Compile error: filename: {range.FileName} {expr}"
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
 
@@ -284,6 +288,7 @@ and checkMemberDefns src members isDelegate =
       TypeAnnotation.checkTypeAbbrevWithAnnotation src synType
       IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.Interface(members = Some members) ->
+      ClassMemberConvention.checkMemberOrder src members
       checkMemberDefns src members isDelegate
     | SynMemberDefn.ValField(SynField(idOpt = idOpt), _) ->
       checkIdOpt src PascalCase idOpt
@@ -449,7 +454,9 @@ and checkTypeDefnWithContext src context typeDefn =
       let ctx =
         { ScopeContext.ModuleAccess = context.ModuleAccess
           ScopeContext.TypeAccess = None }
-      AccessModifierConvention.checkTypeModule src ctx typeAccess)
+      AccessModifierConvention.checkTypeModule src ctx typeAccess
+    else
+      ())
   let effectiveTypeAccess =
     match typeAccess with
     | Some _ -> getAccessLevel typeAccess
@@ -471,8 +478,18 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule(moduleInfo = info; decls = dls; range = rg) ->
-      let SynComponentInfo(longId = lid; accessibility = access) = info
+    | SynModuleDecl.NestedModule(moduleInfo = info
+                                 decls = dls
+                                 range = rg
+                                 trivia = trivia) ->
+      let SynComponentInfo(attributes = attrs
+                           longId = lid
+                           accessibility = access) = info
+      if Option.isSome trivia.ModuleKeyword then
+        DeclarationConvention.checkAttributesLineSpacing src attrs
+          trivia.ModuleKeyword.Value
+      else
+        ()
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
       match access with
@@ -520,7 +537,13 @@ let checkWithAST src = function
     |> List.iter (fun m ->
       let SynModuleOrNamespace(longId = lid
                                decls = decls
-                               accessibility = access) = m
+                               attribs = attribs
+                               accessibility = access
+                               trivia = trivia) = m
+      match trivia.LeadingKeyword with
+      | SynModuleOrNamespaceLeadingKeyword.Module range ->
+        DeclarationConvention.checkAttributesLineSpacing src attribs range
+      | _ -> ()
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
       { ModuleAccess = getAccessLevel access }

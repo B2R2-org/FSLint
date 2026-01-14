@@ -12,7 +12,7 @@ type MemberCategory =
   | Constructor = 2
   | Event = 3
   | Property = 4
-  | Indexer = 5
+  | Abstract = 5 (* Instead of Indexer *)
   | Method = 6
   | NestedType = 7
 

@@ -62,10 +62,11 @@ let checkAttributesLineSpacing src (attribute: SynAttributes) trivia =
   else
     match (trivia: SynTypeDefnTrivia).LeadingKeyword with
     | SynTypeDefnLeadingKeyword.StaticType(typeRange = range)
-    | SynTypeDefnLeadingKeyword.Type(range) ->
-      if lastAttr.Value.Range.EndLine + 1 <> range.StartLine then
+    | SynTypeDefnLeadingKeyword.Type range ->
+      if lastAttr.Value.Range.EndLine + 1 <> range.StartLine
+        && lastAttr.Value.Range.StartLine <> range.StartLine then
         Range.mkRange "" (Position.mkPos (range.StartLine - 1) 0) range.Start
-        |> fun range -> reportWarn src range "Remove unnecessary line break"
+        |> reportNewLine src
       else
         ()
     | _ ->
@@ -73,8 +74,7 @@ let checkAttributesLineSpacing src (attribute: SynAttributes) trivia =
 
 let checkNameBracketSpacing src (idRange: range) (innerRange: range) =
   if idRange.EndColumn <> innerRange.StartColumn then
-    Range.mkRange "" idRange.End innerRange.Start
-    |> fun range -> reportWarn src range "Remove whitespace before '<'"
+    Range.mkRange "" idRange.End innerRange.Start |> reportLeftAngleSpacing src
   else
     ()
 
@@ -91,9 +91,11 @@ let checkBracketElementSpacingInTypar (src: ISourceText) decls =
         if gapStr.StartsWith "," then
           Range.mkRange "" (Position.mkPos front.EndLine (front.EndColumn + 1))
             back.Start
-          |> fun range -> reportWarn src range "Use single whitespace after ','"
+          |> reportCommaAfterSpacing src
         else
-          reportWarn src gap "Use ', '"
+          reportCommaFormat src gap
+      else
+        ()
     )
   else
     ()
@@ -109,12 +111,11 @@ let checkBracketSpacingInTypar src decls constraints (range: range) =
   if range.StartLine = innerRange.StartLine
     && range.StartColumn + 1 <> innerRange.StartColumn then
     Range.mkRange "" (Position.mkPos range.StartLine (range.StartColumn + 1))
-      innerRange.Start
-    |> fun range -> reportWarn src range "Remove whitespace after '<'"
+      innerRange.Start |> reportLeftAngleInnerSpacing src
   elif range.EndLine = innerRange.EndLine
     && innerRange.EndColumn + 1 <> range.EndColumn then
     Range.mkRange "" innerRange.End range.End
-    |> fun range -> reportWarn src range "Remove whitespace before '>'"
+    |> reportRightAngleInnerSpacing src
   else
     ()
 

@@ -93,14 +93,20 @@ module CustomReports =
   let reportRedundant src range =
     reportWarn src range $"Remove Redundant 'private'"
 
-  let reportInfixError src range =
-    reportWarn src range "Use whitespace around operator"
+  let reportNewLine src range =
+    reportWarn src range "Remove unnecessary line break"
+
+  let reportInfixSpacing src range =
+    reportWarn src range "Use whitespace around infix operator"
 
   let reportRangeOperatorError src range =
     reportWarn src range "Use whitespace around '..'"
 
   let reportBracketSpacingError src range =
-    reportWarn src range "Use single whitespace inside brackets"
+    reportWarn src range "Use single whitespace in brackets"
+
+  let reportBracketNoSpacingError src range =
+    reportWarn src range "Remove whitespace in brackets"
 
   let reportSingleElementPerLineError src range =
     reportWarn src range "Use one element per line"
@@ -111,17 +117,69 @@ module CustomReports =
   let reportLowerCaseError src range =
     reportWarn src range "Use single whitespace before '('"
 
-  let reportBarAndPatternError src range =
-    reportWarn src range "Add space after '|'"
+  let reportFrontParenInnerSpacing src range =
+    reportWarn src range "Remove whitespace after '('"
+
+  let reportBackParenInnerSpacing src range =
+    reportWarn src range "Remove whitespace before ')'"
+
+  let reportBarBeforeSpacing src range =
+    reportWarn src range "Use single whitespace before '|'"
+
+  let reportBarAfterSpacing src range =
+    reportWarn src range "Use single whitespace after '|'"
 
   let reportBarAndMatchError src range =
     reportWarn src range "Align '|' with 'match'"
 
-  let reportArrowError src range =
-    reportWarn src range "Use whitespace around '->'"
-
-  let reportTypeError src range =
-    reportWarn src range "Fix type annotation format"
-
   let reportTrailingSeparator src range =
     reportWarn src range "Remove trailing ';'"
+
+  let reportArrowBeforeSpacing src range =
+    reportWarn src range "Use single whitespace before '->'"
+
+  let reportArrowAfterSpacing src range =
+    reportWarn src range "Use single whitespace after '->'"
+
+  let reportEqaulBeforeSpacing src range =
+    reportWarn src range "Use single whitespace before '='"
+
+  let reportEqaulAfterSpacing src range =
+    reportWarn src range "Use single whitespace after '='"
+
+  let reportSemiColonBeforeSpacing src range =
+    reportWarn src range "Remove whitespace before ';'"
+
+  let reportSemiColonAfterSpacing src range =
+    reportWarn src range "Use single whitespace after ';'"
+
+  let reportLeftAngleSpacing src range =
+    reportWarn src range "Remove whitespace before '<'"
+
+  let reportLeftAngleInnerSpacing src range =
+    reportWarn src range "Remove whitespace after '<'"
+
+  let reportRightAngleInnerSpacing src range =
+    reportWarn src range "Remove whitespace before '>'"
+
+  let reportLeftCurlyBraceSpacing src range =
+    reportWarn src range "Use single whitespace after '{'"
+
+  let reportRightCurlyBraceSpacing src range =
+    reportWarn src range "Use single whitespace before '}'"
+
+  let reportCommaFormat src range = reportWarn src range "Use ', '"
+
+  let reportStarFormat src range = reportWarn src range "Use ' * '"
+
+  let reportCommaBeforeSpacing src range =
+    reportWarn src range "Remove whitespace before ','"
+
+  let reportCommaAfterSpacing src range =
+    reportWarn src range "Use single whitespace after ','"
+
+  let reportMemberCurried src range =
+    reportWarn src range "Use non-curried parameter style"
+
+  let reportConsecutiveSpacing src range =
+    reportWarn src range "Remove consecutive whitespace"

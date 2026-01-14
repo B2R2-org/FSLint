@@ -24,7 +24,7 @@ let private getMemberCategory (memberDefn: SynMemberDefn) =
     | _ -> MemberCategory.Method
   | SynMemberDefn.GetSetMember _ -> MemberCategory.Property
   | SynMemberDefn.AutoProperty _ -> MemberCategory.Property
-  | SynMemberDefn.AbstractSlot _ -> MemberCategory.Method
+  | SynMemberDefn.AbstractSlot _ -> MemberCategory.Abstract
   | SynMemberDefn.ValField _ -> MemberCategory.Field
   | SynMemberDefn.LetBindings _ -> MemberCategory.Field
   | SynMemberDefn.NestedType _ -> MemberCategory.NestedType
@@ -205,14 +205,11 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
     | SynPat.Wild(range = range) :: wild when wild.Length <> 0 ->
-      reportWarn src (Range.unionRanges range (List.last wild).Range)
-        "Use non-curried parameter style"
+      reportMemberCurried src (Range.unionRanges range (List.last wild).Range)
     | SynPat.Paren(range = range) :: paren when paren.Length <> 0 ->
-      reportWarn src (Range.unionRanges range (List.last paren).Range)
-        "Use non-curried parameter style"
+      reportMemberCurried src (Range.unionRanges range (List.last paren).Range)
     | SynPat.Named(range = range) :: named when named.Length <> 0 ->
-      reportWarn src (Range.unionRanges range (List.last named).Range)
-        "Use non-curried parameter style"
+      reportMemberCurried src (Range.unionRanges range (List.last named).Range)
     | [ SynPat.Paren(range = range) ] ->
       let lastId = List.last longId
       if checkBackticMethodSpacing src dotRanges range then
@@ -252,14 +249,11 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
   | [ id ] when (idTrivia: list<option<IdentTrivia>>).Head.IsNone ->
     match args with
     | SynPat.Wild(range = range) :: wild when wild.Length <> 0 ->
-      reportWarn src (Range.unionRanges range (List.last wild).Range)
-        "Use non-curried parameter style"
+      reportMemberCurried src (Range.unionRanges range (List.last wild).Range)
     | SynPat.Paren(range = range) :: paren when paren.Length <> 0 ->
-      reportWarn src (Range.unionRanges range (List.last paren).Range)
-        "Use non-curried parameter style"
+      reportMemberCurried src (Range.unionRanges range (List.last paren).Range)
     | SynPat.Named(range = range) :: named when named.Length <> 0 ->
-      reportWarn src (Range.unionRanges range (List.last named).Range)
-        "Use non-curried parameter style"
+      reportMemberCurried src (Range.unionRanges range (List.last named).Range)
     | [ SynPat.Paren(range = range) ] ->
       let idRange =
         match typarDecls with
@@ -303,11 +297,11 @@ let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
     if idRange.EndColumn + 1 <> equalRange.Value.StartColumn
       && idRange.EndLine = equalRange.Value.StartLine then
       Range.mkRange "" idRange.End equalRange.Value.Start
-      |> fun range -> reportWarn src range "Use single whitespace before '='"
+      |> reportEqaulBeforeSpacing src
     elif equalRange.Value.EndColumn + 1 <> (expr: SynExpr).Range.StartColumn
       && equalRange.Value.EndLine = expr.Range.StartLine then
       Range.mkRange "" equalRange.Value.End expr.Range.Start
-      |> fun range -> reportWarn src range "Use single whitespace after '='"
+      |> reportEqaulAfterSpacing src
     else
       ()
   else
@@ -329,6 +323,8 @@ let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
           reportWarn src range "Use single whitespace after 'with'"
       else
         ()
+    else
+      ()
   else
     ()
   match trivia.GetSetKeywords with
@@ -343,11 +339,11 @@ let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
           (Position.mkPos gap.StartLine (getRange.EndColumn + 1),
            setRange.Start)
           ||> Range.mkRange ""
-          |> fun range -> reportWarn src range "Use single whitespace after ','"
+          |> reportCommaAfterSpacing src
         else
-          reportWarn src gap "Use ', '"
+          reportCommaFormat src gap
       elif gap.EndColumn - gap.StartColumn = 2 && gapStr.EndsWith ',' then
-        reportWarn src gap "Use ', '"
+        reportCommaFormat src gap
       else
         ()
   | _ -> ()

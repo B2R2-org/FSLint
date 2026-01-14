@@ -22,13 +22,12 @@ let checkEqualSpacing src (idRange: range) (reprRange: range) equalRange =
     if idRange.EndLine = (equalRange.Value: range).StartLine
       && idRange.EndColumn + 1 <> equalRange.Value.StartColumn then
       Range.mkRange "" idRange.End equalRange.Value.Start
-      |> fun range ->
-        reportWarn src range "Use single whitespace before '='"
+      |> reportEqaulBeforeSpacing src
     elif reprRange.StartLine = equalRange.Value.EndLine
-      && equalRange.Value.EndColumn + 1 <> reprRange.StartColumn then
+      && equalRange.Value.EndColumn + 1 <> reprRange.StartColumn
+      && equalRange.Value.StartColumn < reprRange.StartColumn then
       Range.mkRange "" equalRange.Value.End reprRange.Start
-      |> fun range ->
-        reportWarn src range "Use single whitespace after '='"
+      |> reportEqaulAfterSpacing src
     else
       ()
 

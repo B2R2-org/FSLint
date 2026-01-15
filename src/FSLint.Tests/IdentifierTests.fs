@@ -6,43 +6,53 @@ open B2R2.FSLint.Program
 
 [<TestClass>]
 type IdentifierTests() =
-  let goodBindingLowercaseTest = """
+  let goodBindingLowercaseTest =
+    """
 let age = 30
 """
 
-  let badBindingLowercaseTest = """
+  let badBindingLowercaseTest =
+    """
 let Age = 30
 """
 
-  let goodBindingPascalCaseTest = """
+  let goodBindingPascalCaseTest =
+    """
 let [<Literal>] Age = 30
 """
 
-  let badBindingPascalCaseTest = """
+  let badBindingPascalCaseTest =
+    """
 let [<Literal>] age = 30
 """
 
-  let goodRecordDefPascalCaseTest = """
+  let goodRecordDefPascalCaseTest =
+    """
 type Person = { Age: int }
 """
 
-  let badRecordDefPascalCaseTest = """
+  let badRecordDefPascalCaseTest =
+    """
 type person = { Age: int }
 """
 
-  let goodRecordFieldNamePascalCaseTest = """
+  let goodRecordFieldNamePascalCaseTest =
+    """
 type Person = { Age: int }
 """
 
-  let badRecordFieldNamePascalCaseTest = """
+  let badRecordFieldNamePascalCaseTest =
+    """
 type Person = { age: int }
 """
 
-  let goodBindingUnderscoreTest = """
+  let goodBindingUnderscoreTest =
+    """
 let _age = 30
 """
 
-  let badBindingUnderscoreTest = """
+  let badBindingUnderscoreTest =
+    """
 let age_ = 30
 """
 

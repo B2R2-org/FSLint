@@ -1,0 +1,82 @@
+{
+  "name": "fslint",
+  "displayName": "FSLint",
+  "description": "High-performance F# linter for CI/CD with real-time feedback",
+  "version": "1.0.0",
+  "publisher": "B2R2",
+  "license": "MIT",
+  "icon": "assets/b2r2-240x240.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/B2R2-org/FSLint"
+  },
+  "bugs": {
+    "url": "https://github.com/B2R2-org/FSLint/issues"
+  },
+  "keywords": [
+    "fsharp",
+    "f#",
+    "linter",
+    "static analysis",
+    "code quality"
+  ],
+  "galleryBanner": {
+    "color": "#378BBA",
+    "theme": "dark"
+  },
+  "engines": {
+    "node": ">=20.14.0",
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "FSLint",
+      "properties": {
+        "fslint.decorationStyle": {
+          "type": "string",
+          "enum": ["background", "underline", "both", "none"],
+          "default": "background",
+          "description": "How to display FSLint warnings"
+        },
+        "fslint.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable FSLint"
+        },
+        "fslint.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace LSP communication"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.93.0",
+    "@vscode/vsce": "^2.32.0",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  }
+}

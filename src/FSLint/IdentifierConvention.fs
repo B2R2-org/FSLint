@@ -2,32 +2,36 @@ module B2R2.FSLint.IdentifierConvention
 
 open System
 open FSharp.Compiler.Text
+open Diagnostics
 
-type CaseStyle =
-  | LowerCamelCase
-  | PascalCase
-
-let private keywords =
-  [| "new" |]
+let private keywords = [| "new" |]
 
 let private isKnownKeyWord (identifier: string) =
   Array.exists (fun kw -> kw = identifier) keywords
   || identifier.StartsWith "op_"
   || identifier.StartsWith "|" (* active patterns *)
 
-let private caseCheck src style (identifier: string) (range: range) =
+let private caseCheck (src: ISourceText) style identifier (range: range) =
   match style with
   | LowerCamelCase ->
-    if Char.IsLower identifier[0] || identifier[0] = '_' then ()
-    else reportError src range $"'{identifier}' is not in {LowerCamelCase}."
+    if Char.IsLower (identifier: string).[0] || identifier[0] = '_' then ()
+    else reportWarn src range $"'{identifier}' should be {LowerCamelCase}."
   | PascalCase ->
     if Char.IsUpper identifier[0] || identifier[0] = '_' then ()
-    else reportError src range $"'{identifier}' is not in {PascalCase}."
+    else
+      let identStartIdx =
+        src.GetLineString(range.StartLine - 1).IndexOf identifier
+      let identEndIdx = identStartIdx + identifier.Length
+      let range =
+        (Position.mkPos range.StartLine identStartIdx,
+         Position.mkPos range.StartLine identEndIdx)
+        ||> Range.mkRange ""
+      reportWarn src range $"'{identifier}' should be {PascalCase}."
 
 let private underscoreCheck src (identifier: string) (range: range) =
   let positionOfUnderscore = identifier[1..].IndexOf '_'
   if positionOfUnderscore = -1 then ()
-  else reportError src range $"'{identifier}' contains underscore(s)."
+  else reportWarn src range $"Remove underscore(s) in '{identifier}'"
 
 let check src style checkUnderscore (identifier: string) (range: range) =
   if identifier.Contains " " || isKnownKeyWord identifier then ()

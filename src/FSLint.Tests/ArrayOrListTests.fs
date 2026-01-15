@@ -45,54 +45,64 @@ type ArrayOrListTests() =
 
   let badRangeOperatorWithStepTest = """[ 1 ..2.. 10 ]"""
 
-  let goodRangeOperatorWithStepAndIdentTest = """
+  let goodRangeOperatorWithStepAndIdentTest =
+    """
 [ startIdent .. 2 .. endIdent ]
 """
 
-  let badRangeOperatorWithStepAndIdentTest = """
+  let badRangeOperatorWithStepAndIdentTest =
+    """
 [ startIdent..2 .. endIdent ]
 """
 
-  let goodCommentPositionTest = """
+  let goodCommentPositionTest =
+    """
 [ 1; 2; 3 (* Good *) ]
 """
 
-  let badCommentPositionTest = """
+  let badCommentPositionTest =
+    """
 [ 1; 2; 3(* Bad *) ]
 """
 
-  let goodMultiLineBracketSpacingTest = """
+  let goodMultiLineBracketSpacingTest =
+    """
 [ 1
   2
   3 ]
 """
 
-  let badMultiLineBracketSpacingTest = """
+  let badMultiLineBracketSpacingTest =
+    """
 [1
  2
  3 ]
 """
 
-  let goodArrayMultiLineBracketSpacingTest = """
+  let goodArrayMultiLineBracketSpacingTest =
+    """
 [| 1
    2
    3 |]
 """
 
-  let badArrayMultiLineBracketSpacingTest = """
+  let badArrayMultiLineBracketSpacingTest =
+    """
 [|1
   2
   3 |]
 """
 
-  let goodOpeningBracketInlineWithLetTest = """
+  let goodOpeningBracketInlineWithLetTest =
+    """
 let good =
  [ 1
    2
    3 ]
 """
 
-  let badOpeningBracketInlineWithLetTest = """
+  let badOpeningBracketInlineWithLetTest =
+    """
 let bad = [
   1
   2
@@ -100,78 +110,93 @@ let bad = [
 ]
 """
 
-  let goodSingleElementPerLineTest = """
+  let goodSingleElementPerLineTest =
+    """
 [ 1
   2
   3
   4 ]
 """
 
-  let badSingleElementPerLineTest = """
+  let badSingleElementPerLineTest =
+    """
 [ 1; 2
   3; 4 ]
 """
 
-  let goodSeparatorNotInLineEndingTest = """
+  let goodSeparatorNotInLineEndingTest =
+    """
 [ 1
   2
   3 ]
 """
 
-  let badSeparatorNotInLineEndingTest = """
+  let badSeparatorNotInLineEndingTest =
+    """
 [ 1
   2;
   3 ]
 """
 
-  let goodMultiLineCommentPositionTest = """
+  let goodMultiLineCommentPositionTest =
+    """
 [ 1
   2
   3 (* Good *) ]
 """
 
-  let badMultiLineCommentPositionTest = """
+  let badMultiLineCommentPositionTest =
+    """
 [ 1
   2
   3(* Bad *) ]
 """
 
-  let goodNestedBracketSpacingTest = """
+  let goodNestedBracketSpacingTest =
+    """
 [ [ 1; 2 ]; [ 3; 4 ] ]
 """
 
-  let goodNestedBracketSpacingMultiLineTest = """
+  let goodNestedBracketSpacingMultiLineTest =
+    """
 [ [ 1; 2 ]
   [ 3; 4 ] ]
 """
 
-  let badNestedBracketSpacingTest = """
+  let badNestedBracketSpacingTest =
+    """
 [ [ 1; 2]; [ 3; 4 ] ]
 """
 
-  let badNestedBracketSpacingMultiLineTest = """
+  let badNestedBracketSpacingMultiLineTest =
+    """
 [ [ 1; 2]
   [ 3; 4 ] ]
 """
 
-  let badNestedElementSpacingTest = """
+  let badNestedElementSpacingTest =
+    """
 [ [ 1;2 ]; [ 3; 4 ] ]
 """
 
-  let badNestedElementSpacingMultiLineTest = """
+  let badNestedElementSpacingMultiLineTest =
+    """
 [ [ 1;2 ]
   [ 3; 4 ] ]
 """
 
-  let goodNestedMixBracketSpacingTest = """
+  let goodNestedMixBracketSpacingTest =
+    """
 [ [| 1; 2 |]; [| 3; 4 |] ]
 """
 
-  let badNestedMixBracketSpacingTest = """
+  let badNestedMixBracketSpacingTest =
+    """
 [ [| 1; 2|]; [| 3; 4 |] ]
 """
 
-  let badNestedMixElementSpacingTest = """
+  let badNestedMixElementSpacingTest =
+    """
 [ [| 1;2 |]; [| 3; 4 |] ]
 """
 

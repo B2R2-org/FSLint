@@ -7,70 +7,82 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type PatternMatchingTests() =
 
-  let goodPatternBracketSpacingTest = """
+  let goodPatternBracketSpacingTest =
+    """
 match good with
 | [ 1; 2; 3 ] -> 1
 | _ -> 2
 """
 
-  let badPatternBracketSpacingTest = """
+  let badPatternBracketSpacingTest =
+    """
 match bad with
 | [1; 2; 3] -> 1
 | _ -> 2
 """
 
-  let badPatternElementSpacingTest = """
+  let badPatternElementSpacingTest =
+    """
 match bad with
 | [1; 2;3 ] -> 1
 | _ -> 2
 """
 
-  let goodPatternConsOperatorTest = """
+  let goodPatternConsOperatorTest =
+    """
 match good with
 | x :: xs -> 1
 | _ -> 2
 """
 
-  let badPatternConsOperatorTest = """
+  let badPatternConsOperatorTest =
+    """
 match bad with
 | x ::xs -> 1
 | _ -> 2
 """
 
-  let goodBarAndPatternIsInlineTest = """
+  let goodBarAndPatternIsInlineTest =
+    """
 match x with
 | Foo -> Some good
 | Bar -> None
 """
 
-  let badBarAndPatternIsInlineTest = """
+  let badBarAndPatternIsInlineTest =
+    """
 match x with
 | Foo |
   Bar -> Some bad
 """
 
-  let badBarAndMatchNotSameColTest = """
+  let badBarAndMatchNotSameColTest =
+    """
 match x with
   | Foo
   | Bar -> Some good
 """
 
-  let goodBarAndPatternSpacingTest = """
+  let goodBarAndPatternSpacingTest =
+    """
 match x with
 | Foo | Bar -> Some good
 """
 
-  let badBarAndPatternSpacingTest = """
+  let badBarAndPatternSpacingTest =
+    """
 match x with
 | Foo |Bar -> Some good
 """
 
-  let badArrowSpacingTest = """
+  let badArrowSpacingTest =
+    """
 match x with
 | Foo | Bar-> Some good
 """
 
-  let badArrowSpacingWithWhenTest = """
+  let badArrowSpacingWithWhenTest =
+    """
 match x with
 | Foo | Bar when cond-> Some good
 """

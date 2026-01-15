@@ -23,3 +23,12 @@
 
 build/
 .fsdocs/
+
+.fake
+
+vscode-extension/node_modules/
+vscode-extension/out/
+vscode-extension/bin/
+vscode-extension/*.vsix
+vscode-extension/package-lock.json
+vscode-extension/.vscode-test/

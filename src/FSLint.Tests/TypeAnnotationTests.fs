@@ -6,99 +6,123 @@ open B2R2.FSLint.Program
 
 [<TestClass>]
 type TypeAnnotationTest() =
-  let goodEmptyParenTest = """
+  let goodEmptyParenTest =
+    """
 let fn () = ()
 """
 
-  let badEmptyParenTest = """
+  let badEmptyParenTest =
+    """
 let fn ( ) = ()
 """
 
-  let goodTypeAnnotationIntArrayTest = """
+  let goodTypeAnnotationIntArrayTest =
+    """
 let fn (param: int[]) = 10
 """
 
-  let badTypeAnnotationIntArrayTest = """
+  let badTypeAnnotationIntArrayTest =
+    """
 let fn (param: int []) = 10
 """
 
-  let goodTypeAnnotationIntTest = """
+  let goodTypeAnnotationIntTest =
+    """
 let fn (p: int) = 10
 """
 
-  let badTypeAnnotationIntTest = """
+  let badTypeAnnotationIntTest =
+    """
 let fn (p:int) = 10
 """
 
-  let goodTypeAnnotationStringTest = """
+  let goodTypeAnnotationStringTest =
+    """
 let fn (str: string) = "10"
 """
 
-  let badTypeAnnotationStringTest = """
+  let badTypeAnnotationStringTest =
+    """
 let fn (str:string) = "10"
 """
 
-  let goodTypeAnnotationStringSpaceTest = """
+  let goodTypeAnnotationStringSpaceTest =
+    """
 let fn (str: string) = "10"
 """
 
-  let badTypeAnnotationStringSpaceTest = """
+  let badTypeAnnotationStringSpaceTest =
+    """
 let fn (str :string) = "10"
 """
 
-  let goodTypeAnnotationArrayTest = """
+  let goodTypeAnnotationArrayTest =
+    """
 let inline toString (stmts: LowUIR.Stmt[]) = ()
 """
 
-  let badTypeAnnotationArrayTest = """
+  let badTypeAnnotationArrayTest =
+    """
 let inline toString (stmts:  LowUIR.Stmt[]) = ()
 """
 
-  let goodTypeAnnotationColonSpacingTest = """
+  let goodTypeAnnotationColonSpacingTest =
+    """
 type X = X of a: int * b: int
 """
 
-  let badTypeAnnotationColonSpacingTest = """
+  let badTypeAnnotationColonSpacingTest =
+    """
 type X = X of a : int * b: int
 """
 
-  let goodTypeAnnotationStarSpacingTest = """
+  let goodTypeAnnotationStarSpacingTest =
+    """
 type X = X of a: int * b: int
 """
 
-  let badTypeAnnotationStarSpacingTest = """
+  let badTypeAnnotationStarSpacingTest =
+    """
 type X = X of a : int* b: int
 """
 
-  let goodTypeAnnotationArraySpacingTest = """
+  let goodTypeAnnotationArraySpacingTest =
+    """
 type X = X of a: int[]
 """
 
-  let badTypeAnnotationArraySpacingTest = """
+  let badTypeAnnotationArraySpacingTest =
+    """
 type X = X of a: int []
 """
 
-  let goodParamArrayTest = """
+  let goodParamArrayTest =
+    """
 let x (x: int[]) = x
 """
 
-  let badParamArrayTest = """
+  let badParamArrayTest =
+    """
 let x (x: int []) = x
 """
 
-  let goodTupleArrayTest = """
+  let goodTupleArrayTest =
+    """
 let x (x: int[] * int) = x
 """
 
-  let badTupleArrayTest = """
+  let badTupleArrayTest =
+    """
 let x (x: int[] * int []) = x
 """
 
-  let goodArrowSpacingTest = """
+  let goodArrowSpacingTest =
+    """
 let fn (x: list<int> -> string[] * string) = x
 """
 
-  let badArrowSpacingTest = """
+  let badArrowSpacingTest =
+    """
 let fn (x: list<int>->string[] * string) = x
 """
 

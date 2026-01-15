@@ -7,14 +7,18 @@ open FSharp.Compiler.Syntax
 /// Used to enforce spacing conventions in pattern assignments.
 let checkNamePatPairs src (longIdents: list<NamePatPairField>) =
   longIdents
-  |> List.iter (function
-    | NamePatPairField(fieldName = ident;
-                       equalsRange = symbolRange
-                       pat = lastPat) ->
-      if symbolRange.IsSome then
-        if ident.Range.EndColumn + 1 <> symbolRange.Value.StartColumn
-          || lastPat.Range.StartColumn <> symbolRange.Value.EndColumn + 1
-        then reportError src symbolRange.Value "Need single space around '='"
-        else ()
-      else ()
+  |> List.iter (fun pair ->
+    let NamePatPairField(fieldName = fN; equalsRange = eRange; pat = pat) = pair
+    eRange |> Option.iter (fun range ->
+      if fN.Range.EndColumn + 1 <> range.StartColumn
+        && fN.Range.StartLine = range.StartLine then
+        Range.mkRange "" fN.Range.End range.Start
+        |> reportEqaulBeforeSpacing src
+      elif pat.Range.StartColumn <> range.EndColumn + 1
+        && pat.Range.StartLine = range.StartLine then
+        Range.mkRange "" range.End pat.Range.Start
+        |> reportEqaulAfterSpacing src
+      else
+        ()
+    )
   )

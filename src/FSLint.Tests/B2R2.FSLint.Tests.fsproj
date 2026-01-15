@@ -23,7 +23,10 @@
     <Compile Include="LineTests.fs" />
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="ArgumentAssignmentTests.fs" />
+    <Compile Include="ClassMemberOrderTests.fs" />
+    <Compile Include="AccessModifierTests.fs" />
     <Compile Include="TupleTests.fs" />
+    <Compile Include="NegationSimplificationTests.fs" />
     <Compile Include="ParenTests.fs" />
     <Compile Include="TypeCastTests.fs" />
     <Compile Include="ClassDefinitionTests.fs" />
@@ -39,6 +42,7 @@
     <Compile Include="RecordTests.fs" />
     <Compile Include="DeclarationTests.fs" />
     <Compile Include="FunctionBodyTests.fs" />
+    <Compile Include="IfThenElseTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

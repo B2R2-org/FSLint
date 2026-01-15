@@ -7,7 +7,8 @@ open B2R2.FSLint.Program
 [<TestClass>]
 type RecordTests() =
 
-  let goodBracketPositionTest = """
+  let goodBracketPositionTest =
+    """
 type InsSize =
   { MemSize: MemorySize
     RegSize: RegType
@@ -15,7 +16,8 @@ type InsSize =
     SizeCond: OperandsSizeCondition }
 """
 
-  let badBracketPositionTest = """
+  let badBracketPositionTest =
+    """
 type InsSize =
   {
     MemSize: MemorySize
@@ -25,7 +27,8 @@ type InsSize =
   }
 """
 
-  let badBracketPositionWithEqualTest = """
+  let badBracketPositionWithEqualTest =
+    """
 type InsSize = {
   MemSize: MemorySize
   RegSize: RegType
@@ -34,7 +37,8 @@ type InsSize = {
   }
 """
 
-  let badFieldTypeSpacingTest = """
+  let badFieldTypeSpacingTest =
+    """
 type InsSize =
   { MemSize:  MemorySize
     RegSize:  RegType
@@ -42,27 +46,32 @@ type InsSize =
     SizeCond:  OperandsSizeCondition }
 """
 
-  let goodBracketSpacingTest = """
+  let goodBracketSpacingTest =
+    """
 { Prefixes = prefs }
 """
 
-  let badBracketSpacingTest = """
+  let badBracketSpacingTest =
+    """
 {Prefixes = prefs}
 """
 
-  let goodBracketSpacingMultiLineTest = """
+  let goodBracketSpacingMultiLineTest =
+    """
 { Prefixes = prefs
   Opcode = opcode }
 """
 
-  let badBracketSpacingMultiLineTest = """
+  let badBracketSpacingMultiLineTest =
+    """
 {
   Prefixes = prefs
   Opcode = opcode
 }
 """
 
-  let badOperatorSpacingTest = """
+  let badOperatorSpacingTest =
+    """
 { field =value }
 """
 

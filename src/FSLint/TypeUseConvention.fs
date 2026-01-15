@@ -2,6 +2,7 @@ module B2R2.FSLint.TypeUseConvention
 
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open Diagnostics
 
 let collectRangeOfFirstAndLastType (typeArgs: SynType list) =
   typeArgs
@@ -9,65 +10,76 @@ let collectRangeOfFirstAndLastType (typeArgs: SynType list) =
   |> List.reduce Range.unionRanges
 
 /// Checks that no whitespace in null type arguments.
-let checkEmpty src (typeArgsRange: range) =
-  if typeArgsRange.EndColumn - typeArgsRange.StartColumn <> 3 then
-    reportError src typeArgsRange "Contains invalid whitespace"
+let private checkEmpty src (typeArgsRange: range) =
+  if typeArgsRange.EndColumn - typeArgsRange.StartColumn <> 3
+  then
+    Range.mkRange "" typeArgsRange.Start typeArgsRange.End
+    |> fun range -> reportWarn src range "Remove whitespace in null type args"
   else ()
 
 /// Checks if there is a space between 'expr' and '<type>' in an expression,
 /// e.g., detects 'expr <type>' instead of the correct 'expr<type>'.
-let checkFromExprToOpeningBracketSpacing src expr typeArgsRange =
-  if (expr: SynExpr).Range.EndColumn <> (typeArgsRange: range).StartColumn then
-    reportError src typeArgsRange "Contains invalid whitespace"
-  else ()
+let checkFromExprToOpeningBracketSpacing src exprRange typeNameRange =
+  if (exprRange: range).EndColumn <> (typeNameRange: range).StartColumn then
+    Range.mkRange "" exprRange.End typeNameRange.Start
+    |> reportLeftAngleSpacing src
+  else
+    ()
 
 /// Checks if there is a space between '<' and 'type' or 'type' and '>' in the
 /// given type argument range.
-let checkBracketSpacing src typeArgsRange edgeRange =
-  if (edgeRange: range).StartColumn - 1 <> (typeArgsRange: range).StartColumn
-    || edgeRange.EndColumn + 1 <> typeArgsRange.EndColumn
-  then reportError src edgeRange "Contains invalid whitespace"
-  else ()
+let private checkBracketSpacing src (less: range) (greater: range) elemRange =
+  if less.EndLine = (elemRange: range).StartLine
+    && less.EndColumn <> elemRange.StartColumn then
+    Range.mkRange "" less.End elemRange.Start |> reportLeftAngleInnerSpacing src
+  elif greater.EndLine = elemRange.EndLine
+    && greater.StartColumn <> elemRange.EndColumn then
+    Range.mkRange "" elemRange.End greater.Start
+    |> reportRightAngleInnerSpacing src
+  else
+    ()
 
-let checkStarSeparator src (typeStr: string) typeRange =
+let private checkStarSeparator src (typeStr: string) typeRange =
   let parts = typeStr.Split '*'
   let headEndsWithSpace = (Array.head parts).EndsWith " "
   let lastStartsWithSpace = (Array.last parts).StartsWith " "
   if not (headEndsWithSpace && lastStartsWithSpace) then
-    reportError src typeRange "Need single space between type."
+    reportWarn src typeRange "Use single whitespace around '*'"
   else
     ()
 
-let checkCommaSeparator src (typeStr: string) typeRange =
+let private checkCommaSeparator src (typeStr: string) typeRange =
   let parts = typeStr.Split ','
   let lastPart = Array.last parts
   if (lastPart.Length > 0 && lastPart[0] = ' ' &&
      (lastPart.Length = 1 || lastPart[1] <> ' ')) |> not then
-    reportError src typeRange "Need single space between type."
+    reportWarn src typeRange "Use single whitespace between type"
   else
     ()
   if (Array.head parts).EndsWith " " then
-    reportError src typeRange "No space allowed before comma."
+    reportCommaBeforeSpacing src typeRange
   else
     ()
 
 /// Checks whether the spacing between elements in the given type argument list
 /// is formatted correctly, distinguishing between ',' and '*' separators.
-let checkTypeElementSpacing (src: ISourceText) (typeArgs: SynType list) =
+let checkTypeElementSpacing src (typeArgs: SynType list) =
   let getEffectiveTypeStr (src: ISourceText) (typeRange: range) =
     let lineStr = src.GetLineString(typeRange.StartLine - 1)
     if lineStr.EndsWith "," then lineStr[0..lineStr.Length - 2]
     else lineStr
-  typeArgs
+  let unionRange =
+    Range.unionRanges typeArgs.Head.Range (List.last typeArgs).Range
+  (typeArgs: SynType list)
   |> List.iter (fun typeArg ->
     let typeRange = typeArg.Range
-    let typeStr = src.GetSubTextFromRange typeRange
+    let typeStr = (src: ISourceText).GetSubTextFromRange typeRange
     if typeStr.Contains '*' then
-      checkStarSeparator src typeStr typeRange
+      checkStarSeparator src typeStr unionRange
     else
       let effectiveTypeStr = getEffectiveTypeStr src typeRange
       if effectiveTypeStr.IndexOf ',' <> -1 then
-        checkCommaSeparator src effectiveTypeStr typeRange
+        checkCommaSeparator src effectiveTypeStr unionRange
       else
         ()
   )
@@ -84,7 +96,8 @@ let checkTypeAppParenSpacing src = function
       if id.Length <> 1 then
         if flag = ExprAtomicFlag.NonAtomic
           || typeRange.EndColumn <> parenRange.StartColumn then
-          reportError src parenRange "Contains invalid whitespace"
+          Range.mkRange "" typeRange.End parenRange.Start
+          |> reportPascalCaseError src
         else ()
       else () (* This handle Type Reference convention *)
     | _ -> ()
@@ -94,64 +107,34 @@ let checkLongIdentSpacing src typeArg =
   match typeArg with
   | SynType.LongIdent(SynLongIdent(id = id)) when id.Length >= 2 ->
     id
-    |> List.map (_.idRange)
+    |> List.map _.idRange
     |> List.pairwise
     |> List.iter (fun (front, back) ->
       if front.EndColumn + 1 <> back.StartColumn then
-        reportError src back "Contains invalid whitespace"
+        Range.mkRange "" front.End back.Start
+        |> fun range ->
+          reportWarn src range "Use single whitespace between LongIdent"
       else
         ()
     )
   | _ -> ()
 
-let checkBracketRanges src (innerRange: range) lessRange greaterRange =
+let checkBracketRanges src lessRange greaterRange (innerRange: range) =
   match (lessRange: range option), (greaterRange: range option) with
   | Some lessRange, None ->
     if innerRange.StartColumn <> lessRange.EndColumn then
-      reportError src lessRange "Contains invalid whitespace"
+      Range.mkRange "" lessRange.End innerRange.Start
+      |> reportLeftAngleInnerSpacing src
     else
       ()
   | None, Some greaterRange ->
     if innerRange.EndColumn <> greaterRange.StartColumn then
-      reportError src greaterRange "Contains invalid whitespace"
+      Range.mkRange "" innerRange.End greaterRange.Start
+      |> reportRightAngleInnerSpacing src
     else
       ()
   | Some lessRange, Some greaterRange ->
-    let range = Range.unionRanges lessRange greaterRange
-    checkBracketSpacing src range innerRange
-  | _ -> ()
-
-let rec checkTypeAbbrevWithAnnotation src = function
-  | SynType.App(lessRange = lessRange
-                typeArgs = typeArgs
-                greaterRange = greaterRange) ->
-    let innerRange = collectRangeOfFirstAndLastType typeArgs
-    checkBracketRanges src innerRange lessRange greaterRange
-    typeArgs |> List.iter (checkLongIdentSpacing src)
-    checkTypeElementSpacing src typeArgs
-  | SynType.Fun(argType = argType; returnType = returnType; trivia = trivia) ->
-    if argType.Range.EndLine <> trivia.ArrowRange.StartLine
-      && returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn
-    then reportError src trivia.ArrowRange "Contains invalid whitespace"
-    elif argType.Range.EndLine = trivia.ArrowRange.StartLine
-      && trivia.ArrowRange.EndLine = returnType.Range.StartLine
-      && (argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
-      || returnType.Range.StartColumn - 1 <> trivia.ArrowRange.EndColumn)
-    then reportError src trivia.ArrowRange "Contains invalid whitespace"
-    elif argType.Range.EndLine = trivia.ArrowRange.StartLine
-      && trivia.ArrowRange.EndLine <> returnType.Range.StartLine
-      && argType.Range.EndColumn + 1 <> trivia.ArrowRange.StartColumn
-    then reportError src trivia.ArrowRange "Contains invalid whitespace"
-    else ()
-    TypeAnnotation.checkFieldWidth src argType.Range
-    TypeAnnotation.checkFieldWidth src returnType.Range
-    checkTypeAbbrevWithAnnotation src argType
-    checkTypeAbbrevWithAnnotation src returnType
-  | _ -> ()
-
-let checkExprAnnotation src = function
-  | SynExpr.Typed(targetType = targetType) ->
-    checkTypeAbbrevWithAnnotation src targetType
+    checkBracketSpacing src lessRange greaterRange innerRange
   | _ ->
     ()
 
@@ -163,16 +146,12 @@ let checkBarAlignment (src: ISourceText) (range: range) = function
         |> Range.mkRange "" barRange.Start
         |> src.GetSubTextFromRange
         |> fun str ->
-          if str <> "| " then
-            reportError src barRange "Contains invalid whitespace"
-          else
-            ()
+          if str <> "| " then reportBarAfterSpacing src barRange else ()
       else
-        reportError src range "Contains invalid whitespace"
+        Range.mkRange "" barRange.End range.Start |> reportBarAfterSpacing src
     else
       ()
-  | None ->
-    warn "Union case does not have a bar range."
+  | None -> warn "Exception: '|' range does not exist"
 
 let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
   match cases with
@@ -185,35 +164,10 @@ let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
     )
   | _ -> ()
 
-let rec checkParamTypeSpacing src = function
-  | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
-    pats |> List.iter (fun field -> checkParamTypeSpacing src field.Pattern)
-  | SynPat.LongIdent(argPats = SynArgPats.Pats pats) ->
-    pats |> List.iter (checkParamTypeSpacing src)
-  | SynPat.Tuple(elementPats = pats) ->
-    pats |> List.iter (checkParamTypeSpacing src)
-  | SynPat.Paren(pat, range) ->
-    TypeAnnotation.checkFieldWidth src range
-    checkParamTypeSpacing src pat
-  | SynPat.Typed(pat, targetType, range) ->
-    checkTypeAbbrevWithAnnotation src targetType
-    TypeAnnotation.checkFieldWidth src range
-    checkParamTypeSpacing src pat
-  | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat) ->
-    checkParamTypeSpacing src lhsPat
-    checkParamTypeSpacing src rhsPat
-  | SynPat.IsInst(pat = pat) ->
-    checkTypeAbbrevWithAnnotation src pat
-  | SynPat.Named(range = range) ->
-    TypeAnnotation.checkFieldWidth src range
-  | _ ->
-    ()
-
-let check src expr (typeArgs: SynType list) typeArgsRange =
-  checkFromExprToOpeningBracketSpacing src expr typeArgsRange
-  match typeArgs with
+let check src (expr: SynExpr) typeArgs less greater typeArgsRange =
+  checkFromExprToOpeningBracketSpacing src expr.Range typeArgsRange
+  collectRangeOfFirstAndLastType typeArgs
+  |> checkBracketRanges src less greater
+  match (typeArgs: SynType list) with
   | [] -> checkEmpty src typeArgsRange
-  | _ ->
-    collectRangeOfFirstAndLastType typeArgs
-    |> checkBracketSpacing src typeArgsRange
-    checkTypeElementSpacing src typeArgs
+  | _ -> checkTypeElementSpacing src typeArgs

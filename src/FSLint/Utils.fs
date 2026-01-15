@@ -4,37 +4,56 @@ module B2R2.FSLint.Utils
 open System
 open System.IO
 open System.Text.RegularExpressions
+open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
+open FSharp.Compiler.Syntax
 
-exception LintException of string
+let [<Literal>] MaxLineLength = 80
 
-let raiseWithError (message: string) =
-  raise <| LintException message
+let isPascalCase (methodName: string) =
+  methodName.Length > 0 && Char.IsUpper(methodName[0])
 
-let exitWithError (message: string) =
-  Console.WriteLine message
-  exit 1
+let getAccessLevel = function
+  | Some(SynAccess.Private _) -> Private
+  | _ -> Public
 
-let warn (message: string) =
-  Console.Error.WriteLine message
+let extractComparisonOperator = function
+  | SynExpr.App(funcExpr = SynExpr.App(funcExpr = funcExpr)) ->
+    match funcExpr with
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ]))
+    | SynExpr.Ident(ident = id) -> Some id.idText
+    | _ -> None
+  | _ -> None
 
-let reportError (src: ISourceText) (range: range) message =
-  Console.Error.WriteLine(src.GetLineString(range.StartLine - 1))
-  Console.Error.WriteLine(String.replicate range.StartColumn " " + "^")
-  raiseWithError $"{range.StartLine} {message}"
-
-let runOnEveryFsFile (path: string) (action: string -> unit) =
+/// Collects all .fs source files under the given root directory
+let getFsFiles (root: string) =
   let sep = Path.DirectorySeparatorChar |> string |> Regex.Escape
-  let exclusionPatterns =
+  let exclusion =
     [| Regex $"obj{sep}Debug{sep}"
        Regex $"obj{sep}Release{sep}"
        Regex $"CFG.Tests" |]
-  let searchOpt = SearchOption.AllDirectories
-  for f in Directory.EnumerateFiles(path, "*.fs", searchOpt) do
-    if exclusionPatterns |> Array.exists (fun r -> r.IsMatch f) then ()
-    else action f
+  Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
+  |> Seq.filter
+    (fun f -> not (exclusion |> Array.exists (fun r -> r.IsMatch f)))
+  |> Seq.sort
+  |> Seq.toArray
 
-let runOnEveryProjectSlnFile (path: string) (action: string -> unit) =
-  let searchOpt = SearchOption.AllDirectories
-  for f in Directory.EnumerateFiles(path, "*.fsproj", searchOpt) do action f
-  for f in Directory.EnumerateFiles(path, "*.sln", searchOpt) do action f
+/// Collects .fsproj and .sln project/solution files
+let getProjOrSlnFiles (root: string) =
+  [ "*.fsproj"; "*.sln" ]
+  |> Seq.collect (fun pattern ->
+    Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
+  |> Seq.sort
+  |> Seq.toArray
+
+let parseFile txt (path: string) =
+  let checker = FSharpChecker.Create()
+  let src = SourceText.ofString txt
+  let projOptions, _ =
+    checker.GetProjectOptionsFromScript(path, src)
+    |> Async.RunSynchronously
+  let parsingOptions, _ =
+    checker.GetParsingOptionsFromProjectOptions projOptions
+  checker.ParseFile(path, src, parsingOptions)
+  |> Async.RunSynchronously
+  |> fun r -> src, r.ParseTree

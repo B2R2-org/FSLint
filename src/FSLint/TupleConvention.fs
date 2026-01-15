@@ -2,15 +2,16 @@ module B2R2.FSLint.TupleConvention
 
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
+open Diagnostics
 
-let makeNewRangeAdjustedByGap (targetRange: range) gap =
+let private makeNewRangeAdjustedByGap (targetRange: range) gap =
   let reduceStart =
     Position.mkPos targetRange.StartLine (targetRange.Start.Column - gap)
   let reduceEnd =
     Position.mkPos targetRange.StartLine (targetRange.End.Column - gap)
   Range.mkRange "" reduceStart reduceEnd
 
-let adjustRangeByComment (src: ISourceText) rangeWithElems =
+let private adjustRangeByComment (src: ISourceText) rangeWithElems =
   rangeWithElems
   |> List.map (fun ((comRange: range), (fstElem: SynExpr, sndElem: SynExpr)) ->
     let betweenElementsRange =
@@ -20,15 +21,16 @@ let adjustRangeByComment (src: ISourceText) rangeWithElems =
     let gapStr = src.GetSubTextFromRange betweenElementsRange
     if findPointer.Chars(0).Equals '?' then
       comRange, fstElem.Range, makeNewRangeAdjustedByGap sndElem.Range 1
-    elif gapStr.IndexOf "(*" <> - 1 then
+    elif gapStr.IndexOf "(*" <> -1 then
       let gap = gapStr.IndexOf "*)" - gapStr.IndexOf "(*" + 3
       makeNewRangeAdjustedByGap comRange gap,
       fstElem.Range,
       makeNewRangeAdjustedByGap sndElem.Range gap
-    else comRange, fstElem.Range, sndElem.Range
+    else
+      comRange, fstElem.Range, sndElem.Range
   )
 
-let adjustRangeByCommentInPat (src: ISourceText) rangeWithElems =
+let private adjustRangeByCommentInPat (src: ISourceText) rangeWithElems =
   rangeWithElems
   |> List.map (fun ((comRange: range), (fstElem: SynPat, sndElem: SynPat)) ->
     let betweenElementsRange =
@@ -38,27 +40,49 @@ let adjustRangeByCommentInPat (src: ISourceText) rangeWithElems =
     let gapStr = src.GetSubTextFromRange betweenElementsRange
     if findPointer.Chars(0).Equals '?' then
       comRange, fstElem.Range, makeNewRangeAdjustedByGap sndElem.Range 1
-    elif gapStr.IndexOf "(*" <> - 1 then
+    elif gapStr.IndexOf "(*" <> -1 then
       let gap = gapStr.IndexOf "*)" - gapStr.IndexOf "(*" + 3
       makeNewRangeAdjustedByGap comRange gap,
       fstElem.Range,
       makeNewRangeAdjustedByGap sndElem.Range gap
-    else comRange, fstElem.Range, sndElem.Range
+    else
+      comRange, fstElem.Range, sndElem.Range
   )
 
-let check src exprs commaRanges =
+let filterOutConsOperators exprs =
+  exprs
+  |> List.filter (function
+    | SynExpr.App(isInfix = true
+                  funcExpr = SynExpr.LongIdent(
+                    longDotId = SynLongIdent(
+                      id = [ id ]))) when id.idText = "op_ColonColon" ->
+      false
+    | _ -> true)
+
+let check (src: ISourceText) exprs commaRanges =
   exprs
   |> List.pairwise
   |> List.zip commaRanges
   |> adjustRangeByComment src
   |> List.iter (fun (commaRange, fstElemRange, sndElemRange) ->
+    let gapStr =
+      Range.unionRanges fstElemRange commaRange
+      |> src.GetSubTextFromRange
+    let symb = if gapStr.TrimEnd().EndsWith("::") then "'::'" else "','"
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
-      reportError src commaRange "No space allowed before comma"
+      Range.mkRange "" fstElemRange.End commaRange.Start
+      |> fun range ->
+        if symb = "'::'" then
+          reportWarn src range $"Use single whitespace before {symb}"
+        else
+          reportCommaBeforeSpacing src range
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
-      reportError src commaRange "Need to space after comma"
-    else ()
+      Range.mkRange "" commaRange.End sndElemRange.Start
+      |> fun range -> reportWarn src range $"Use single whitespace after {symb}"
+    else
+      ()
   )
 
 let checkPat src pats commaRanges =
@@ -69,9 +93,12 @@ let checkPat src pats commaRanges =
   |> List.iter (fun (commaRange, fstElemRange, sndElemRange) ->
     let gap = commaRange.EndColumn - commaRange.StartColumn - 1
     if fstElemRange.EndColumn + gap <> commaRange.StartColumn then
-      reportError src commaRange "No space allowed before comma"
+      Range.mkRange "" fstElemRange.End commaRange.Start
+      |> reportCommaBeforeSpacing src
     elif sndElemRange.StartColumn - 1 <> commaRange.EndColumn
       && sndElemRange.StartLine = commaRange.StartLine then
-      reportError src commaRange "Need to space after comma"
-    else ()
+      Range.mkRange "" commaRange.End sndElemRange.Start
+      |> reportCommaAfterSpacing src
+    else
+      ()
   )

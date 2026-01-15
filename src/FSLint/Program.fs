@@ -1,23 +1,11 @@
 module B2R2.FSLint.Program
 
+open System
 open System.IO
-open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
-open type IdentifierConvention.CaseStyle
-
-let parseFile txt (path: string) =
-  let checker = FSharpChecker.Create()
-  let src = SourceText.ofString txt
-  let projOptions, _ =
-    checker.GetProjectOptionsFromScript(path, src)
-    |> Async.RunSynchronously
-  let parsingOptions, _ =
-    checker.GetParsingOptionsFromProjectOptions projOptions
-  checker.ParseFile(path, src, parsingOptions)
-  |> Async.RunSynchronously
-  |> fun r -> src, r.ParseTree
+open Diagnostics
 
 let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.Attrib _
@@ -27,9 +15,9 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     () (* no need to check this *)
   | SynPat.Named(ident = SynIdent(ident = id); range = range) ->
     IdentifierConvention.check src case true id.idText range
-  | SynPat.Typed(pat = pat; targetType = typ; range = range) ->
+  | SynPat.Typed(pat = pat; targetType = typ) ->
     checkPattern src case isArg trivia pat
-    TypeAnnotation.checkPat src pat range typ
+    TypeAnnotation.checkPat src pat typ
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
     checkPattern src case isArg trivia lhs
     checkPattern src case isArg trivia rhs
@@ -76,9 +64,18 @@ and checkSimplePattern src case = function
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
 and checkMatchClause (src: ISourceText) clause =
-  let SynMatchClause(pat = pat; whenExpr = whenExpr; resultExpr = expr) = clause
+  let SynMatchClause(pat = pat
+                     whenExpr = whenExpr
+                     resultExpr = expr
+                     trivia = trivia) = clause
+  if Option.isSome trivia.ArrowRange then
+    PatternMatchingConvention.checkArrowSpacing
+      src pat.Range whenExpr expr.Range trivia.ArrowRange.Value
+  else
+    ()
   PatternMatchingConvention.checkBody src pat
-  TypeUseConvention.checkParamTypeSpacing src pat
+  TypeAnnotation.checkParamTypeSpacing src pat
+  RecordConvention.checkRecordPat src pat
   match pat with
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
     FunctionCallConvention.checkMethodParenSpacing src expr
@@ -98,10 +95,25 @@ and checkExpression src = function
     checkExpression src innerExpr
   | SynExpr.Typed(expr = expr) ->
     checkExpression src expr
-  | SynExpr.Lambda(args = args; body = body) ->
-    let SynSimplePats.SimplePats(pats = pats) = args
+  | SynExpr.Lambda(args = args
+                   body = body
+                   range = lambdaRange
+                   parsedData = parsedData
+                   trivia = trivia) as t ->
+    let SynSimplePats.SimplePats(pats = pats; range = patRange) = args
     for pat in pats do checkSimplePattern src LowerCamelCase pat
-    checkExpression src body
+    AppConvention.checkLambdaArrowSpacing src patRange body.Range trivia
+    AppConvention.checkLambdaKeywordSpacing src lambdaRange args.Range
+    if Option.isSome parsedData then
+      let pats, expr = parsedData.Value
+      for pat in pats do
+        ParenConvention.checkPat src pat
+        TypeAnnotation.checkFieldWidthByPat src pat
+        TypeAnnotation.checkParamTypeSpacing src pat
+      checkExpression src body
+      checkExpression src expr
+    else
+      checkExpression src body
   | SynExpr.LetOrUse(bindings = bindings; body = body) ->
     checkBindings src LowerCamelCase bindings
     checkExpression src body
@@ -118,11 +130,14 @@ and checkExpression src = function
     checkExpression src doExpr
   | SynExpr.IfThenElse(ifExpr = ifExpr
                        thenExpr = thenExpr
-                       elseExpr = elseExpr) ->
+                       elseExpr = elseExpr
+                       range = range
+                       trivia = trivia) ->
+    NegationSimplificationConvention.check src ifExpr
+    IfThenElseConvention.check src ifExpr thenExpr elseExpr range trivia
     checkExpression src ifExpr
     checkExpression src thenExpr
-    if Option.isSome elseExpr then
-      checkExpression src (Option.get elseExpr)
+    if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
     else ()
   | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
     checkExpression src expr
@@ -144,6 +159,7 @@ and checkExpression src = function
     checkExpression src finallyExpr
   | SynExpr.TryWith(tryExpr = tryExpr; withCases = clauses) ->
     checkExpression src tryExpr
+    TryWithConvention.check src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
     ArrayOrListConvention.check src isArray range expr
@@ -156,6 +172,7 @@ and checkExpression src = function
                 isInfix = isInfix
                 funcExpr = funcExpr
                 argExpr = argExpr) as expr ->
+    NegationSimplificationConvention.check src expr
     match funcExpr, flag, argExpr.IsArrayOrListComputed with
     | _, ExprAtomicFlag.Atomic, true
     | SynExpr.Paren _, _, true
@@ -165,6 +182,7 @@ and checkExpression src = function
       TypeUseConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix flag funcExpr argExpr
+      AppConvention.checkUnaryOperatorSpacing src expr
       checkExpression src funcExpr
       checkExpression src argExpr
   | SynExpr.Sequential(expr1 = expr1; expr2 = expr2) ->
@@ -173,7 +191,8 @@ and checkExpression src = function
   | SynExpr.DotSet(targetExpr = targetExpr; rhsExpr = rhsExpr) ->
     checkExpression src targetExpr
     checkExpression src rhsExpr
-  | SynExpr.DotGet(expr = expr) ->
+  | SynExpr.DotGet(expr, dotm, longDotId, _) ->
+    FunctionCallConvention.checkDotGetSpacing src expr dotm longDotId
     FunctionCallConvention.checkMethodParenSpacing src expr
     checkExpression src expr
   | SynExpr.YieldOrReturn(expr = expr)
@@ -186,13 +205,15 @@ and checkExpression src = function
   | SynExpr.Const _ as expr ->
     ParenConvention.checkExpr src expr
   | SynExpr.TypeApp(expr = expr
+                    lessRange = less
                     typeArgs = typeArgs
-                    typeArgsRange = typeArgsRange) ->
-    TypeUseConvention.check src expr typeArgs typeArgsRange
+                    greaterRange = greater
+                    typeArgsRange = range) ->
+    TypeUseConvention.check src expr typeArgs (Some less) greater range
     checkExpression src expr
   | SynExpr.ObjExpr(bindings = bindings; members = members) ->
     checkBindings src LowerCamelCase bindings
-    checkMemberDefns src members
+    checkMemberDefns src members false
   | SynExpr.ComputationExpr(expr = expr) ->
     checkExpression src expr
   | SynExpr.New(targetType = targetType; expr = expr) ->
@@ -234,6 +255,8 @@ and checkExpression src = function
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _ ->
     () (* no need to check this *)
+  | SynExpr.FromParseError(expr, range) ->
+    failwith $"Compile error: filename: {range.FileName} {expr}"
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
 
@@ -242,7 +265,7 @@ and checkIdOpt src case = function
     IdentifierConvention.check src case true id.idText id.idRange
   | None -> failwith "?"
 
-and checkMemberDefns src members =
+and checkMemberDefns src members isDelegate =
   for memberDefn in members do
     match memberDefn with
     | SynMemberDefn.Member(binding, _) ->
@@ -253,17 +276,28 @@ and checkMemberDefns src members =
     | SynMemberDefn.LetBindings(bindings = bindings) ->
       checkBindings src LowerCamelCase bindings
     | SynMemberDefn.AbstractSlot(slotSig = SynValSig(ident = id
-                                                     synType = synType)) ->
+                                                     synType = synType
+                                                     trivia = trivia)) ->
       let SynIdent(ident = id) = id
+      if isDelegate then
+        ()
+      else
+        TypeAnnotation.checkAbstractSpacing src id synType
+          trivia.LeadingKeyword.Range
       TypeAnnotation.checkAbstractSlot src id synType
-      TypeUseConvention.checkTypeAbbrevWithAnnotation src synType
+      TypeAnnotation.checkTypeAbbrevWithAnnotation src synType
       IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.Interface(members = Some members) ->
-      checkMemberDefns src members
+      ClassMemberConvention.checkMemberOrder src members
+      checkMemberDefns src members isDelegate
     | SynMemberDefn.ValField(SynField(idOpt = idOpt), _) ->
       checkIdOpt src PascalCase idOpt
-    | SynMemberDefn.AutoProperty(ident = id; typeOpt = typ; synExpr = expr) ->
+    | SynMemberDefn.AutoProperty(ident = id
+                                 typeOpt = typ
+                                 synExpr = expr
+                                 trivia = trivia) ->
       TypeAnnotation.checkMember src id typ
+      ClassMemberConvention.checkAutoPropertySpacing src id typ expr trivia
       IdentifierConvention.check src PascalCase true id.idText id.idRange
       checkExpression src expr
     | SynMemberDefn.ImplicitInherit(inheritArgs = inheritArgs) ->
@@ -275,27 +309,33 @@ and checkMemberDefns src members =
       failwith $"{nameof checkMemberDefns} TODO: {memberDefn}"
 
 and checkTypeDefnSimpleRepr src trivia = function
-  | SynTypeDefnSimpleRepr.Union(unionCases = cases) ->
+  | SynTypeDefnSimpleRepr.Union(unionCases = cases; range = range) ->
     TypeAnnotation.checkUnionType src cases
     TypeUseConvention.checkUnionType src cases
     for case in cases do
       let SynUnionCase(ident = SynIdent(ident = id); range = range) = case
       IdentifierConvention.check src PascalCase false id.idText range
-  | SynTypeDefnSimpleRepr.Enum(cases = cases) ->
+  | SynTypeDefnSimpleRepr.Enum(cases = cases) as t ->
     for case in cases do
-      let SynEnumCase(ident = SynIdent(ident = id); range = range) = case
+      let SynEnumCase(ident = SynIdent(ident = id)
+                      valueExpr = valueExpr
+                      range = range
+                      trivia = trivia) = case
+      TypeConstructor.checkEqualSpacing src id.idRange valueExpr.Range
+        (Some trivia.EqualsRange)
+      TypeUseConvention.checkBarAlignment src id.idRange trivia.BarRange
       IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
     TypeAnnotation.checkSynFields src fields
     RecordConvention.checkDefinition src fields range trivia
     for field in fields do
       let SynField(idOpt = idOpt; fieldType = fieldType) = field
-      TypeUseConvention.checkTypeAbbrevWithAnnotation src fieldType
+      TypeAnnotation.checkTypeAbbrevWithAnnotation src fieldType
       checkIdOpt src PascalCase idOpt
   | SynTypeDefnSimpleRepr.Exception repr ->
     checkExceptionDefnRepr src repr
   | SynTypeDefnSimpleRepr.TypeAbbrev(rhsType = rhsType) ->
-    TypeUseConvention.checkTypeAbbrevWithAnnotation src rhsType
+    TypeAnnotation.checkTypeAbbrevWithAnnotation src rhsType
   | SynTypeDefnSimpleRepr.None _ ->
     () (* no need to check this *)
   | repr ->
@@ -306,11 +346,12 @@ and checkExceptionDefnRepr src repr =
   let SynUnionCase(ident = SynIdent(ident = id); range = range) = caseName
   IdentifierConvention.check src PascalCase true id.idText range
 
-and checkTypeDefnRepr src lid repr trivia =
+and checkTypeDefnRepr src repr trivia =
   match repr with
-  | SynTypeDefnRepr.ObjectModel(_, members, _) ->
+  | SynTypeDefnRepr.ObjectModel(kind, members, _) ->
     ClassDefinition.checkIdentifierWithParen src members
-    checkMemberDefns src members
+    ClassMemberConvention.checkMemberOrder src members
+    checkMemberDefns src members kind.IsDelegate
   | SynTypeDefnRepr.Simple(repr, _) ->
     checkTypeDefnSimpleRepr src trivia repr
   | SynTypeDefnRepr.Exception repr ->
@@ -322,16 +363,46 @@ and checkTypeDefn src defn =
                   members = members
                   implicitConstructor = implicitConstructor
                   trivia = trivia) = defn
-  let SynComponentInfo(longId = lid; range = range; attributes = attrs) = info
+  let SynComponentInfo(longId = lid
+                       typeParams = typeParams
+                       range = range
+                       attributes = attrs) = info
   let name = (List.last lid).idText
-  if hasAttr "Measure" attrs then ()
-  else IdentifierConvention.check src PascalCase true name range
-  if implicitConstructor.IsSome then
-    ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
+  if Option.isSome typeParams then
+    ClassDefinition.checkSynTypar src range typeParams.Value
   else
     ()
-  checkTypeDefnRepr src lid repr trivia
-  checkMemberDefns src members
+  ClassDefinition.checkAttributesLineSpacing src attrs trivia
+  if hasAttr "Measure" attrs then ()
+  else IdentifierConvention.check src PascalCase true name range
+  if Option.isSome implicitConstructor then
+    ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
+    match implicitConstructor with
+    | Some(SynMemberDefn.ImplicitCtor(ctorArgs = ctorArgs
+                                      selfIdentifier = selfIdentifier
+                                      trivia = innerTriv))
+      when ctorArgs.IsParen ->
+      ParenConvention.checkPat src ctorArgs
+      if Option.isSome innerTriv.AsKeyword then
+        TypeConstructor.checkAsSpacing src ctorArgs.Range
+          innerTriv.AsKeyword.Value selfIdentifier.Value.idRange
+        TypeConstructor.checkEqualSpacing src selfIdentifier.Value.idRange
+          repr.Range trivia.EqualsRange
+      else
+        TypeConstructor.checkEqualSpacing src ctorArgs.Range repr.Range
+          trivia.EqualsRange
+    | _ ->
+      ()
+  else
+    match info with
+    | SynComponentInfo(typeParams = Some typeParams)
+      when typeParams.IsPostfixList ->
+      TypeConstructor.checkEqualSpacing src typeParams.Range repr.Range
+        trivia.EqualsRange
+    | _ ->
+      TypeConstructor.checkEqualSpacing src range repr.Range trivia.EqualsRange
+  checkTypeDefnRepr src repr trivia
+  checkMemberDefns src members false
 
 and hasAttr attrName attrs =
   attrs
@@ -350,31 +421,94 @@ and checkBinding src case binding =
                  returnInfo = returnInfo
                  trivia = trivia) = binding
   let case = if hasAttr "Literal" attrs then PascalCase else case
+  TypeAnnotation.checkFieldWidthByPat src pat
   checkPattern src case false trivia pat
-  DeclarationConvention.checkEqualSpacing src trivia.EqualsRange
-  TypeUseConvention.checkParamTypeSpacing src pat
+  if Option.isSome trivia.EqualsRange
+    && trivia.LeadingKeyword.IsNew |> not then
+    DeclarationConvention.checkEqualSpacing
+      src pat.Range trivia.EqualsRange.Value body.Range returnInfo
+  else
+    ()
+  DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
+  DeclarationConvention.checkUnnecessaryLineBreak src binding
+  DeclarationConvention.checkComputationExprPlacement src binding
+  TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
   ClassMemberConvention.checkSelfIdentifierUsage src pat body
-  TypeUseConvention.checkExprAnnotation src body
+  TypeAnnotation.checkExprAnnotation src body
   checkExpression src body
 
 and checkBindings src case bindings =
-  for binding in bindings do
-    checkBinding src case binding
+  for binding in bindings do checkBinding src case binding
 
-and checkDeclarations src decls =
+and checkTypeDefnWithContext src context typeDefn =
+  let SynTypeDefn(typeInfo = componentInfo
+                  typeRepr = repr
+                  members = explicitMembers) = typeDefn
+  let SynComponentInfo(typeParams = typeParams
+                       accessibility = typeAccess) = componentInfo
+  typeAccess |> Option.iter (fun _ ->
+    let explicitAccess = getAccessLevel typeAccess
+    if explicitAccess <= context.ModuleAccess then
+      let ctx =
+        { ScopeContext.ModuleAccess = context.ModuleAccess
+          ScopeContext.TypeAccess = None }
+      AccessModifierConvention.checkTypeModule src ctx typeAccess
+    else
+      ())
+  let effectiveTypeAccess =
+    match typeAccess with
+    | Some _ -> getAccessLevel typeAccess
+    | None -> context.ModuleAccess
+  let memberScopeContext =
+    { ScopeContext.ModuleAccess = context.ModuleAccess
+      ScopeContext.TypeAccess = Some effectiveTypeAccess }
+  (match repr with
+   | SynTypeDefnRepr.ObjectModel(_, members, _) ->
+     List.append members explicitMembers
+   | _ ->
+     explicitMembers)
+  |> List.iter (AccessModifierConvention.checkTypeMember src memberScopeContext)
+  checkTypeDefn src typeDefn
+
+and checkDeclarationsWithContext src decls (context: CheckContext) =
   DeclarationConvention.check src decls
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule(moduleInfo = info; decls = decls) ->
-      let SynComponentInfo(longId = lid) = info
+    | SynModuleDecl.NestedModule(moduleInfo = info
+                                 decls = dls
+                                 range = rg
+                                 trivia = trivia) ->
+      let SynComponentInfo(attributes = attrs
+                           longId = lid
+                           accessibility = access) = info
+      if Option.isSome trivia.ModuleKeyword then
+        DeclarationConvention.checkAttributesLineSpacing src attrs
+          trivia.ModuleKeyword.Value
+      else
+        ()
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
-      checkDeclarations src decls
+      match access with
+      | Some _ when getAccessLevel access <= context.ModuleAccess ->
+        { ModuleAccess = context.ModuleAccess
+          TypeAccess = None }
+        |> AccessModifierConvention.checkNestModule src access rg
+      | _ -> ()
+      { ModuleAccess =
+          match access with
+          | Some _ -> getAccessLevel access
+          | None -> context.ModuleAccess }
+      |> checkDeclarationsWithContext src dls
     | SynModuleDecl.Let(_, bindings, range) ->
+      let scopeContext =
+        { ModuleAccess = context.ModuleAccess
+          TypeAccess = None }
+      for binding in bindings do
+        AccessModifierConvention.checkLetBinding src binding scopeContext
       FunctionBodyConvention.checkBindings src range bindings
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
@@ -384,65 +518,141 @@ and checkDeclarations src decls =
         ClassDefinition.checkNestedTypeDefns src range typeDefns
       else
         ()
-      for typeDefn in typeDefns do checkTypeDefn src typeDefn
-    | SynModuleDecl.Exception(SynExceptionDefn(exnRepr = repr), _) ->
-      checkExceptionDefnRepr src repr
+      for typeDefn in typeDefns do
+        checkTypeDefnWithContext src context typeDefn
     | SynModuleDecl.Open _
     | SynModuleDecl.HashDirective _
+    | SynModuleDecl.Exception _
     | SynModuleDecl.Attributes _ ->
       () (* no need to check this *)
     | _ ->
       failwith $"{nameof checkDeclarations} TODO: {decl}"
 
+and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
+  checkDeclarationsWithContext src decls { ModuleAccess = Public }
+
 let checkWithAST src = function
-  | ParsedInput.ImplFile(ParsedImplFileInput(contents=modules)) ->
-    for m in modules do
-      let SynModuleOrNamespace(longId = lid; decls = decls) = m
+  | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules)) ->
+    modules
+    |> List.iter (fun m ->
+      let SynModuleOrNamespace(longId = lid
+                               decls = decls
+                               attribs = attribs
+                               accessibility = access
+                               trivia = trivia) = m
+      match trivia.LeadingKeyword with
+      | SynModuleOrNamespaceLeadingKeyword.Module range ->
+        DeclarationConvention.checkAttributesLineSpacing src attribs range
+      | _ -> ()
       for id in lid do
         IdentifierConvention.check src PascalCase true id.idText id.idRange
-      checkDeclarations src decls
+      { ModuleAccess = getAccessLevel access }
+      |> checkDeclarationsWithContext src decls
+    )
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 
 let ensureNoBOM (bs: byte[]) =
-  if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy then
-    exitWithError "Byte Order Mark (BOM) should be removed from the file."
-  else
-    bs
+  if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy
+  then exitWithError "Byte Order Mark (BOM) should be removed from the file."
+  else bs
 
-let lintFile (linter: ILintable) (path: string) =
-  if not <| File.Exists path then exitWithError $"File '{path}' not found"
-  else printfn $"Linting file: {path}"
-  let bytes = File.ReadAllBytes path |> ensureNoBOM
-  let txt = System.Text.Encoding.UTF8.GetString bytes
-  linter.Lint(path, txt)
-
-let runLinter linter (path: string) =
-  try lintFile linter path
-  with LintException msg ->
-    System.Console.WriteLine msg
-    exit 1
-
-let linterForFs =
+let linterForFsWithContext context =
   { new ILintable with
       member _.Lint(path, txt) =
-        LineConvention.check txt
-        parseFile txt path ||> checkWithAST }
+        setCurrentLintContext context
+        setCurrentFile path
+        let runCheck fn =
+          try fn () with LintException _ when context.IsSome -> ()
+        runCheck (fun () ->
+          LineConvention.check txt
+          parseFile txt path ||> checkWithAST)
+        setCurrentLintContext None }
+
+let linterForFs = linterForFsWithContext None
+
+/// Lints a single file, catching exceptions and returning a `LintOutcome`.
+let tryOutputToBuffer (index: int) (path: string): LintOutcome =
+  try
+    setCurrentFile path
+    let bytes = File.ReadAllBytes path |> ensureNoBOM
+    let txt = System.Text.Encoding.UTF8.GetString bytes
+    let src = SourceText.ofString txt
+    let context =
+      { Errors = []
+        Source = src
+        FilePath = path }
+    linterForFsWithContext(Some context).Lint(path, txt)
+    setCurrentLintContext None
+    { Index = index
+      Path = path
+      Ok = List.isEmpty context.Errors
+      Log = ""
+      Errors = context.Errors }
+  with
+    LintException msg ->
+      { Index = index
+        Path = path
+        Ok = false
+        Log = msg
+        Errors = [] }
+
+/// Runs linting jobs in parallel for all given files
+let runParallelByOrder (paths: string array) =
+  paths
+   |> Array.mapi (fun i p -> async { return tryOutputToBuffer i p })
+  |> Async.Parallel
+  |> Async.RunSynchronously
+  |> Array.sortBy (fun r -> r.Index)
+  |> fun results ->
+    results
+    |> Array.iter (fun result ->
+    if not result.Ok then
+      Console.WriteLine ""
+      Console.WriteLine $"--- File: {result.Path}"
+      Console.WriteLine $"Linting file: {result.Path}"
+      if not (List.isEmpty result.Errors) then
+        reportWarns result.Errors result.Path
+        Console.WriteLine "Linting errors found"
+        Console.WriteLine ""
+      elif not (String.IsNullOrEmpty result.Log) then
+        Console.WriteLine result.Log
+        Console.WriteLine "Linting errors found"
+        Console.WriteLine ""
+      else
+        ()
+    else
+      Console.WriteLine $"Linting file: {result.Path}"
+    )
+    results |> Array.exists (fun r -> not r.Ok)
 
 let linterForProjSln =
   { new ILintable with
-      member _.Lint(_path, txt) =
-        LineConvention.checkWindowsLineEndings txt }
+      member _.Lint(_path, txt) = LineConvention.checkWindowsLineEndings txt }
 
 [<EntryPoint>]
 let main args =
-  if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
+  if args.Length < 1 then
+    exitWithError "Usage: fslint <file|dir>"
   elif File.Exists args[0] then
-    runLinter linterForFs args[0]
-    0
+    setCurrentFile args[0]
+    let outcome = tryOutputToBuffer 0 args[0]
+    if not outcome.Ok then
+      Console.WriteLine $"--- File: {outcome.Path}"
+      Console.Write outcome.Log
+      if outcome.Errors.IsEmpty then ()
+      else reportWarns outcome.Errors outcome.Path
+      1
+    else
+      0
   elif Directory.Exists args[0] then
-    runOnEveryProjectSlnFile args[0] (runLinter linterForProjSln)
-    runOnEveryFsFile args[0] (runLinter linterForFs)
-    System.Console.WriteLine "Linting completed."
-    0
-  else exitWithError $"File or directory '{args[0]}' not found"
+    getProjOrSlnFiles args[0]
+    |> Array.iter (fun p ->
+      setCurrentFile p
+      let bytes = File.ReadAllBytes p |> ensureNoBOM
+      let txt = System.Text.Encoding.UTF8.GetString bytes
+      linterForProjSln.Lint(p, txt)
+    )
+    if getFsFiles args[0] |> runParallelByOrder then 1 else 0
+  else
+    exitWithError $"File or directory '{args[0]}' not found"

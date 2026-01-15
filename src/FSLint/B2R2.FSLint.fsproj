@@ -19,18 +19,27 @@
     <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <GlobalNamespaces>FSharp.Compiler.Syntax; FSharp.Compiler.Text</GlobalNamespaces>
+  </PropertyGroup>
+
   <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Diagnostics.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />
+    <Compile Include="TryWithConvention.fs" />
+    <Compile Include="AccessModifierConvention.fs" />
     <Compile Include="ArgumentAssignmentConvention.fs" />
+    <Compile Include="NegationSimplificationConvention.fs" />
     <Compile Include="TupleConvention.fs" />
     <Compile Include="ParenConvention.fs" />
     <Compile Include="FunctionCallConvention.fs" />
     <Compile Include="TypeCastConvention.fs" />
-    <Compile Include="ClassDefinitionConvention.fs" />
-    <Compile Include="TypeAnnotationConvention.fs" />
     <Compile Include="TypeUseConvention.fs" />
+    <Compile Include="TypeAnnotationConvention.fs" />
+    <Compile Include="ClassDefinitionConvention.fs" />
     <Compile Include="IndexedPropertyConvention.fs" />
     <Compile Include="ArrayOrListConvention.fs" />
     <Compile Include="RecordConvention.fs" />
@@ -40,6 +49,7 @@
     <Compile Include="TypeConstructor.fs" />
     <Compile Include="DeclarationConvention.fs" />
     <Compile Include="FunctionBodyConvention.fs" />
+    <Compile Include="IfThenElseConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

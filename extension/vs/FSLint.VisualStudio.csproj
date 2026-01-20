@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">
+      $(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)
+    </VSToolsPath>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectTypeGuids>{82b43b9b-a64c-4715-b499-d71e9ca2bd60};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <ProjectGuid>{29BC339B-69F5-4291-BB11-4676A18484FB}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>FSLint.VisualStudio</RootNamespace>
+    <AssemblyName>FSLint.VisualStudio</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <StartAction>Program</StartAction>
+    <StartProgram Condition="'$(DevEnvDir)' != ''">$(DevEnvDir)devenv.exe</StartProgram>
+    <StartArguments>/rootsuffix Exp</StartArguments>
+    <RuntimeIdentifiers>win</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Package.cs" />
+    <Compile Include="LanguageClient.cs" />
+    <Compile Include="Configuration.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <LanguageServerSource>..\..\src\FSLint.LanguageServer\bin\$(Configuration)\net10.0</LanguageServerSource>
+  </PropertyGroup>
+
+  <Target Name="IncludeLanguageServerInVSIX" BeforeTargets="GetVsixSourceItems">
+    <ItemGroup>
+      <VSIXSourceItem Include="$(LanguageServerSource)\B2R2.FSLint.LanguageServer.exe">
+        <VSIXSubPath>
+        </VSIXSubPath>
+      </VSIXSourceItem>
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ServerDlls Include="$(LanguageServerSource)\*.dll" />
+      <VSIXSourceItem Include="@(_ServerDlls)">
+        <VSIXSubPath>
+        </VSIXSubPath>
+      </VSIXSourceItem>
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ServerJson Include="$(LanguageServerSource)\*.json" Exclude="$(LanguageServerSource)\*.deps.json" />
+      <VSIXSourceItem Include="@(_ServerJson)" Condition="Exists('%(Identity)')">
+        <VSIXSubPath>
+        </VSIXSubPath>
+      </VSIXSourceItem>
+    </ItemGroup>
+
+    <Message Importance="high" Text="Including Language Server files in VSIX:" />
+    <Message Importance="high" Text="  Source: $(LanguageServerSource)" />
+    <Message Importance="high" Text="  DLLs: @(_ServerDlls-&gt;Count()) files" />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System" />
+    <Reference Include="EnvDTE" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" NoWarn="NU1604" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2120" NoWarn="NU1604" />
+    <PackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.0.487" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.0.64" />
+    <PackageReference Include="StreamJsonRpc" Version="2.10.44" />
+    <PackageReference Include="Microsoft.VisualStudio.Text.UI" Version="17.14.249" />
+    <PackageReference Include="Microsoft.VisualStudio.CoreUtility" Version="17.14.275" />
+    <PackageReference Include="Microsoft.VisualStudio.Language" Version="17.14.249" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="b2r2-240x240.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+
+    <Content Include="LICENSE.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
+
+  <Target Name="CheckLanguageServer" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <LanguageServerExe>..\..\src\FSLint.LanguageServer\bin\$(Configuration)\net10.0\B2R2.FSLint.LanguageServer.exe</LanguageServerExe>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Checking Language Server: $(LanguageServerExe)" />
+    <Error Condition="!Exists('$(LanguageServerExe)')" Text="Language Server not found at: $(LanguageServerExe)%0A%0APlease build FSLint.LanguageServer first:%0A  cd ..\..\src\FSLint.LanguageServer%0A  dotnet build -c $(Configuration)%0A%0AOr use the build script:%0A  .\build.ps1 $(Configuration)" />
+    <Message Importance="high" Text="âœ“ Language Server found at: $(LanguageServerExe)" />
+  </Target>
+</Project>

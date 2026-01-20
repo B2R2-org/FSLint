@@ -3,7 +3,7 @@ set -e
 
 echo "Building FSLint Language Server..."
 dotnet publish -c Release \
-  ../src/FSLint.LanguageServer/B2R2.FSLint.LanguageServer.fsproj \
+  ../../src/FSLint.LanguageServer/B2R2.FSLint.LanguageServer.fsproj \
   -o bin
 
 echo ""

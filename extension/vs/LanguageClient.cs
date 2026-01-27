@@ -123,7 +123,7 @@ namespace FSLint.VisualStudio
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[FSLint] Failed to get workspace path: {ex.Message}");
+                OutputWindowHelper.WriteLine($"[FSLint] Failed to get workspace path: {ex.Message}");
             }
 
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -157,7 +157,7 @@ namespace FSLint.VisualStudio
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(token);
                 workspaceRoot = GetWorkspaceRootPath();
 
-                Console.WriteLine($"[FSLint] Starting server for workspace: {workspaceRoot}");
+                OutputWindowHelper.WriteLine($"[FSLint] Starting server for workspace: {workspaceRoot}");
 
                 ProcessStartInfo info = new ProcessStartInfo
                 {
@@ -177,14 +177,14 @@ namespace FSLint.VisualStudio
                 {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        Console.WriteLine("[FSLint Server] " + e.Data);
+                        OutputWindowHelper.WriteLine(e.Data);
                     }
                 };
 
                 if (!serverProcess.Start())
                 {
                     string error = "Failed to start FSLint Language Server process";
-                    Console.WriteLine(error);
+                    OutputWindowHelper.WriteLine(error);
                     throw new InvalidOperationException(error);
                 }
 
@@ -197,7 +197,7 @@ namespace FSLint.VisualStudio
                     try
                     {
                         serverProcess.WaitForExit();
-                        Console.WriteLine($"[FSLint] Server process exited with code: {serverProcess.ExitCode}");
+                        OutputWindowHelper.WriteLine($"[FSLint] Server process exited with code: {serverProcess.ExitCode}");
 
                         if (serverProcess.ExitCode != 0 && StopAsync != null)
                         {
@@ -206,20 +206,32 @@ namespace FSLint.VisualStudio
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("[FSLint] Error monitoring process exit: " + ex.ToString());
+                        OutputWindowHelper.WriteLine("[FSLint] Error monitoring process exit: " + ex.ToString());
                     }
                 });
 
+                var outputStream = new LoggingStream(
+                    serverProcess.StandardOutput.BaseStream, 
+                    "LSP Server -> Client");
+                var inputStream = new LoggingStream(
+                    serverProcess.StandardInput.BaseStream, 
+                    "LSP Client -> Server");
+        
                 Connection connection = new Connection(
-                    serverProcess.StandardOutput.BaseStream,
-                    serverProcess.StandardInput.BaseStream
+                    outputStream,  // 래핑된 stdout
+                    inputStream    // 래핑된 stdin
                 );
+
+                // Connection connection = new Connection(
+                //     serverProcess.StandardOutput.BaseStream,
+                //     serverProcess.StandardInput.BaseStream
+                // );
 
                 return connection;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[FSLint] ActivateAsync FAILED: " + ex.ToString());
+                OutputWindowHelper.WriteLine("[FSLint] ActivateAsync FAILED: " + ex.ToString());
 
                 if (StopAsync != null)
                 {
@@ -237,7 +249,7 @@ namespace FSLint.VisualStudio
         {
             try
             {
-                Console.WriteLine("[FSLint] Language client loaded");
+                OutputWindowHelper.WriteLine("[FSLint] Language client loaded");
 
                 if (StartAsync != null)
                 {
@@ -245,12 +257,12 @@ namespace FSLint.VisualStudio
                 }
                 else
                 {
-                    Console.WriteLine("[FSLint] WARNING: StartAsync event is null");
+                    OutputWindowHelper.WriteLine("[FSLint] WARNING: StartAsync event is null");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[FSLint] OnLoadedAsync FAILED: " + ex.ToString());
+                OutputWindowHelper.WriteLine("[FSLint] OnLoadedAsync FAILED: " + ex.ToString());
                 throw;
             }
         }
@@ -260,7 +272,7 @@ namespace FSLint.VisualStudio
         /// </summary>
         public Task OnServerInitializedAsync()
         {
-            Console.WriteLine("[FSLint] Language server initialized successfully");
+            OutputWindowHelper.WriteLine("[FSLint] Language server initialized successfully");
             return Task.CompletedTask;
         }
 
@@ -274,7 +286,7 @@ namespace FSLint.VisualStudio
 
             if (initializationState?.InitializationException != null)
             {
-                Console.WriteLine("[FSLint] Initialization Exception: " +
+                OutputWindowHelper.WriteLine("[FSLint] Initialization Exception: " +
                                   initializationState.InitializationException.ToString());
             }
 

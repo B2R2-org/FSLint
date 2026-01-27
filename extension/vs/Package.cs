@@ -32,6 +32,8 @@ namespace FSLint.VisualStudio
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+            OutputWindowHelper.Initialize(this);
+            OutputWindowHelper.WriteLine("FSLint package initialized");
         }
     }
 }

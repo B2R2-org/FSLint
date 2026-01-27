@@ -5,8 +5,8 @@
         <DisplayName>FSLint</DisplayName>
         <Description xml:space="preserve">High-performance F# linter for CI/CD with real-time feedback.</Description>
         <MoreInfo>https://github.com/B2R2-org/FSLint</MoreInfo>
-        <License>Metadata\LICENSE.txt</License>
-        <Icon>Metadata\b2r2-240x240.png</Icon>
+        <License>LICENSE.txt</License>
+        <Icon>b2r2-240x240.png</Icon>
         <PreviewImage>b2r2-240x240.png</PreviewImage>
         <Preview>true</Preview>
     </Metadata>

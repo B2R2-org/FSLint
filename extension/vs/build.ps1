@@ -40,6 +40,34 @@ try {
 
     Write-Host "Language Server built successfully" -ForegroundColor Green
     Write-Host "    Location: $ServerExe" -ForegroundColor Gray
+
+    # VS Extension으로 복사
+    $ExtensionBinPath = Join-Path $PSScriptRoot "bin\$Configuration"
+    
+    Write-Host "  Copying Language Server to VS Extension..." -ForegroundColor Gray
+    
+    # bin 폴더가 없으면 생성
+    if (-not (Test-Path $ExtensionBinPath)) {
+        New-Item -ItemType Directory -Path $ExtensionBinPath -Force | Out-Null
+    }
+    
+    # Language Server 실행 파일 및 DLL 복사
+    $ServerBinPath = "bin\$Configuration\net10.0"
+    
+    Copy-Item "$ServerBinPath\B2R2.FSLint.LanguageServer.exe" -Destination $ExtensionBinPath -Force
+    Copy-Item "$ServerBinPath\*.dll" -Destination $ExtensionBinPath -Force
+    Copy-Item "$ServerBinPath\*.json" -Destination $ExtensionBinPath -Force -Exclude "*.deps.json"
+    
+    Write-Host "Language Server files copied to: $ExtensionBinPath" -ForegroundColor Green
+    
+    # 복사된 파일 확인
+    $CopiedExe = Join-Path $ExtensionBinPath "B2R2.FSLint.LanguageServer.exe"
+    if (Test-Path $CopiedExe) {
+        Write-Host "    ✓ B2R2.FSLint.LanguageServer.exe" -ForegroundColor Gray
+    } else {
+        throw "Failed to copy Language Server executable"
+    }
+
 } finally {
     Pop-Location
 }
@@ -47,7 +75,7 @@ try {
 Write-Host ""
 
 Write-Host "[2/4] Restoring NuGet packages..." -ForegroundColor Green
-dotnet restore FSLint_VisualStudio.sln
+dotnet restore FSLint.VisualStudio.slnx
 if ($LASTEXITCODE -ne 0) {
     Write-Host "WARNING: NuGet restore failed, continuing anyway..." -ForegroundColor Yellow
 }

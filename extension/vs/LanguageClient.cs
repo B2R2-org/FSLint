@@ -21,6 +21,7 @@ namespace FSLint.VisualStudio
     [Export(typeof(ILanguageClient))]
     public class LanguageClient : ILanguageClient
     {
+
         private Process serverProcess;
 
         [Import]
@@ -70,7 +71,7 @@ namespace FSLint.VisualStudio
         {
             get
             {
-                return null;
+                yield return "**/*.fs";
             }
         }
 
@@ -211,21 +212,16 @@ namespace FSLint.VisualStudio
                 });
 
                 var outputStream = new LoggingStream(
-                    serverProcess.StandardOutput.BaseStream, 
+                    serverProcess.StandardOutput.BaseStream,
                     "LSP Server -> Client");
                 var inputStream = new LoggingStream(
-                    serverProcess.StandardInput.BaseStream, 
+                    serverProcess.StandardInput.BaseStream,
                     "LSP Client -> Server");
-        
-                Connection connection = new Connection(
-                    outputStream,  // 래핑된 stdout
-                    inputStream    // 래핑된 stdin
-                );
 
-                // Connection connection = new Connection(
-                //     serverProcess.StandardOutput.BaseStream,
-                //     serverProcess.StandardInput.BaseStream
-                // );
+                Connection connection = new Connection(
+                    outputStream,
+                    inputStream
+                );
 
                 return connection;
             }
@@ -293,11 +289,11 @@ namespace FSLint.VisualStudio
             var failureContext = new InitializationFailureContext
             {
                 FailureMessage = $"FSLint Language Server failed to initialize.\n\n" +
-                               $"Status: {statusMessage}\n\n" +
-                               $"Please ensure:\n" +
-                               $"1. The FSLint Language Server is properly installed\n" +
-                               $"2. You have an F# solution or project open\n" +
-                               $"3. Check the Output window (View -> Output -> FSLint) for details"
+                                 $"Status: {statusMessage}\n\n" +
+                                 $"Please ensure:\n" +
+                                 $"1. The FSLint Language Server is properly installed\n" +
+                                 $"2. You have an F# solution or project open\n" +
+                                 $"3. Check the Output window (View -> Output -> FSLint) for details"
             };
 
             if (StopAsync != null)

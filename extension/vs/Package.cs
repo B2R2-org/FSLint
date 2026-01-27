@@ -16,6 +16,8 @@ namespace FSLint.VisualStudio
     [Guid(PackageGuidString)]
     [ProvideAutoLoad(UIContextGuids.SolutionHasMultipleProjects, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(UIContextGuids.SolutionHasSingleProject, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideAutoLoad(UIContextGuids.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideAutoLoad(UIContextGuids.CodeWindow, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class Package : AsyncPackage
     {
         /// <summary>
@@ -32,8 +34,37 @@ namespace FSLint.VisualStudio
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+
             OutputWindowHelper.Initialize(this);
-            OutputWindowHelper.WriteLine("FSLint package initialized");
+            OutputWindowHelper.WriteLine("==========================================");
+            OutputWindowHelper.WriteLine("FSLint Extension Loaded");
+            OutputWindowHelper.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            OutputWindowHelper.WriteLine("==========================================");
+            OutputWindowHelper.WriteLine("");
+
+            try
+            {
+                var dte = await GetServiceAsync(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+                if (dte?.Solution != null)
+                {
+                    if (!string.IsNullOrEmpty(dte.Solution.FullName))
+                    {
+                        OutputWindowHelper.WriteLine($"Solution: {dte.Solution.FullName}");
+                    }
+                    else
+                    {
+                        OutputWindowHelper.WriteLine("No solution currently loaded");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                OutputWindowHelper.WriteLine($"Error getting solution info: {ex.Message}");
+            }
+
+            OutputWindowHelper.WriteLine("");
+            OutputWindowHelper.WriteLine("Waiting for F# files to open or Language Server to start...");
+            OutputWindowHelper.WriteLine("==========================================");
         }
     }
 }

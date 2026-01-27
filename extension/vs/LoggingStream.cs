@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace FSLint.VisualStudio
 {
@@ -37,58 +38,81 @@ namespace FSLint.VisualStudio
 
         private void LogData(byte[] data, int offset, int count, string operation)
         {
-            try
+          try
+          {
+            string text = Encoding.UTF8.GetString(data, offset, count);
+            buffer.Append(text);
+
+            string bufferedText = buffer.ToString();
+            int headerEnd = bufferedText.IndexOf("\r\n\r\n");
+
+            while (headerEnd >= 0)
             {
-                string text = Encoding.UTF8.GetString(data, offset, count);
-                buffer.Append(text);
+              string headers = bufferedText.Substring(0, headerEnd);
 
-                string bufferedText = buffer.ToString();
-                int headerEnd = bufferedText.IndexOf("\r\n\r\n");
-
-                while (headerEnd >= 0)
+              int contentLength = 0;
+              foreach (string line in headers.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries))
+              {
+                if (line.StartsWith("Content-Length: "))
                 {
-                    string headers = bufferedText.Substring(0, headerEnd);
-
-                    int contentLength = 0;
-                    foreach (string line in headers.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries))
-                    {
-                        if (line.StartsWith("Content-Length: "))
-                        {
-                            int.TryParse(line.Substring(16), out contentLength);
-                            break;
-                        }
-                    }
-
-                    int messageStart = headerEnd + 4;
-                    if (bufferedText.Length >= messageStart + contentLength)
-                    {
-                        string message = bufferedText.Substring(messageStart, contentLength);
-
-                        OutputWindowHelper.WriteLine($"[{direction}] {operation}:");
-                        OutputWindowHelper.WriteLine($"Headers: {headers.Replace("\r\n", " | ")}");
-
-                        OutputWindowHelper.WriteLine($"Content: {message}");
-                        OutputWindowHelper.WriteLine("---");
-
-                        bufferedText = bufferedText.Substring(messageStart + contentLength);
-                        buffer.Clear();
-                        buffer.Append(bufferedText);
-
-                        headerEnd = bufferedText.IndexOf("\r\n\r\n");
-                    }
-                    else
-                    {
-                        break;
-                    }
+                  int.TryParse(line.Substring(16), out contentLength);
+                  break;
                 }
+              }
+
+              int messageStart = headerEnd + 4;
+              if (bufferedText.Length >= messageStart + contentLength)
+              {
+                string message = bufferedText.Substring(messageStart, contentLength);
+
+                if (direction == "LSP Server -> Client" && operation == "READ")
+                {
+                  ParseAndStoreDiagnostics(message);
+                }
+
+                bufferedText = bufferedText.Substring(messageStart + contentLength);
+                buffer.Clear();
+                buffer.Append(bufferedText);
+
+                headerEnd = bufferedText.IndexOf("\r\n\r\n");
+              }
+              else
+              {
+                break;
+              }
             }
-            catch (Exception ex)
-            {
-                OutputWindowHelper.WriteLine($"[{direction}] Logging error: {ex.Message}");
-            }
+          }
+          catch (Exception ex)
+          {
+            OutputWindowHelper.WriteLine($"[{direction}] Logging error: {ex.Message}");
+          }
         }
 
-        public override bool CanRead => innerStream.CanRead;
+        private void ParseAndStoreDiagnostics(string jsonMessage)
+        {
+          try
+          {
+            var json = JObject.Parse(jsonMessage);
+            var method = json["method"]?.Value<string>();
+
+            if (method == "textDocument/publishDiagnostics")
+            {
+              var uri = json["params"]?["uri"]?.Value<string>();
+              var diagnostics = json["params"]?["diagnostics"] as JArray;
+
+              if (!string.IsNullOrEmpty(uri))
+              {
+                DiagnosticStore.UpdateDiagnostics(uri, diagnostics);
+              }
+            }
+          }
+          catch (Exception ex)
+          {
+            OutputWindowHelper.WriteLine($"[DiagnosticStore] Failed to parse diagnostics: {ex.Message}");
+          }
+        }
+
+    public override bool CanRead => innerStream.CanRead;
         public override bool CanSeek => innerStream.CanSeek;
         public override bool CanWrite => innerStream.CanWrite;
         public override long Length => innerStream.Length;

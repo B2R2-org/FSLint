@@ -6,8 +6,19 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 $Configuration = "Release"
-if ($args.Length -gt 0) {
-    $Configuration = $args[0]
+$Clean = $false
+$Install = $false
+
+foreach ($arg in $args) {
+    if ($arg -eq "--clean") {
+        $Clean = $true
+    }
+    elseif ($arg -eq "--install") {
+        $Install = $true
+    }
+    elseif ($arg -eq "Debug" -or $arg -eq "Release") {
+        $Configuration = $arg
+    }
 }
 
 Write-Host "Build Configuration: $Configuration" -ForegroundColor Yellow
@@ -41,17 +52,14 @@ try {
     Write-Host "Language Server built successfully" -ForegroundColor Green
     Write-Host "    Location: $ServerExe" -ForegroundColor Gray
 
-    # VS Extension으로 복사
     $ExtensionBinPath = Join-Path $PSScriptRoot "bin\$Configuration"
     
     Write-Host "  Copying Language Server to VS Extension..." -ForegroundColor Gray
     
-    # bin 폴더가 없으면 생성
     if (-not (Test-Path $ExtensionBinPath)) {
         New-Item -ItemType Directory -Path $ExtensionBinPath -Force | Out-Null
     }
     
-    # Language Server 실행 파일 및 DLL 복사
     $ServerBinPath = "bin\$Configuration\net10.0"
     
     Copy-Item "$ServerBinPath\B2R2.FSLint.LanguageServer.exe" -Destination $ExtensionBinPath -Force
@@ -60,7 +68,6 @@ try {
     
     Write-Host "Language Server files copied to: $ExtensionBinPath" -ForegroundColor Green
     
-    # 복사된 파일 확인
     $CopiedExe = Join-Path $ExtensionBinPath "B2R2.FSLint.LanguageServer.exe"
     if (Test-Path $CopiedExe) {
         Write-Host "    ✓ B2R2.FSLint.LanguageServer.exe" -ForegroundColor Gray
@@ -82,7 +89,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "NuGet packages restored" -ForegroundColor Green
 Write-Host ""
 
-if ($args -contains "--clean") {
+if ($Clean) {
     Write-Host "[3/4] Cleaning previous build..." -ForegroundColor Green
     msbuild /t:Clean /p:Configuration=$Configuration /v:minimal
     Write-Host "Clean complete" -ForegroundColor Green
@@ -156,8 +163,9 @@ Write-Host "  1. Install: .\$VsixPath" -ForegroundColor White
 Write-Host "  2. Restart Visual Studio" -ForegroundColor White
 Write-Host "  3. Open an F# file" -ForegroundColor White
 Write-Host ""
-if ($args -contains "--install") {
-    Write-Host "Installing extension..." -ForegroundColor Green
+
+if ($Install) {
+    Write-Host "Installing VSIX..." -ForegroundColor Green
     Start-Process $VsixPath -Wait
-    Write-Host "Installation complete" -ForegroundColor Green
+    Write-Host "VSIX installation complete" -ForegroundColor Green
 }

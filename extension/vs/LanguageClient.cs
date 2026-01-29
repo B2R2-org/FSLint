@@ -1,3 +1,10 @@
+using Microsoft.VisualStudio.LanguageServer.Client;
+using Microsoft.VisualStudio.LanguageServer.Protocol;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
+using Microsoft.VisualStudio.Utilities;
+using Newtonsoft.Json.Linq;
+using StreamJsonRpc;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
@@ -6,13 +13,10 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Task = System.Threading.Tasks.Task;
-using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Threading;
-using Microsoft.VisualStudio.Utilities;
-using Microsoft.VisualStudio.LanguageServer.Client;
 
 namespace FSLint.VisualStudio
 {
+
     /// <summary>
     /// FSLint Language Server Client for Visual Studio
     /// Implements ILanguageClient to provide LSP-based F# linting
@@ -23,6 +27,9 @@ namespace FSLint.VisualStudio
     {
 
         private Process serverProcess;
+        private static bool hasScannedWorkspace = false;
+        private static readonly object scanLock = new object();
+        private static string lastWorkspaceRoot = null;
 
         [Import]
         internal SVsServiceProvider ServiceProvider { get; set; }
@@ -106,16 +113,22 @@ namespace FSLint.VisualStudio
                 ThreadHelper.ThrowIfNotOnUIThread();
 
                 var dte = ServiceProvider.GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
-                if (dte?.Solution != null && !string.IsNullOrEmpty(dte.Solution.FullName))
+
+                if (dte == null)
+                {
+                    return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                }
+
+                if (dte.Solution != null && !string.IsNullOrEmpty(dte.Solution.FullName))
                 {
                     return Path.GetDirectoryName(dte.Solution.FullName);
                 }
 
-                if (dte?.Solution?.Projects != null)
+                if (dte.Solution?.Projects != null)
                 {
                     foreach (EnvDTE.Project project in dte.Solution.Projects)
                     {
-                        if (!string.IsNullOrEmpty(project.FullName))
+                        if (project != null && !string.IsNullOrEmpty(project.FullName))
                         {
                             return Path.GetDirectoryName(project.FullName);
                         }
@@ -158,6 +171,15 @@ namespace FSLint.VisualStudio
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(token);
                 workspaceRoot = GetWorkspaceRootPath();
 
+                if (lastWorkspaceRoot != workspaceRoot)
+                {
+                    lock (scanLock)
+                    {
+                        hasScannedWorkspace = false;
+                    }
+                    lastWorkspaceRoot = workspaceRoot;
+                    DiagnosticStore.Clear();
+                }
                 OutputWindowHelper.WriteLine($"[FSLint] Starting server for workspace: {workspaceRoot}");
 
                 ProcessStartInfo info = new ProcessStartInfo
@@ -189,10 +211,8 @@ namespace FSLint.VisualStudio
                     throw new InvalidOperationException(error);
                 }
 
-                // Begin reading stderr asynchronously
                 serverProcess.BeginErrorReadLine();
 
-                // Monitor process exit
                 _ = Task.Run(() =>
                 {
                     try
@@ -268,7 +288,14 @@ namespace FSLint.VisualStudio
         /// </summary>
         public Task OnServerInitializedAsync()
         {
-            OutputWindowHelper.WriteLine("[FSLint] Language server initialized successfully");
+            lock (scanLock)
+            {
+                if (!hasScannedWorkspace)
+                {
+                    hasScannedWorkspace = true;
+                    OutputWindowHelper.WriteLine("[FSLint] Language server initialized - workspace scan started");
+                }
+            }
             return Task.CompletedTask;
         }
 
@@ -303,5 +330,5 @@ namespace FSLint.VisualStudio
 
             return Task.FromResult(failureContext);
         }
-    }
+  }
 }

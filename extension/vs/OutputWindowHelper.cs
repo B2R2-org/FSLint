@@ -20,8 +20,7 @@ namespace FSLint.VisualStudio
             {
                 _joinableTaskFactory = ThreadHelper.JoinableTaskFactory;
 
-                var outputWindow = serviceProvider.GetService(typeof(SVsOutputWindow)) as IVsOutputWindow;
-                if (outputWindow == null) return;
+                if (!(serviceProvider.GetService(typeof(SVsOutputWindow)) is IVsOutputWindow outputWindow)) return;
 
                 Guid guid = PaneGuid;
                 outputWindow.CreatePane(ref guid, "FSLint", 1, 1);
@@ -39,43 +38,45 @@ namespace FSLint.VisualStudio
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD010:Invoke single-threaded types on Main thread", Justification = "Method internally switches to main thread")]
         public static void WriteLine(string message)
         {
             if (_joinableTaskFactory == null || _outputPane == null)
             {
-                Console.WriteLine($"[FSLint] {message}");
+                System.Diagnostics.Debug.WriteLine($"[FSLint] {message}");
                 return;
             }
 
-            if (!ThreadHelper.CheckAccess())
+            _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                _joinableTaskFactory.Run(async () =>
+                try
                 {
                     await _joinableTaskFactory.SwitchToMainThreadAsync();
                     WriteLineInternal(message);
-                });
-            }
-            else
-            {
-                WriteLineInternal(message);
-            }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[OutputWindowHelper] Error: {ex.Message}");
+                }
+            });
         }
 
         private static void WriteLineInternal(string message)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+#pragma warning disable VSTHRD010
                 if (_outputPane != null)
                 {
                     string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
                     _outputPane.OutputStringThreadSafe($"[{timestamp}] {message}\r\n");
                 }
+#pragma warning restore VSTHRD010
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[OutputWindowHelper] WriteLineInternal error: {ex.Message}");
             }
-            Console.WriteLine($"[FSLint] {message}");
         }
     }
 }

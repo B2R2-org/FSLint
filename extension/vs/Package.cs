@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Task = System.Threading.Tasks.Task;
@@ -8,63 +7,79 @@ using Microsoft.VisualStudio.Shell.Interop;
 
 namespace FSLint.VisualStudio
 {
-    /// <summary>
-    /// FSLint Visual Studio Extension Package
-    /// This package provides LSP-based F# linting capabilities
-    /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
-    [ProvideAutoLoad(UIContextGuids.SolutionHasMultipleProjects, PackageAutoLoadFlags.BackgroundLoad)]
-    [ProvideAutoLoad(UIContextGuids.SolutionHasSingleProject, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideAutoLoad(UIContextGuids.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(UIContextGuids.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
-    [ProvideAutoLoad(UIContextGuids.CodeWindow, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class Package : AsyncPackage
     {
-        /// <summary>
-        /// FSLintVisualStudioPackage GUID string.
-        /// </summary>
         public const string PackageGuidString = "9cbe68c1-132a-49cb-80fd-399060bd283c";
+        private static string currentWorkspace = null;
 
-        /// <summary>
-        /// Initialization of the package; this method is called right after the package is sited.
-        /// </summary>
-        /// <param name="cancellationToken">A cancellation token to monitor for initialization cancellation</param>
-        /// <param name="progress">A provider for progress updates</param>
-        /// <returns>A task representing the async work of package initialization</returns>
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
             OutputWindowHelper.Initialize(this);
-            OutputWindowHelper.WriteLine("==========================================");
-            OutputWindowHelper.WriteLine("FSLint Extension Loaded");
-            OutputWindowHelper.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            OutputWindowHelper.WriteLine("==========================================");
-            OutputWindowHelper.WriteLine("");
 
-            try
+            var dte = await GetServiceAsync(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+            string newWorkspace = GetWorkspacePath(dte);
+
+            if (currentWorkspace != newWorkspace)
             {
-                var dte = await GetServiceAsync(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
-                if (dte?.Solution != null)
+                OutputWindowHelper.WriteLine("==========================================");
+                OutputWindowHelper.WriteLine("FSLint Extension Loaded");
+                OutputWindowHelper.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                if (!string.IsNullOrEmpty(currentWorkspace))
                 {
-                    if (!string.IsNullOrEmpty(dte.Solution.FullName))
+                    OutputWindowHelper.WriteLine($"Workspace changed from: {currentWorkspace}");
+                    OutputWindowHelper.WriteLine($"                    to: {newWorkspace}");
+                    OutputWindowHelper.WriteLine("Clearing previous diagnostics...");
+                    DiagnosticStore.Clear();
+                    OutputWindowHelper.WriteLine("Language Server will restart for new workspace");
+                }
+
+                currentWorkspace = newWorkspace;
+
+                if (!string.IsNullOrEmpty(newWorkspace))
+                {
+                    OutputWindowHelper.WriteLine($"Workspace: {newWorkspace}");
+                }
+                else
+                {
+                    OutputWindowHelper.WriteLine("No workspace currently loaded");
+                }
+
+                OutputWindowHelper.WriteLine("Waiting for F# files to open...");
+                OutputWindowHelper.WriteLine("==========================================");
+            }
+        }
+
+        private string GetWorkspacePath(EnvDTE.DTE dte)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (dte?.Solution != null)
+            {
+                if (!string.IsNullOrEmpty(dte.Solution.FullName))
+                {
+                    return System.IO.Path.GetDirectoryName(dte.Solution.FullName);
+                }
+
+                if (dte.Solution.Projects != null)
+                {
+                    foreach (EnvDTE.Project project in dte.Solution.Projects)
                     {
-                        OutputWindowHelper.WriteLine($"Solution: {dte.Solution.FullName}");
-                    }
-                    else
-                    {
-                        OutputWindowHelper.WriteLine("No solution currently loaded");
+                        if (!string.IsNullOrEmpty(project.FullName))
+                        {
+                            return System.IO.Path.GetDirectoryName(project.FullName);
+                        }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                OutputWindowHelper.WriteLine($"Error getting solution info: {ex.Message}");
-            }
 
-            OutputWindowHelper.WriteLine("");
-            OutputWindowHelper.WriteLine("Waiting for F# files to open or Language Server to start...");
-            OutputWindowHelper.WriteLine("==========================================");
+            return null;
         }
     }
 }

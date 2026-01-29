@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="FSLint.VisualStudio.b8a51cf7-fe48-4611-a60c-51ee40360faa" Version="1.0" Language="en-US" Publisher="Company" />
+        <Identity Id="FSLint.VisualStudio.b8a51cf7-fe48-4611-a60c-51ee40360faa" Version="1.0" Language="ko-KR" Publisher="B2R2" />
         <DisplayName>FSLint</DisplayName>
         <Description xml:space="preserve">High-performance F# linter for CI/CD with real-time feedback.</Description>
         <MoreInfo>https://github.com/B2R2-org/FSLint</MoreInfo>
         <License>LICENSE.txt</License>
         <Icon>b2r2-240x240.png</Icon>
         <PreviewImage>b2r2-240x240.png</PreviewImage>
-        <Preview>true</Preview>
+        <Tags>F#, FSharp, Linter, Code Quality, CI/CD, Static Analysis</Tags>
     </Metadata>
     <Installation>
         <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">

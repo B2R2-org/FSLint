@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
@@ -52,7 +53,6 @@ namespace FSLint.VisualStudio
                 diagnosticsByUri[uri] = diagList;
             }
 
-            // Notify classifiers that diagnostics changed
             DiagnosticsChanged?.Invoke(null, uri);
         }
 
@@ -62,7 +62,7 @@ namespace FSLint.VisualStudio
             {
                 if (diagnosticsByUri.TryGetValue(uri, out var diags))
                 {
-                    return diags.ToList(); // Return copy
+                    return diags.ToList();
                 }
                 return new List<DiagnosticInfo>();
             }
@@ -74,6 +74,8 @@ namespace FSLint.VisualStudio
             {
                 diagnosticsByUri.Clear();
             }
+
+            DiagnosticsChanged?.Invoke(null, string.Empty);
         }
     }
 

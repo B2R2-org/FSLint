@@ -17,13 +17,11 @@ namespace FSLint.VisualStudio
             this.errorType = registry.GetClassificationType(FSLintClassificationTypes.Error);
             this.buffer = buffer;
 
-            // Get document URI
             if (buffer.Properties.TryGetProperty(typeof(ITextDocument), out ITextDocument document))
             {
                 documentUri = new Uri(document.FilePath).AbsoluteUri;
             }
 
-            // Subscribe to diagnostic changes
             DiagnosticStore.DiagnosticsChanged += OnDiagnosticsChanged;
         }
 
@@ -31,7 +29,6 @@ namespace FSLint.VisualStudio
         {
             if (uri == documentUri)
             {
-                // Trigger reclassification of entire document
                 ClassificationChanged?.Invoke(this,
                     new ClassificationChangedEventArgs(
                         new SnapshotSpan(buffer.CurrentSnapshot, 0, buffer.CurrentSnapshot.Length)));
@@ -57,7 +54,6 @@ namespace FSLint.VisualStudio
             {
                 try
                 {
-                    // Convert LSP line/character to VS snapshot position
                     var snapshot = span.Snapshot;
 
                     if (diag.StartLine >= snapshot.LineCount || diag.EndLine >= snapshot.LineCount)
@@ -69,13 +65,11 @@ namespace FSLint.VisualStudio
                     int startPos = startLine.Start.Position + diag.StartCharacter;
                     int endPos = endLine.Start.Position + diag.EndCharacter;
 
-                    // Ensure positions are valid
                     if (startPos < 0 || endPos > snapshot.Length || startPos >= endPos)
                         continue;
 
                     var diagSpan = new SnapshotSpan(snapshot, startPos, endPos - startPos);
 
-                    // Only add if it intersects with requested span
                     if (diagSpan.IntersectsWith(span))
                     {
                         result.Add(new ClassificationSpan(diagSpan, errorType));

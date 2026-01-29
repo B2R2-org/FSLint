@@ -50,7 +50,7 @@ let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
       |> (src: ISourceText).GetSubTextFromRange
       |> fun thenToEndStr ->
         if thenToEndStr.Contains "else " then ()
-        elif thenToEndStr.Contains("else" + System.Environment.NewLine) then ()
-        else reportWarn src range "Add else expression"
+        elif thenToEndStr.Contains("else" + Environment.NewLine) then ()
+        else reportWarn src trivia.IfToThenRange "Add else expression"
     else
-      reportWarn src range "Add else expression"
+      reportWarn src trivia.IfToThenRange "Add else expression"

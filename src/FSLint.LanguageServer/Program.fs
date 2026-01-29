@@ -50,7 +50,6 @@ type LspServer(rpc: JsonRpc) =
 
   let lintDocument (uri: string) (content: string): LspDiagnostic[] =
     try
-      eprintfn "[LINT] Starting: %s" uri
       let sourceText = SourceText.ofString content
       let context: LintContext =
         { Errors = []
@@ -62,7 +61,6 @@ type LspServer(rpc: JsonRpc) =
         LineConvention.check content
         let src, parseTree = Utils.parseFile content uri
         Program.checkWithAST src parseTree
-        eprintfn "[LINT] Completed successfully"
       with :? LintException as ex ->
         eprintfn "[LINT] LintException: %s" ex.Message
       setCurrentLintContext None
@@ -71,7 +69,6 @@ type LspServer(rpc: JsonRpc) =
         |> List.rev
         |> List.choose toLspDiagnostic
         |> Array.ofList
-      eprintfn "[LINT] Created %d valid diagnostics" diagnostics.Length
       diagnostics
     with ex ->
       eprintfn "[LINT] ERROR: %s" ex.Message
@@ -95,7 +92,6 @@ type LspServer(rpc: JsonRpc) =
 
   let publishDiagnostics (uri: string) (diagnostics: LspDiagnostic[]) =
     try
-      eprintfn "[LSP] Publishing %d diagnostics for %s" diagnostics.Length uri
       let validDiagnostics =
         diagnostics
         |> Array.filter (fun diag ->
@@ -152,9 +148,6 @@ type LspServer(rpc: JsonRpc) =
         eprintfn "[SCAN] ERROR: No workspace root set"
       | Some root ->
         try
-          eprintfn "[SCAN] =========================================="
-          eprintfn "[SCAN] Root: %s" root
-          eprintfn "[SCAN] =========================================="
           if not (Directory.Exists(root)) then
             eprintfn "[SCAN] ERROR: Directory does not exist: %s" root
           else
@@ -200,18 +193,13 @@ type LspServer(rpc: JsonRpc) =
 
   [<JsonRpcMethod("initialize")>]
   member _.Initialize(p: JToken) =
-    eprintfn "[LSP] =========================================="
-    eprintfn "[LSP] Initialize"
     let rootUri = p["rootUri"]
     if not (isNull rootUri) then
       let uriStr = rootUri.ToString()
-      eprintfn "[LSP] Raw Root URI: %s" uriStr
       try
         let decodedUri = Uri.UnescapeDataString(uriStr)
-        eprintfn "[LSP] Decoded URI: %s" decodedUri
         let uri = Uri(decodedUri)
         let localPath = uri.LocalPath
-        eprintfn "[LSP] Local path: %s" localPath
         workspaceRoot <- Some localPath
       with ex ->
         eprintfn "[LSP] ERROR parsing URI: %s - %s" uriStr ex.Message
@@ -231,7 +219,6 @@ type LspServer(rpc: JsonRpc) =
         workspaceRoot <- Some path
     else
       eprintfn "[LSP] WARNING: No rootUri"
-    eprintfn "[LSP] =========================================="
     JObject(
       JProperty("capabilities",
         JObject(
@@ -255,10 +242,6 @@ type LspServer(rpc: JsonRpc) =
   [<JsonRpcMethod("initialized")>]
   member _.Initialized(p: JToken) =
     task {
-      eprintfn "[LSP] =========================================="
-      eprintfn "[LSP] Initialized notification received"
-      eprintfn "[LSP] Workspace root: %A" workspaceRoot
-      eprintfn "[LSP] =========================================="
       match workspaceRoot with
       | None ->
         eprintfn "[LSP] WARNING: Cannot scan - no workspace root"

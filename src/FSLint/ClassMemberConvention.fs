@@ -9,26 +9,34 @@ open Utils
 
 let private getMemberCategory (memberDefn: SynMemberDefn) =
   match memberDefn with
-  | SynMemberDefn.ImplicitCtor _ -> MemberCategory.Constructor
+  | SynMemberDefn.ImplicitCtor(range = range) ->
+    MemberCategory.Constructor, range
   | SynMemberDefn.Member(binding, _) ->
-    let SynBinding(headPat = pat) = binding
-    match pat with
-    | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
-      match longDotId with
-      | SynLongIdent(id = [ id ]) when id.idText = "new" ->
-        MemberCategory.Constructor
-      | _ ->
-        match args with
-        | SynArgPats.Pats [] -> MemberCategory.Property
-        | _ -> MemberCategory.Method
-    | _ -> MemberCategory.Method
-  | SynMemberDefn.GetSetMember _ -> MemberCategory.Property
-  | SynMemberDefn.AutoProperty _ -> MemberCategory.Property
-  | SynMemberDefn.AbstractSlot _ -> MemberCategory.Abstract
-  | SynMemberDefn.ValField _ -> MemberCategory.Field
-  | SynMemberDefn.LetBindings _ -> MemberCategory.Field
-  | SynMemberDefn.NestedType _ -> MemberCategory.NestedType
-  | _ -> MemberCategory.Method
+    let SynBinding(headPat = pat; trivia = trivia) = binding
+    (match pat with
+     | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
+       match longDotId with
+       | SynLongIdent(id = [ id ]) when id.idText = "new" ->
+         MemberCategory.Constructor
+       | _ ->
+         match args with
+         | SynArgPats.Pats [] -> MemberCategory.Property
+         | _ -> MemberCategory.Method
+     | _ -> MemberCategory.Method), trivia.LeadingKeyword.Range
+  | SynMemberDefn.GetSetMember(range = range; trivia = trivia) ->
+    MemberCategory.Property,
+    Range.mkRange "" range.Start trivia.WithKeyword.Start
+  | SynMemberDefn.AutoProperty(trivia = trivia) ->
+    MemberCategory.Property, trivia.LeadingKeyword.Range
+  | SynMemberDefn.AbstractSlot(range = range) ->
+    MemberCategory.Abstract, range
+  | SynMemberDefn.ValField(range = range) ->
+    MemberCategory.Field, range
+  | SynMemberDefn.LetBindings(range = range) ->
+    MemberCategory.Field, range
+  | SynMemberDefn.NestedType(range = range) ->
+    MemberCategory.NestedType, range
+  | _ as other -> MemberCategory.Method, other.Range
 
 let private isStaticMember (memberDefn: SynMemberDefn) =
   match memberDefn with
@@ -49,7 +57,7 @@ let private getAccessLevel = function
   | _ -> AccessLevel.Public
 
 let private getMemberOrderKey (memberDefn: SynMemberDefn) =
-  let category = int (getMemberCategory memberDefn)
+  let category = int (getMemberCategory memberDefn |> fst)
   let scope = int (getMemberScope memberDefn)
   let access = int (getAccessLevel memberDefn)
   category * 100 + scope * 10 + access
@@ -158,18 +166,18 @@ let checkMemberOrder src (members: SynMemberDefn list) =
     let prevKey = getMemberOrderKey prev
     let nextKey = getMemberOrderKey next
     if prevKey > nextKey then
-      let prevCat = getMemberCategory prev
-      let nextCat = getMemberCategory next
+      let prevCat = getMemberCategory prev |> fst
+      let nextCat, range = getMemberCategory next
       let prevScope = getMemberScope prev
       let nextScope = getMemberScope next
       if prevCat <> nextCat then
-        reportWarn src next.Range
+        reportWarn src range
           $"Move {nextCat} before {prevCat}"
       elif prevScope <> nextScope then
-        reportWarn src next.Range
+        reportWarn src range
           "Move static member before instance members"
       else
-        reportWarn src next.Range
+        reportWarn src range
           "Fix member order by access level"
     else
       ()

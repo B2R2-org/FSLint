@@ -13,7 +13,7 @@ type ClassMemberOrderTests() =
       "type MyClass() =\n" +
       "  member _.Property = 42\n" +
       "  member _.Method() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Static before instance - good``() =
@@ -21,7 +21,7 @@ type ClassMemberOrderTests() =
       "type MyClass() =\n" +
       "  static member StaticMethod() = ()\n" +
       "  member _.InstanceMethod() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Complete order - good``() =
@@ -36,7 +36,7 @@ type ClassMemberOrderTests() =
       "  static member StaticMethod() = ()\n" +
       "\n" +
       "  member _.InstanceMethod() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Multiple properties then methods - good``() =
@@ -48,7 +48,7 @@ type ClassMemberOrderTests() =
       "\n" +
       "  member _.Method1() = ()\n" +
       "  member _.Method2() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Auto-properties before methods - good``() =
@@ -57,7 +57,7 @@ type ClassMemberOrderTests() =
       "  member val AutoProp = 42 with get, set\n" +
       "\n" +
       "  member _.Method() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Error - method before property``() =
@@ -66,7 +66,7 @@ type ClassMemberOrderTests() =
       "  member _.Method() = ()\n" +
       "  member _.Property = 42\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -76,7 +76,7 @@ type ClassMemberOrderTests() =
       "  member _.InstanceMethod() = ()\n" +
       "  static member StaticMethod() = ()\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -86,7 +86,7 @@ type ClassMemberOrderTests() =
       "  member _.Method() = ()\n" +
       "  val mutable Field: int\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -96,7 +96,7 @@ type ClassMemberOrderTests() =
       "  member _.InstanceProp = 1\n" +
       "  static member StaticProp = 2\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -107,7 +107,7 @@ type ClassMemberOrderTests() =
       "\n" +
       "  interface System.IDisposable with\n" +
       "    member _.Dispose() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Abstract members - good``() =
@@ -116,14 +116,14 @@ type ClassMemberOrderTests() =
       "type MyClass() =\n" +
       "  abstract member AbstractProp: int\n" +
       "  abstract member AbstractMethod: unit -> unit\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Single member - good``() =
     let code =
       "type MyClass() =\n" +
       "  member _.OnlyMethod() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[MemberOrder] Operators treated as methods - good``() =
@@ -132,4 +132,4 @@ type ClassMemberOrderTests() =
       "  member _.Property = 42\n" +
       "\n" +
       "  static member (+) (a: MyClass, b: MyClass) = MyClass()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)

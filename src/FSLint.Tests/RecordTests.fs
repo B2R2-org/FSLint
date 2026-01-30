@@ -77,39 +77,39 @@ type InsSize =
 
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketPositionTest)
+    linterForFs.Lint(FakeFsPath, goodBracketPositionTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketPositionTest)
+      linterForFs.Lint(FakeFsPath, badBracketPositionTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[Record] Bracket Position Inline With Equal Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketPositionWithEqualTest)
+      linterForFs.Lint(FakeFsPath, badBracketPositionWithEqualTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[Record] Field Type Spacing Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badFieldTypeSpacingTest)
+      linterForFs.Lint(FakeFsPath, badFieldTypeSpacingTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[Record] Bracket Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketSpacingTest)
+    linterForFs.Lint(FakeFsPath, goodBracketSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketSpacingTest)
+      linterForFs.Lint(FakeFsPath, badBracketSpacingTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[Record] Bracket Spacing MultiLine Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBracketSpacingMultiLineTest)
+    linterForFs.Lint(FakeFsPath, goodBracketSpacingMultiLineTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBracketSpacingMultiLineTest)
+      linterForFs.Lint(FakeFsPath, badBracketSpacingMultiLineTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[Record] Operator Spacing Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badOperatorSpacingTest)
+      linterForFs.Lint(FakeFsPath, badOperatorSpacingTest)
     ) |> ignore

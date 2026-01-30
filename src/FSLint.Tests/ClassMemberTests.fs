@@ -57,28 +57,28 @@ type Class() =
 
   [<TestMethod>]
   member _.``[ClassMember] Between Infix and Paren Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSpacingInfixParenTest)
+    linterForFs.Lint(FakeFsPath, goodSpacingInfixParenTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSpacingInfixParenTest)
+      linterForFs.Lint(FakeFsPath, badSpacingInfixParenTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassMember] Between Function and Paren Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSpacingFunctionParenTest)
+    linterForFs.Lint(FakeFsPath, goodSpacingFunctionParenTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSpacingFunctionParenTest)
+      linterForFs.Lint(FakeFsPath, badSpacingFunctionParenTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Double Underscore Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSelfIdentifierUnderscoreTest)
+    linterForFs.Lint(FakeFsPath, goodSelfIdentifierUnderscoreTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSelfIdentifierUnderscoreTest)
+      linterForFs.Lint(FakeFsPath, badSelfIdentifierUnderscoreTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Unused Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodSelfIdentifierUnusedTest)
+    linterForFs.Lint(FakeFsPath, goodSelfIdentifierUnusedTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSelfIdentifierUnusedTest)
+      linterForFs.Lint(FakeFsPath, badSelfIdentifierUnusedTest)
      ) |> ignore

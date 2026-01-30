@@ -19,22 +19,22 @@ type IndexedPropertyTests() =
 
   [<TestMethod>]
   member _.``[IndexedProperty] Indexed Property Spacing From App Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodIndexedPropertyTest)
+    linterForFs.Lint(FakeFsPath, goodIndexedPropertyTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath,
+      linterForFs.Lint(FakeFsPath,
         badIndexedPropertySpacingFromAppTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[IndexedProperty] Indexed Property Bracket Spacing Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath,
+      linterForFs.Lint(FakeFsPath,
         badIndexedPropertyBracketSpacingTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[IndexedProperty] Indexed Property Range Operator Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodIndexedPropertyHasOpmTest)
+    linterForFs.Lint(FakeFsPath, goodIndexedPropertyHasOpmTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badIndexedPropertyHasOpmTest)
+      linterForFs.Lint(FakeFsPath, badIndexedPropertyHasOpmTest)
     ) |> ignore

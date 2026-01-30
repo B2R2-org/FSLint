@@ -144,7 +144,12 @@ export function activate(context: vscode.ExtensionContext) {
       transport: TransportKind.stdio
     },
     {
-      documentSelector: [{ scheme: 'file', language: 'fsharp' }],
+      documentSelector: [
+        { scheme: 'file', language: 'fsharp' },
+        { scheme: 'file', pattern: '**/*.fsproj' },
+        { scheme: 'file', pattern: '**/*.sln' },
+        { scheme: 'file', pattern: '**/*.slnx' }
+      ],
       outputChannel: vscode.window.createOutputChannel('FSLint')
     }
   );

@@ -15,7 +15,7 @@ type TryWithTests() =
       "    riskyOp ()\n" +
       "  with ex ->\n" +
       "    printfn \"error\"\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[TryWith] Single specific exception without bar - good``() =
@@ -25,7 +25,7 @@ type TryWithTests() =
       "    riskyOp ()\n" +
       "  with :? System.IO.IOException as ex ->\n" +
       "    printfn \"IO error\"\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[TryWith] Single wildcard without bar - good``() =
@@ -35,7 +35,7 @@ type TryWithTests() =
       "    riskyOp ()\n" +
       "  with _ ->\n" +
       "    printfn \"error\"\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[TryWith] Multiple cases with bars - good``() =
@@ -47,7 +47,7 @@ type TryWithTests() =
       "  | System.IO.IOException as ex -> printfn \"IO\"\n" +
       "  | System.TimeoutException as ex -> printfn \"Timeout\"\n" +
       "  | _ -> printfn \"Other\"\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[TryWith] Two cases with bars - good``() =
@@ -58,7 +58,7 @@ type TryWithTests() =
       "  with\n" +
       "  | :? System.IO.IOException -> printfn \"IO\"\n" +
       "  | _ -> printfn \"Other\"\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[TryWith] Error - single case with bar``() =
@@ -69,7 +69,7 @@ type TryWithTests() =
       "  with | ex ->\n" +
       "    printfn \"error\"\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -82,7 +82,7 @@ type TryWithTests() =
       "  | :? System.IO.IOException as ex ->\n" +
       "    printfn \"IO error\"\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -94,7 +94,7 @@ type TryWithTests() =
       "  with | _ ->\n" +
       "    printfn \"error\"\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -106,9 +106,9 @@ type TryWithTests() =
       "      inner ()\n" +
       "    with ex1 -> ()\n" +
       "  with ex2 -> ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[TryWith] Try-with in expression - good``() =
     let code = "let x = try compute () with ex -> 0\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)

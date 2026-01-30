@@ -253,10 +253,10 @@ and checkExpression src = function
   | SynExpr.ObjExpr _
   | SynExpr.Set _
   | SynExpr.YieldOrReturn _
-  | SynExpr.YieldOrReturnFrom _ ->
+  | SynExpr.YieldOrReturnFrom _
+  | SynExpr.DiscardAfterMissingQualificationAfterDot _
+  | SynExpr.FromParseError _ ->
     () (* no need to check this *)
-  | SynExpr.FromParseError(expr, range) ->
-    failwith $"Compile error: filename: {range.FileName} {expr}"
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
 
@@ -552,10 +552,17 @@ let checkWithAST src = function
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 
-let ensureNoBOM (bs: byte[]) =
-  if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy
-  then exitWithError "Byte Order Mark (BOM) should be removed from the file."
-  else bs
+let checkBOM (src: ISourceText) (bs: byte[]) =
+  if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy then
+    let firstLine = src.GetLineString(0)
+    let range =
+      Range.mkRange ""
+        (Position.mkPos 1 0)
+        (Position.mkPos 1 firstLine.Length)
+    reportWarn src range
+      "Byte Order Mark (BOM) should be removed from the file."
+  else
+    ()
 
 let linterForFsWithContext context =
   { new ILintable with
@@ -565,8 +572,12 @@ let linterForFsWithContext context =
         let runCheck fn =
           try fn () with LintException _ when context.IsSome -> ()
         runCheck (fun () ->
-          LineConvention.check txt
-          parseFile txt path ||> checkWithAST)
+          let src = SourceText.ofString txt
+          if path = FakeFsPath then ()
+          else checkBOM src (path |> File.ReadAllBytes)
+          match LineConvention.check src txt with
+          | Ok() -> parseFile src path |> checkWithAST src
+          | _ -> ())
         setCurrentLintContext None }
 
 let linterForFs = linterForFsWithContext None
@@ -575,12 +586,11 @@ let linterForFs = linterForFsWithContext None
 let tryOutputToBuffer (index: int) (path: string): LintOutcome =
   try
     setCurrentFile path
-    let bytes = File.ReadAllBytes path |> ensureNoBOM
+    let bytes = File.ReadAllBytes path
     let txt = System.Text.Encoding.UTF8.GetString bytes
-    let src = SourceText.ofString txt
     let context =
       { Errors = []
-        Source = src
+        Source = SourceText.ofString txt
         FilePath = path }
     linterForFsWithContext(Some context).Lint(path, txt)
     setCurrentLintContext None
@@ -628,7 +638,11 @@ let runParallelByOrder (paths: string array) =
 
 let linterForProjSln =
   { new ILintable with
-      member _.Lint(_path, txt) = LineConvention.checkWindowsLineEndings txt }
+      member _.Lint(path, txt) =
+        let src = SourceText.ofString txt
+        if path = FakeFsPath then ()
+        else checkBOM src (path |> File.ReadAllBytes)
+        LineConvention.checkWindowsLineEndings src txt |> ignore }
 
 [<EntryPoint>]
 let main args =
@@ -649,7 +663,7 @@ let main args =
     getProjOrSlnFiles args[0]
     |> Array.iter (fun p ->
       setCurrentFile p
-      let bytes = File.ReadAllBytes p |> ensureNoBOM
+      let bytes = File.ReadAllBytes p
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
     )

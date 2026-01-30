@@ -40,15 +40,14 @@ let getFsFiles (root: string) =
 
 /// Collects .fsproj and .sln project/solution files
 let getProjOrSlnFiles (root: string) =
-  [ "*.fsproj"; "*.sln" ]
+  [ "*.fsproj"; "*.sln"; "*.slnx" ]
   |> Seq.collect (fun pattern ->
     Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
   |> Seq.sort
   |> Seq.toArray
 
-let parseFile txt (path: string) =
+let parseFile src (path: string) =
   let checker = FSharpChecker.Create()
-  let src = SourceText.ofString txt
   let projOptions, _ =
     checker.GetProjectOptionsFromScript(path, src)
     |> Async.RunSynchronously
@@ -56,4 +55,4 @@ let parseFile txt (path: string) =
     checker.GetParsingOptionsFromProjectOptions projOptions
   checker.ParseFile(path, src, parsingOptions)
   |> Async.RunSynchronously
-  |> fun r -> src, r.ParseTree
+  |> fun r -> r.ParseTree

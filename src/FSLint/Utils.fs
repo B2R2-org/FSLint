@@ -10,6 +10,8 @@ open FSharp.Compiler.Syntax
 
 let [<Literal>] MaxLineLength = 80
 
+let [<Literal>] FakeFsPath = "FakeFsPathForUnitTest.fs"
+
 let isPascalCase (methodName: string) =
   methodName.Length > 0 && Char.IsUpper(methodName[0])
 

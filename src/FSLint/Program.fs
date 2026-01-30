@@ -573,7 +573,8 @@ let linterForFsWithContext context =
           try fn () with LintException _ when context.IsSome -> ()
         runCheck (fun () ->
           let src = SourceText.ofString txt
-          checkBOM src (path |> File.ReadAllBytes)
+          if path = FakeFsPath then ()
+          else checkBOM src (path |> File.ReadAllBytes)
           match LineConvention.check src txt with
           | Ok() -> parseFile src path |> checkWithAST src
           | _ -> ())
@@ -639,7 +640,8 @@ let linterForProjSln =
   { new ILintable with
       member _.Lint(path, txt) =
         let src = SourceText.ofString txt
-        checkBOM src (path |> File.ReadAllBytes)
+        if path = FakeFsPath then ()
+        else checkBOM src (path |> File.ReadAllBytes)
         LineConvention.checkWindowsLineEndings src txt |> ignore }
 
 [<EntryPoint>]

@@ -14,7 +14,7 @@ type AccessModifierTests() =
       "\n" +
       "let private func x = x + 1\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+      linterForFs.Lint(FakeFsPath, code)) |> ignore
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - public let in private module``() =
@@ -22,7 +22,7 @@ type AccessModifierTests() =
       "module private MyModule\n" +
       "\n" +
       "let func x = x + 1\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - private let in public module``() =
@@ -30,7 +30,7 @@ type AccessModifierTests() =
       "module MyModule\n" +
       "\n" +
       "let private func x = x + 1\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Error - private module in private module``() =
@@ -39,7 +39,7 @@ type AccessModifierTests() =
       "  module private Inner =\n" +
       "    let x = 1\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+      linterForFs.Lint(FakeFsPath, code)) |> ignore
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - public module in private module``() =
@@ -47,7 +47,7 @@ type AccessModifierTests() =
       "module private Outer =\n" +
       "  module Inner =\n" +
       "    let x = 1\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - private module in public module``() =
@@ -55,7 +55,7 @@ type AccessModifierTests() =
       "module Outer =\n" +
       "  module private Inner =\n" +
       "    let x = 1\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Error - private type in private module``() =
@@ -65,7 +65,7 @@ type AccessModifierTests() =
       "type private MyType() =\n" +
       "  member _.Method() = ()\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+      linterForFs.Lint(FakeFsPath, code)) |> ignore
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - public type in private module``() =
@@ -74,7 +74,7 @@ type AccessModifierTests() =
       "\n" +
       "type MyType() =\n" +
       "  member _.Method() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - private type in public module``() =
@@ -83,7 +83,7 @@ type AccessModifierTests() =
       "\n" +
       "type private MyType() =\n" +
       "  member _.Method() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Error - private member in private type``() =
@@ -91,21 +91,21 @@ type AccessModifierTests() =
       "type private MyType() =\n" +
       "  member private _.Helper() = ()\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+      linterForFs.Lint(FakeFsPath, code)) |> ignore
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - public member in private type``() =
     let code =
       "type private MyType() =\n" +
       "  member _.Helper() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - private member in public type``() =
     let code =
       "type MyType() =\n" +
       "  member private _.Helper() = ()\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Error - deeply nested private modules``() =
@@ -115,7 +115,7 @@ type AccessModifierTests() =
       "    module private Inner =\n" +
       "      let x = 1\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)) |> ignore
+      linterForFs.Lint(FakeFsPath, code)) |> ignore
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - mixed access in nested structure``() =
@@ -125,7 +125,7 @@ type AccessModifierTests() =
       "    let x = 1\n" +
       "    type MyType() =\n" +
       "      member _.Method() = x\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[AccessModifier] Good - complex type with mixed members``() =
@@ -138,4 +138,4 @@ type AccessModifierTests() =
       "  member _.DoSomething() =\n" +
       "    this.IncrementState()\n" +
       "    printfn \"%d\" state\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)

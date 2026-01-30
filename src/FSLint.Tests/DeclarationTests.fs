@@ -30,15 +30,15 @@ let bar = 2
 
   [<TestMethod>]
   member _.``[ModuleDeclaration] Top Binding Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodTopBindingSpacingTest)
+    linterForFs.Lint(FakeFsPath, goodTopBindingSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTopBindingSpacingTest)
+      linterForFs.Lint(FakeFsPath, badTopBindingSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[ModuleDeclaration] Top Binding Too Much Spacing Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badTopBindingTooMuchSpacingTest)
+      linterForFs.Lint(FakeFsPath, badTopBindingTooMuchSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
@@ -47,7 +47,7 @@ let bar = 2
       """
 let func = printfn "hello"
 """
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[Declaration] Short function on one line``() =
@@ -55,7 +55,7 @@ let func = printfn "hello"
       """
 let add x y = x + y
 """
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[Declaration] Multi-line with long body - allowed``() =
@@ -66,7 +66,7 @@ let processData input =
   let step2 = validate step1
   compute step2
 """
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[Declaration] Error - unnecessary line break``() =
@@ -76,7 +76,7 @@ let func =
   printfn "hello"
 """
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -87,7 +87,7 @@ let add x y =
   x + y
 """
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -98,7 +98,7 @@ let value =
   42
 """
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -108,7 +108,7 @@ let value =
       "  async {\n" +
       "    return 42\n" +
       "  }\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[Declaration] Task expression on next line - good``() =
@@ -117,7 +117,7 @@ let value =
       "  task {\n" +
       "    return! getData ()\n" +
       "  }\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[Declaration] Seq expression on next line - good``() =
@@ -127,7 +127,7 @@ let value =
       "    yield 1\n" +
       "    yield 2\n" +
       "  }\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
   member _.``[Declaration] Error - async on same line as equals``() =
@@ -136,7 +136,7 @@ let value =
       "  return 42\n" +
       "}\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -146,7 +146,7 @@ let value =
       "  return 1\n" +
       "}\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -156,7 +156,7 @@ let value =
       "  yield 1\n" +
       "}\n"
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, code)
+      linterForFs.Lint(FakeFsPath, code)
     ) |> ignore
 
   [<TestMethod>]
@@ -167,4 +167,4 @@ let value =
       "    do! Async.Sleep 100\n" +
       "    return! loop ()\n" +
       "  }\n"
-    linterForFs.Lint(Constants.FakeFsPath, code)
+    linterForFs.Lint(FakeFsPath, code)

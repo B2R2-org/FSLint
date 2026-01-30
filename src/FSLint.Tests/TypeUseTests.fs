@@ -21,21 +21,21 @@ type TypeUseTests() =
 
   [<TestMethod>]
   member _.``[TypeUse] Generic Argument Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodGenericArguSpacingTest)
+    linterForFs.Lint(FakeFsPath, goodGenericArguSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badGenericArguSpacingTest)
+      linterForFs.Lint(FakeFsPath, badGenericArguSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[TypeUse] Generic Argument Comma Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodGenericArguCommaTest)
+    linterForFs.Lint(FakeFsPath, goodGenericArguCommaTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badGenericArguCommaTest)
+      linterForFs.Lint(FakeFsPath, badGenericArguCommaTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[TypeUse] Generic Argument Star Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodGenericArguStarTest)
+    linterForFs.Lint(FakeFsPath, goodGenericArguStarTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badGenericArguStarTest)
+      linterForFs.Lint(FakeFsPath, badGenericArguStarTest)
      ) |> ignore

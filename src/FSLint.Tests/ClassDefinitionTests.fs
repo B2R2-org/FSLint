@@ -109,35 +109,35 @@ type ComplexClass (initialValue: int) =
 
   [<TestMethod>]
   member _.``[ClassDefinition] Constructor Parameter Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodImplicitCtorTest)
+    linterForFs.Lint(FakeFsPath, goodImplicitCtorTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badImplicitCtorTest)
+      linterForFs.Lint(FakeFsPath, badImplicitCtorTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassDefinition] Base Constructor Call Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodImplicitInheritTest)
+    linterForFs.Lint(FakeFsPath, goodImplicitInheritTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badImplicitInheritTest)
+      linterForFs.Lint(FakeFsPath, badImplicitInheritTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassDefinition] Explicit Base Class Call Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodExplicitInheritTest)
+    linterForFs.Lint(FakeFsPath, goodExplicitInheritTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badExplicitInheritTest)
+      linterForFs.Lint(FakeFsPath, badExplicitInheritTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassDefinition] Multiple Level Inheritance Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodNestedInheritTest)
+    linterForFs.Lint(FakeFsPath, goodNestedInheritTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badNestedInheritTest)
+      linterForFs.Lint(FakeFsPath, badNestedInheritTest)
     ) |> ignore
 
   [<TestMethod>]
   member _.``[ClassDefinition] Complex Class Definition Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodMixedCaseTest)
+    linterForFs.Lint(FakeFsPath, goodMixedCaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badMixedCaseTest)
+      linterForFs.Lint(FakeFsPath, badMixedCaseTest)
     ) |> ignore

@@ -60,33 +60,33 @@ type IfThenElseTests() =
 
   [<TestMethod>]
   member _.``[IfThenElse] Else Expression not Exist Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodElseExprExistTest)
+    linterForFs.Lint(FakeFsPath, goodElseExprExistTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badElseExprExistTest)
+      linterForFs.Lint(FakeFsPath, badElseExprExistTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[IfThenElse] Else Expression not Exist Test(2)``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodElseExprExistTest2)
+    linterForFs.Lint(FakeFsPath, goodElseExprExistTest2)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badElseExprExistTest2)
+      linterForFs.Lint(FakeFsPath, badElseExprExistTest2)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[IfThenElse] Keyword Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodKeywordSpacingTest)
+    linterForFs.Lint(FakeFsPath, goodKeywordSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badKeywordSpacingTest)
+      linterForFs.Lint(FakeFsPath, badKeywordSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[IfThenElse] Keyword Spacing Test(2)``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badKeywordSpacingTest2)
+      linterForFs.Lint(FakeFsPath, badKeywordSpacingTest2)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[IfThenElse] Keyword Spacing Test(3)``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badKeywordSpacingTest3)
+      linterForFs.Lint(FakeFsPath, badKeywordSpacingTest3)
      ) |> ignore

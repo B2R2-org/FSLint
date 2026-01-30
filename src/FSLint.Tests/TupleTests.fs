@@ -15,10 +15,10 @@ type TupleTests() =
 
   [<TestMethod>]
   member _.``[Tuple] Comma Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCommaSpacingTest)
+    linterForFs.Lint(FakeFsPath, goodCommaSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSpacingBeforeCommaTest)
+      linterForFs.Lint(FakeFsPath, badSpacingBeforeCommaTest)
      ) |> ignore
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badSpacingAfterCommaTest)
+      linterForFs.Lint(FakeFsPath, badSpacingAfterCommaTest)
      ) |> ignore

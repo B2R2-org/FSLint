@@ -34,19 +34,20 @@ let checkControlChar (src: ISourceText) (lineNum: int) (line: string) =
 
 let check src (txt: string) =
   let hasPassed = checkWindowsLineEndings src txt
+  let maxLineLength = getCurrentMaxLineLength ()
   match hasPassed, currentLintContext.Value with
   | Ok(), Some context ->
     let src = context.Source
     txt.Split([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
       let lineNum = i + 1
-      if line.Length > MaxLineLength then
+      if line.Length > maxLineLength then
         let range =
           Range.mkRange ""
-            (Position.mkPos lineNum (MaxLineLength - 1))
+            (Position.mkPos lineNum (maxLineLength - 1))
             (Position.mkPos lineNum line.Length)
         reportWarn src range
-          $"exceeds {MaxLineLength} characters."
+          $"exceeds {maxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         let trailingStart = line.TrimEnd().Length
         let range =
@@ -62,11 +63,11 @@ let check src (txt: string) =
     txt.Split([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
       let lineNum = i + 1
-      if line.Length > MaxLineLength then
+      if line.Length > maxLineLength then
         Console.WriteLine line
         Console.WriteLine(
-          "|" + String.replicate (MaxLineLength - 2) "-" + "|")
-        raiseWithWarn $"Line {i + 1} exceeds {MaxLineLength} characters."
+          "|" + String.replicate (maxLineLength - 2) "-" + "|")
+        raiseWithWarn $"Line {i + 1} exceeds {maxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         Console.WriteLine line
         Console.WriteLine(String.replicate (line.Length - 1) " " + "^")

@@ -2,6 +2,7 @@ namespace B2R2.FSLint
 
 open System
 open System.IO
+open System.Threading
 open FSharp.Compiler.Text
 
 exception LintException of string
@@ -9,14 +10,23 @@ exception LintException of string
 module Diagnostics =
   let private outputLock = obj ()
 
-  let currentFilePath = new Threading.AsyncLocal<string>()
+  let currentFilePath = new AsyncLocal<string>()
 
-  let currentLintContext = new Threading.AsyncLocal<LintContext option>()
+  let cliEditorConfig = new AsyncLocal<Configuration.EditorConfig>()
+
+  let currentLintContext = new AsyncLocal<LintContext option>()
 
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
     currentLintContext.Value <- context
+
+  let setCliEditorConfig config = cliEditorConfig.Value <- config
+
+  let getCurrentMaxLineLength () =
+    match currentLintContext.Value with
+    | Some ctx -> ctx.EditorConfig.MaxLineLength
+    | None -> cliEditorConfig.Value.MaxLineLength
 
   let exitWithError (message: string) =
     Console.WriteLine message

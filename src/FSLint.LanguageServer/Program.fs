@@ -50,7 +50,6 @@ type LspServer(rpc: JsonRpc) =
 
   let lintDocument (uri: string) (content: string): LspDiagnostic[] =
     try
-      eprintfn "[LINT] Starting: %s" uri
       let sourceText = SourceText.ofString content
       let context: LintContext =
         { Errors = []
@@ -59,10 +58,9 @@ type LspServer(rpc: JsonRpc) =
       setCurrentLintContext (Some context)
       setCurrentFile uri
       try
-        LineConvention.check content
-        let src, parseTree = Utils.parseFile content uri
-        Program.checkWithAST src parseTree
-        eprintfn "[LINT] Completed successfully"
+        match LineConvention.check sourceText content with
+        | Ok() -> parseFile sourceText uri |> Program.checkWithAST sourceText
+        | _ -> ()
       with :? LintException as ex ->
         eprintfn "[LINT] LintException: %s" ex.Message
       setCurrentLintContext None
@@ -71,7 +69,6 @@ type LspServer(rpc: JsonRpc) =
         |> List.rev
         |> List.choose toLspDiagnostic
         |> Array.ofList
-      eprintfn "[LINT] Created %d valid diagnostics" diagnostics.Length
       diagnostics
     with ex ->
       eprintfn "[LINT] ERROR: %s" ex.Message
@@ -95,7 +92,6 @@ type LspServer(rpc: JsonRpc) =
 
   let publishDiagnostics (uri: string) (diagnostics: LspDiagnostic[]) =
     try
-      eprintfn "[LSP] Publishing %d diagnostics for %s" diagnostics.Length uri
       let validDiagnostics =
         diagnostics
         |> Array.filter (fun diag ->
@@ -152,9 +148,6 @@ type LspServer(rpc: JsonRpc) =
         eprintfn "[SCAN] ERROR: No workspace root set"
       | Some root ->
         try
-          eprintfn "[SCAN] =========================================="
-          eprintfn "[SCAN] Root: %s" root
-          eprintfn "[SCAN] =========================================="
           if not (Directory.Exists(root)) then
             eprintfn "[SCAN] ERROR: Directory does not exist: %s" root
           else
@@ -168,9 +161,7 @@ type LspServer(rpc: JsonRpc) =
                      path.Contains(".git")))
               |> Seq.toArray
             let batchSize = Environment.ProcessorCount
-            let batches =
-              fsFiles
-              |> Array.chunkBySize batchSize
+            let batches = fsFiles |> Array.chunkBySize batchSize
             for batch in batches do
               let! results =
                 batch
@@ -192,6 +183,36 @@ type LspServer(rpc: JsonRpc) =
                   })
                 |> Async.Parallel
               do! Async.Sleep 10
+            let fsprojFiles =
+              Directory.GetFiles(root, "*.fsproj", SearchOption.AllDirectories)
+            let slnFiles =
+              let net9 = "*.sln"
+              let net10 = "*.slnx"
+              Array.append
+                (Directory.GetFiles(root, net9, SearchOption.AllDirectories))
+                (Directory.GetFiles(root, net10, SearchOption.AllDirectories))
+            let projectFiles = Array.append fsprojFiles slnFiles
+            for file in projectFiles do
+              try
+                let content = File.ReadAllText(file)
+                if content.Contains LineConvention.WindowsLineEnding then
+                  let diagnostic =
+                    { Range = { Start = { Line = 0; Character = 0 }
+                                End = { Line = 0; Character = 1 } }
+                      Severity = 2
+                      Source = "FSLint"
+                      Message = "Use Windows line endings 'LF'" }
+                  let normalizedPath = file.Replace("\\", "/")
+                  let uri =
+                    if normalizedPath.[0] = '/' then
+                      sprintf "file://%s" normalizedPath
+                    else
+                      sprintf "file:///%s" normalizedPath
+                  do! publishDiagnostics uri [| diagnostic |] |> Async.AwaitTask
+                else
+                  ()
+              with ex ->
+                eprintfn "[SCAN] ERROR checking CRLF in %s: %s" file ex.Message
             eprintfn "[SCAN] Completed workspace scan"
         with ex ->
           eprintfn "[SCAN] FATAL ERROR: %s" ex.Message
@@ -200,18 +221,13 @@ type LspServer(rpc: JsonRpc) =
 
   [<JsonRpcMethod("initialize")>]
   member _.Initialize(p: JToken) =
-    eprintfn "[LSP] =========================================="
-    eprintfn "[LSP] Initialize"
     let rootUri = p["rootUri"]
     if not (isNull rootUri) then
       let uriStr = rootUri.ToString()
-      eprintfn "[LSP] Raw Root URI: %s" uriStr
       try
         let decodedUri = Uri.UnescapeDataString(uriStr)
-        eprintfn "[LSP] Decoded URI: %s" decodedUri
         let uri = Uri(decodedUri)
         let localPath = uri.LocalPath
-        eprintfn "[LSP] Local path: %s" localPath
         workspaceRoot <- Some localPath
       with ex ->
         eprintfn "[LSP] ERROR parsing URI: %s - %s" uriStr ex.Message
@@ -231,7 +247,6 @@ type LspServer(rpc: JsonRpc) =
         workspaceRoot <- Some path
     else
       eprintfn "[LSP] WARNING: No rootUri"
-    eprintfn "[LSP] =========================================="
     JObject(
       JProperty("capabilities",
         JObject(
@@ -255,10 +270,6 @@ type LspServer(rpc: JsonRpc) =
   [<JsonRpcMethod("initialized")>]
   member _.Initialized(p: JToken) =
     task {
-      eprintfn "[LSP] =========================================="
-      eprintfn "[LSP] Initialized notification received"
-      eprintfn "[LSP] Workspace root: %A" workspaceRoot
-      eprintfn "[LSP] =========================================="
       match workspaceRoot with
       | None ->
         eprintfn "[LSP] WARNING: Cannot scan - no workspace root"
@@ -291,18 +302,43 @@ type LspServer(rpc: JsonRpc) =
         let changes = p["contentChanges"] :?> JArray
         if changes.Count > 0 then
           let text = changes.[changes.Count - 1].["text"].ToString()
-          match debounceTimers.TryGetValue(uri) with
-          | true, timer -> timer.Dispose()
-          | _ -> ()
-          let timer = new Threading.Timer(
-            (fun _ ->
-              async {
-                let diagnostics = lintDocument uri text
-                do! publishDiagnostics uri diagnostics |> Async.AwaitTask
-              } |> Async.Start
-            ),
-            null, 300, Threading.Timeout.Infinite)
-          debounceTimers.[uri] <- timer
+          if uri.EndsWith(".fsproj") ||
+            uri.EndsWith(".sln") ||
+            uri.EndsWith(".slnx") then
+            match debounceTimers.TryGetValue(uri) with
+            | true, timer -> timer.Dispose()
+            | _ -> ()
+            let timer = new Threading.Timer(
+              (fun _ ->
+                async {
+                  if text.Contains LineConvention.WindowsLineEnding then
+                    let diagnostic =
+                      { Range = { Start = { Line = 0; Character = 0 }
+                                  End = { Line = 0; Character = 1 } }
+                        Severity = 2
+                        Source = "FSLint"
+                        Message = "Use Unix line endings 'LF'" }
+                    do! publishDiagnostics uri [| diagnostic |]
+                        |> Async.AwaitTask
+                  else
+                    do! publishDiagnostics uri [||] |> Async.AwaitTask
+                } |> Async.Start
+              ),
+              null, 300, Threading.Timeout.Infinite)
+            debounceTimers.[uri] <- timer
+          else
+            match debounceTimers.TryGetValue(uri) with
+            | true, timer -> timer.Dispose()
+            | _ -> ()
+            let timer = new Threading.Timer(
+              (fun _ ->
+                async {
+                  let diagnostics = lintDocument uri text
+                  do! publishDiagnostics uri diagnostics |> Async.AwaitTask
+                } |> Async.Start
+              ),
+              null, 300, Threading.Timeout.Infinite)
+            debounceTimers.[uri] <- timer
         else
           ()
       with ex ->
@@ -314,12 +350,46 @@ type LspServer(rpc: JsonRpc) =
     async {
       try
         let uri = p["textDocument"].["uri"].ToString()
-        match p["text"] with
-        | null -> ()
-        | text ->
-          let content = text.ToString()
-          let diagnostics = lintDocument uri content
-          do! publishDiagnostics uri diagnostics |> Async.AwaitTask
+        if uri.EndsWith(".fsproj") ||
+          uri.EndsWith(".sln") ||
+          uri.EndsWith(".slnx") then
+          match p["text"] with
+          | null ->
+            try
+              let filePath = Uri(uri).LocalPath
+              let content = File.ReadAllText(filePath)
+              if content.Contains LineConvention.WindowsLineEnding then
+                let diagnostic =
+                  { Range = { Start = { Line = 0; Character = 0 }
+                              End = { Line = 0; Character = 1 } }
+                    Severity = 2
+                    Source = "FSLint"
+                    Message = "Use Unix line endings 'LF'" }
+                do! publishDiagnostics uri [| diagnostic |]
+                    |> Async.AwaitTask
+              else
+                do! publishDiagnostics uri [||] |> Async.AwaitTask
+            with ex ->
+              eprintfn "[LSP] ERROR reading file in didSave: %s" ex.Message
+          | text ->
+            let content = text.ToString()
+            if content.Contains LineConvention.WindowsLineEnding then
+              let diagnostic =
+                { Range = { Start = { Line = 0; Character = 0 }
+                            End = { Line = 0; Character = 1 } }
+                  Severity = 2
+                  Source = "FSLint"
+                  Message = "Use Unix line endings 'LF'" }
+              do! publishDiagnostics uri [| diagnostic |] |> Async.AwaitTask
+            else
+              do! publishDiagnostics uri [||] |> Async.AwaitTask
+        else
+          match p["text"] with
+          | null -> ()
+          | text ->
+            let content = text.ToString()
+            let diagnostics = lintDocument uri content
+            do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didSave: %s" ex.Message
     } |> Async.StartAsTask :> Task

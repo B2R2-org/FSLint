@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+    <Metadata>
+        <Identity Id="FSLint.VisualStudio.b8a51cf7-fe48-4611-a60c-51ee40360faa" Version="1.0" Language="ko-KR" Publisher="B2R2" />
+        <DisplayName>FSLint</DisplayName>
+        <Description xml:space="preserve">High-performance F# linter for CI/CD with real-time feedback.</Description>
+        <MoreInfo>https://github.com/B2R2-org/FSLint</MoreInfo>
+        <License>LICENSE.txt</License>
+        <Icon>b2r2-240x240.png</Icon>
+        <PreviewImage>b2r2-240x240.png</PreviewImage>
+        <Tags>F#, FSharp, Linter, Code Quality, CI/CD, Static Analysis</Tags>
+    </Metadata>
+    <Installation>
+        <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">
+            <ProductArchitecture>amd64</ProductArchitecture>
+        </InstallationTarget>
+    </Installation>
+    <Dependencies>
+        <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
+    </Dependencies>
+    <Prerequisites>
+        <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,18.0)" DisplayName="Visual Studio core editor" />
+    </Prerequisites>
+    <Assets>
+        <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+        <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%|" />
+    </Assets>
+</PackageManifest>

@@ -45,14 +45,14 @@ and bad = ()
 
   [<TestMethod>]
   member _.``[FunctionBody] Empty NewLine Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodEmptyNewLineTest)
+    linterForFs.Lint(FakeFsPath, goodEmptyNewLineTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badEmptyNewLineTest)
+      linterForFs.Lint(FakeFsPath, badEmptyNewLineTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[FunctionBody] Recursive Binding NewLine Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodBindingWithAndKeywordTest)
+    linterForFs.Lint(FakeFsPath, goodBindingWithAndKeywordTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badBindingWithAndKeywordTest)
+      linterForFs.Lint(FakeFsPath, badBindingWithAndKeywordTest)
      ) |> ignore

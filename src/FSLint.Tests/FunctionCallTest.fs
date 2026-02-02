@@ -27,35 +27,35 @@ type FunctionCallTests() =
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function Bracket Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodNonCurriedFuncTest)
+    linterForFs.Lint(FakeFsPath, goodNonCurriedFuncTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath,
+      linterForFs.Lint(FakeFsPath,
         badNonCurriedFuncBracketSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function App Spacing Test``() =
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badNonCurriedFuncSpacingTest)
+      linterForFs.Lint(FakeFsPath, badNonCurriedFuncSpacingTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function PascalCase Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCurriedFuncPascalCaseTest)
+    linterForFs.Lint(FakeFsPath, goodCurriedFuncPascalCaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badCurriedFuncPascalCaseTest)
+      linterForFs.Lint(FakeFsPath, badCurriedFuncPascalCaseTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function LowerCase Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCurriedFuncLowerCaseTest)
+    linterForFs.Lint(FakeFsPath, goodCurriedFuncLowerCaseTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badCurriedFuncLowerCaseTest)
+      linterForFs.Lint(FakeFsPath, badCurriedFuncLowerCaseTest)
      ) |> ignore
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function Nested Spacing Test``() =
-    linterForFs.Lint(Constants.FakeFsPath, goodCurriedFuncPascalCaseNestedTest)
+    linterForFs.Lint(FakeFsPath, goodCurriedFuncPascalCaseNestedTest)
     Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(Constants.FakeFsPath, badCurriedFuncPascalCaseNestedTest)
+      linterForFs.Lint(FakeFsPath, badCurriedFuncPascalCaseNestedTest)
      ) |> ignore

@@ -7,28 +7,35 @@ open Diagnostics
 
 let private trailingWhiteSpace = Regex @"\s$"
 
-let [<Literal>] private WindowsLineEnding = "\r\n"
+let [<Literal>] WindowsLineEnding = "\r\n"
 
-let checkWindowsLineEndings (txt: string) =
+let checkWindowsLineEndings (src: ISourceText) (txt: string) =
   if txt.Contains WindowsLineEnding then
-    raiseWithWarn "Use Windows line endings 'LF'"
+    let firstLine = src.GetLineString(0)
+    let range =
+      Range.mkRange ""
+        (Position.mkPos 1 0)
+        (Position.mkPos 1 firstLine.Length)
+    reportWarn src range "Use Unix line endings 'LF'"
+    Error()
+  else
+    Ok()
+
+let checkControlChar (src: ISourceText) (lineNum: int) (line: string) =
+  if line |> String.exists Char.IsControl then
+    let controlCharIdx = line |> Seq.findIndex Char.IsControl
+    let range =
+      Range.mkRange ""
+        (Position.mkPos lineNum controlCharIdx)
+        (Position.mkPos lineNum (controlCharIdx + 1))
+    reportWarn src range "Remove file contains control characters"
   else
     ()
 
-let checkControlChar (txt: string) =
-  if txt |> String.exists Char.IsControl then
-    txt
-    |> String.filter Char.IsControl
-    |> String.iter (fun c ->
-      Console.WriteLine $"Control char: {c} (0x{int c:X2})")
-    raiseWithWarn "Remove file contains control characters"
-  else
-    ()
-
-let check (txt: string) =
-  checkWindowsLineEndings txt
-  match currentLintContext.Value with
-  | Some context ->
+let check src (txt: string) =
+  let hasPassed = checkWindowsLineEndings src txt
+  match hasPassed, currentLintContext.Value with
+  | Ok(), Some context ->
     let src = context.Source
     txt.Split([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
@@ -48,11 +55,13 @@ let check (txt: string) =
             (Position.mkPos lineNum line.Length)
         reportWarn src range "Remove trailing whitespace"
       else
-        checkControlChar line
+        checkControlChar src lineNum line
     )
-  | None ->
+    hasPassed
+  | Ok(), None ->
     txt.Split([| "\n" |], StringSplitOptions.None)
     |> Array.iteri (fun i line ->
+      let lineNum = i + 1
       if line.Length > MaxLineLength then
         Console.WriteLine line
         Console.WriteLine(
@@ -63,5 +72,8 @@ let check (txt: string) =
         Console.WriteLine(String.replicate (line.Length - 1) " " + "^")
         raiseWithWarn $"Remove trailing whitespace in Line {i + 1}"
       else
-        checkControlChar line
+        checkControlChar src lineNum line
     )
+    hasPassed
+  | _ ->
+    hasPassed

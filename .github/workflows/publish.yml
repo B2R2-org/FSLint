@@ -1,0 +1,170 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  publish-vscode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Azure Token
+        run: |
+          if [ -z "${{ secrets.AZURE_TOKEN }}" ]; then
+            echo "Error: AZURE_TOKEN not set"
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify version
+        working-directory: extension/vscode
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          PACKAGE_VERSION=$(cat package.json | grep '"version"' | sed 's/.*"version": "\(.*\)".*/\1/')
+          if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+            echo "Error: Version mismatch (package.json: $PACKAGE_VERSION, tag: $VERSION)"
+            exit 1
+          fi
+
+      - name: Build Language Server
+        run: |
+          dotnet publish -c Release \
+            src/FSLint.LanguageServer/B2R2.FSLint.LanguageServer.fsproj \
+            -o extension/vscode/bin
+
+      - name: Install dependencies and compile
+        working-directory: extension/vscode
+        run: |
+          npm install --legacy-peer-deps
+          npm run compile
+
+      - name: Publish to VS Code Marketplace
+        working-directory: extension/vscode
+        env:
+          VSCE_PAT: ${{ secrets.AZURE_TOKEN }}
+        run: npx @vscode/vsce publish -p $VSCE_PAT
+
+  publish-visual-studio:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify Azure Token
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrEmpty("${{ secrets.AZURE_TOKEN }}")) {
+            Write-Error "Error: AZURE_TOKEN not set"
+            exit 1
+          }
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Verify version
+        shell: pwsh
+        run: |
+          $version = "$env:GITHUB_REF" -replace 'refs/tags/v', ''
+          $xml = [xml](Get-Content "extension\vs\source.extension.vsixmanifest")
+          $manifestVersion = $xml.PackageManifest.Metadata.Identity.Version
+          if ($manifestVersion -ne $version) {
+            Write-Error "Error: Version mismatch (manifest: $manifestVersion, tag: $version)"
+            exit 1
+          }
+
+      - name: Build Language Server
+        run: |
+          dotnet build -c Release `
+            src/FSLint.LanguageServer/B2R2.FSLint.LanguageServer.fsproj
+
+      - name: Copy Language Server
+        shell: pwsh
+        run: |
+          $sourceDir = "src\FSLint.LanguageServer\bin\Release\net10.0"
+          $destDir = "extension\vs\bin\Release"
+          New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+          Copy-Item "$sourceDir\*" -Destination $destDir -Include "*.exe","*.dll","*.json" -Exclude "*.deps.json" -Force
+
+      - name: Build VS Extension
+        working-directory: extension/vs
+        run: |
+          dotnet restore FSLint.VisualStudio.slnx
+          msbuild /p:Configuration=Release /v:minimal
+
+      - name: Verify VSIX created
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "extension\vs\bin\Release\FSLint.VisualStudio.vsix")) {
+            Write-Error "VSIX not found"
+            exit 1
+          }
+
+      - name: Create publishManifest.json
+        shell: pwsh
+        run: |
+          @{
+            '$schema' = 'http://json.schemastore.org/vsix-publish'
+            categories = @('Coding')
+            identity = @{ internalName = 'FSLint.VisualStudio' }
+            overview = 'extension/vs/README.md'
+            priceCategory = 'free'
+            publisher = 'B2R2'
+            private = $false
+            qna = $true
+            repo = 'https://github.com/B2R2-org/FSLint'
+          } | ConvertTo-Json -Depth 10 | Out-File 'extension/vs/publishManifest.json' -Encoding UTF8
+
+      - name: Publish to Visual Studio Marketplace
+        shell: pwsh
+        working-directory: extension/vs
+        env:
+          VSIX_PAT: ${{ secrets.AZURE_TOKEN }}
+        run: |
+          $vswherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+
+          if (-not (Test-Path $vswherePath)) {
+            Write-Error "vswhere.exe not found"
+            exit 1
+          }
+
+          $vsPath = & $vswherePath -latest -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+
+          if (-not $vsPath) {
+            Write-Error "Visual Studio not found"
+            exit 1
+          }
+
+          $vsixPublisher = Join-Path $vsPath "VSSDK\VisualStudioIntegration\Tools\Bin\VsixPublisher.exe"
+
+          if (-not (Test-Path $vsixPublisher)) {
+            Write-Error "VsixPublisher.exe not found"
+            exit 1
+          }
+
+          & $vsixPublisher publish `
+            -payload "bin\Release\FSLint.VisualStudio.vsix" `
+            -publishManifest "publishManifest.json" `
+            -personalAccessToken $env:VSIX_PAT `
+            -ignoreWarnings "VSIXValidatorWarning01,VSIXValidatorWarning02"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit 1
+          }

@@ -46,7 +46,8 @@ type LintError =
 and LintContext =
   { mutable Errors: LintError list
     Source: ISourceText
-    FilePath: string }
+    FilePath: string
+    EditorConfig: Configuration.EditorConfig }
 
 and LintOutcome =
   { Index: int

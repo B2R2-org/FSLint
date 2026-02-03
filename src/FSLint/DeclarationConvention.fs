@@ -216,8 +216,10 @@ let checkUnnecessaryLineBreak (src: ISourceText) (binding: SynBinding) =
           |> Array.filter (fun line -> line <> "")
         let oneLine = String.concat " " contentParts
         let totalLength = indent + oneLine.Length
-        if totalLength <= MaxLineLength then reportNewLine src body.Range
-        else ()
+        if totalLength <= getCurrentMaxLineLength () then
+          reportNewLine src body.Range
+        else
+          ()
       else
         ()
     | None ->

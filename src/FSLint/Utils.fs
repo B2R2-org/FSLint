@@ -5,10 +5,7 @@ open System
 open System.IO
 open System.Text.RegularExpressions
 open FSharp.Compiler.CodeAnalysis
-open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
-
-let [<Literal>] MaxLineLength = 80
 
 let [<Literal>] FakeFsPath = "FakeFsPathForUnitTest.fs"
 

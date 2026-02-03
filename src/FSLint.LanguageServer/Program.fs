@@ -12,6 +12,8 @@ open B2R2.FSLint.Diagnostics
 type LspServer(rpc: JsonRpc) =
   let mutable workspaceRoot: string option = None
   let mutable hasScannedWorkspace = false
+  let mutable editorConfig = Configuration.defaultSettings
+  let mutable editorConfigWatcher: FileSystemWatcher option = None
   let debounceTimers =
     Collections.Concurrent.ConcurrentDictionary<string, Threading.Timer>()
 
@@ -54,7 +56,8 @@ type LspServer(rpc: JsonRpc) =
       let context: LintContext =
         { Errors = []
           Source = sourceText
-          FilePath = uri }
+          FilePath = uri
+          EditorConfig = editorConfig }
       setCurrentLintContext (Some context)
       setCurrentFile uri
       try
@@ -219,8 +222,41 @@ type LspServer(rpc: JsonRpc) =
           eprintfn "[SCAN] STACK: %s" ex.StackTrace
     }
 
+  let startEditorConfigWatcher (rootPath: string) =
+    try
+      let watcher = new FileSystemWatcher()
+      watcher.Path <- rootPath
+      watcher.Filter <- ".editorconfig"
+      watcher.NotifyFilter <- NotifyFilters.LastWrite ||| NotifyFilters.FileName
+      watcher.IncludeSubdirectories <- true
+      let reloadConfig _ =
+        editorConfig <- Configuration.getSettings rootPath
+        scanWorkspace () |> Async.Start
+      watcher.Changed.Add(reloadConfig)
+      watcher.Created.Add(reloadConfig)
+      watcher.Deleted.Add(fun _ ->
+        eprintfn "[EditorConfig] File deleted, using defaults"
+        editorConfig <- Configuration.defaultSettings
+      )
+      watcher.EnableRaisingEvents <- true
+      editorConfigWatcher <- Some watcher
+    with ex ->
+      eprintfn "[EditorConfig] Failed to start watcher: %s" ex.Message
+
+  let stopEditorConfigWatcher () =
+    match editorConfigWatcher with
+    | Some watcher ->
+      watcher.Dispose()
+      editorConfigWatcher <- None
+    | None -> ()
+
   [<JsonRpcMethod("initialize")>]
   member _.Initialize(p: JToken) =
+    let setupWorkspace path =
+      workspaceRoot <- Some path
+      editorConfig <- Configuration.getSettings path
+      eprintfn "[LSP] EditorConfig loaded"
+      startEditorConfigWatcher path
     let rootUri = p["rootUri"]
     if not (isNull rootUri) then
       let uriStr = rootUri.ToString()
@@ -228,6 +264,7 @@ type LspServer(rpc: JsonRpc) =
         let decodedUri = Uri.UnescapeDataString(uriStr)
         let uri = Uri(decodedUri)
         let localPath = uri.LocalPath
+        setupWorkspace localPath
         workspaceRoot <- Some localPath
       with ex ->
         eprintfn "[LSP] ERROR parsing URI: %s - %s" uriStr ex.Message
@@ -244,9 +281,10 @@ type LspServer(rpc: JsonRpc) =
           else
             Uri.UnescapeDataString(uriStr)
         eprintfn "[LSP] Workspace root (fallback): %s" path
-        workspaceRoot <- Some path
+        setupWorkspace path
     else
       eprintfn "[LSP] WARNING: No rootUri"
+      editorConfig <- Configuration.defaultSettings
     JObject(
       JProperty("capabilities",
         JObject(
@@ -399,12 +437,14 @@ type LspServer(rpc: JsonRpc) =
 
   [<JsonRpcMethod("shutdown")>]
   member _.Shutdown() =
-    eprintfn "[LSP] Shutdown"
-    null
+    task { eprintfn "[LSP] Shutdown requested"
+           stopEditorConfigWatcher ()
+           () }
 
   [<JsonRpcMethod("exit")>]
   member _.Exit() =
     eprintfn "[LSP] Exit"
+    stopEditorConfigWatcher ()
     Environment.Exit(0)
 
 [<EntryPoint>]

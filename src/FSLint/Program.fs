@@ -573,8 +573,10 @@ let linterForFsWithContext context =
           try fn () with LintException _ when context.IsSome -> ()
         runCheck (fun () ->
           let src = SourceText.ofString txt
-          if path = FakeFsPath then ()
-          else checkBOM src (path |> File.ReadAllBytes)
+          if path = FakeFsPath then
+            setCliEditorConfig Configuration.defaultSettings
+          else
+            checkBOM src (path |> File.ReadAllBytes)
           match LineConvention.check src txt with
           | Ok() -> parseFile src path |> checkWithAST src
           | _ -> ())
@@ -583,7 +585,7 @@ let linterForFsWithContext context =
 let linterForFs = linterForFsWithContext None
 
 /// Lints a single file, catching exceptions and returning a `LintOutcome`.
-let tryOutputToBuffer (index: int) (path: string): LintOutcome =
+let tryOutputToBuffer (index: int) (path: string) editorConfig =
   try
     setCurrentFile path
     let bytes = File.ReadAllBytes path
@@ -591,7 +593,8 @@ let tryOutputToBuffer (index: int) (path: string): LintOutcome =
     let context =
       { Errors = []
         Source = SourceText.ofString txt
-        FilePath = path }
+        FilePath = path
+        EditorConfig = editorConfig }
     linterForFsWithContext(Some context).Lint(path, txt)
     setCurrentLintContext None
     { Index = index
@@ -608,9 +611,9 @@ let tryOutputToBuffer (index: int) (path: string): LintOutcome =
         Errors = [] }
 
 /// Runs linting jobs in parallel for all given files
-let runParallelByOrder (paths: string array) =
+let runParallelByOrder editConfig (paths: string array) =
   paths
-   |> Array.mapi (fun i p -> async { return tryOutputToBuffer i p })
+   |> Array.mapi (fun i p -> async { return tryOutputToBuffer i p editConfig })
   |> Async.Parallel
   |> Async.RunSynchronously
   |> Array.sortBy (fun r -> r.Index)
@@ -646,11 +649,15 @@ let linterForProjSln =
 
 [<EntryPoint>]
 let main args =
-  if args.Length < 1 then
-    exitWithError "Usage: fslint <file|dir>"
-  elif File.Exists args[0] then
+  if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
+  else ()
+  let editorConfig =
+    Directory.GetCurrentDirectory()
+    |> Configuration.getSettings
+  editorConfig |> setCliEditorConfig
+  if File.Exists args[0] then
     setCurrentFile args[0]
-    let outcome = tryOutputToBuffer 0 args[0]
+    let outcome = tryOutputToBuffer 0 args[0] editorConfig
     if not outcome.Ok then
       Console.WriteLine $"--- File: {outcome.Path}"
       Console.Write outcome.Log
@@ -667,6 +674,6 @@ let main args =
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
     )
-    if getFsFiles args[0] |> runParallelByOrder then 1 else 0
+    if getFsFiles args[0] |> runParallelByOrder editorConfig then 1 else 0
   else
     exitWithError $"File or directory '{args[0]}' not found"

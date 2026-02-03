@@ -14,11 +14,14 @@
     "url": "https://github.com/B2R2-org/FSLint/issues"
   },
   "keywords": [
-    "fsharp",
-    "f#",
-    "linter",
-    "static analysis",
-    "code quality"
+    "B2R2",
+    "F#",
+    "FSharp",
+    "Lint",
+    "Linter",
+    "Code Style",
+    "Convention",
+    "Fast"
   ],
   "galleryBanner": {
     "color": "#378BBA",
@@ -29,6 +32,7 @@
     "vscode": "^1.93.0"
   },
   "categories": [
+    "Education",
     "Linters",
     "Programming Languages"
   ],

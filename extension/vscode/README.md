@@ -77,7 +77,7 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
-### 0.1.1
+### 1.0.1
 
 **EditorConfig Integration**
 - Added support for `.editorconfig` `max_line_length` setting

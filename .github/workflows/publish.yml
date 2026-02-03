@@ -122,6 +122,7 @@ jobs:
             '$schema' = 'http://json.schemastore.org/vsix-publish'
             categories = @('Coding')
             identity = @{ internalName = 'FSLint.VisualStudio' }
+            overview = 'README.md'
             priceCategory = 'free'
             publisher = 'B2R2'
             private = $false

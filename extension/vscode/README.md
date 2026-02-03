@@ -1,70 +1,98 @@
-# FSLint - Fast F# Linter for CI/CD
+# FSLint
 
-High-performance F# linter based on syntactic analysis, designed for 
-seamless CI/CD integration.
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/B2R2.fslint?style=flat-square&label=VS%20Code&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=B2R2.fslint) [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/B2R2.B2R2?style=flat-square&label=Visual%20Studio&logo=visual-studio)](https://marketplace.visualstudio.com/items?itemName=B2R2.B2R2) [![NuGet](https://img.shields.io/nuget/v/B2R2.FSLint?style=flat-square&logo=nuget)](https://www.nuget.org/packages/B2R2.FSLint) [![License](https://img.shields.io/github/license/B2R2-org/B2R2?style=flat-square)](https://github.com/B2R2-org/B2R2/blob/main/LICENSE.md)
 
-## Features
 
-- **Real-time Feedback**: Instant lint warnings as you type
-- **CI/CD Ready**: File-level analysis without dependency resolution
-- **Zero Configuration**: Works out of the box
-- **Workspace Scanning**: Analyzes all F# files on startup
+High-performance F# linter based on syntactic analysis, providing real-time feedback in IDEs and seamless CI/CD integration.
+
+## The Problem
+
+Your F# codebase grows. Style inconsistencies creep in. Code reviews catch formatting issues instead of logic bugs. CI pipelines slow down waiting for linters that need full semantic analysis.
+
+## The Solution
+
+FSLint gives you **real-time style enforcement** without the wait. No dependency resolution. No type checking overhead. Just instant feedback on what matters.
+
+## What You Get
+
+**Zero Setup** — Install and start linting. No config files required.
+
+**Instant Feedback** — See violations as you type, not after you push.
+
+**CI/CD Native** — File-level analysis works in any pipeline, any environment.
+
+**Precise Rules** — Based on [F# official guidelines](https://learn.microsoft.com/en-us/dotnet/fsharp/style-guide/) and [B2R2 F# conventions](https://github.com/B2R2-org/B2R2/blob/main/CONTRIBUTING.md).
 
 ## Quick Start
 
-1. Install the extension
-2. Open any F# file or workspace
-3. Lint warnings appear automatically with visual indicators
+**VS Code**
+```bash
+ext install B2R2.fslint
+```
 
-## Coding Conventions
+**Visual Studio**
+```
+Extensions → Manage Extensions → Search "FSLint"
+```
 
-FSLint enforces F# coding conventions based on the 
-[B2R2 Contributing Guidelines](https://github.com/B2R2-org/B2R2/blob/main/CONTRIBUTING.md):
+**Command Line (CI/CD)**
+```bash
+dotnet tool install --global B2R2.FSLint
+fslint check ./src
+```
 
-- Line length limits (80 columns)
-- Naming conventions (PascalCase/camelCase)
-- Indentation consistency
-- Pattern matching completeness
-- Type annotation usage
-- Function definition formatting
-- List operation patterns
+Open any `.fs` file. Violations appear instantly with visual indicators.
+
+## Why Syntactic Analysis?
+
+FSLint analyzes your code **structure**, not its **semantics**. This means:
+- No waiting for type inference
+- No dependency graph resolution
+- Works on incomplete code
+- Scales to massive codebases
+
+Perfect for catching style violations the moment you write them.
+
+## Built by Security Researchers
+
+Developed at KAIST SoftSec Lab for the [B2R2 binary analysis platform](https://github.com/B2R2-org/B2R2) — a project with 700,000+ lines of F# that demands both speed and precision.
 
 ## Requirements
 
-- .NET SDK 10.0 or higher
+- .NET SDK 10.0+
 - F# source files (`.fs`)
 
 ## Extension Settings
 
-This extension contributes the following settings:
+- `fslint.enable` — Toggle linting (default: `true`)
+- `fslint.trace.server` — Debug LSP communication
 
-- `fslint.enable`: Enable/disable FSLint (default: `true`)
-- `fslint.trace.server`: Trace LSP communication for debugging
+## Configuration
 
-## Known Issues
-
-- Workspace scanning triggers on first file open or initialized event
-- Large workspaces may take time for initial scanning
+FSLint respects `.editorconfig` settings in your workspace:
+```ini
+[*.fs]
+max_line_length = 120  # Default: 80
+```
 
 ## Release Notes
 
-### 1.0.0
+### 0.1.1
 
-Initial release:
-- Real-time linting with LSP integration
-- Workspace-wide scanning
-- File-level syntactic analysis
+**EditorConfig Integration**
+- Added support for `.editorconfig` `max_line_length` setting
+- Line length checks now adapt to project-specific requirements
+- Flexible configuration for teams with different style preferences
 
 ## Contributing
 
-Issues and pull requests welcome at 
-[GitHub repository](https://github.com/B2R2-org/FSLint)
+Found an issue? Have a suggestion?
+→ [GitHub Issues](https://github.com/B2R2-org/FSLint/issues)
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT — Free for commercial and open source use.
 
 ---
 
-**Note**: FSLint uses syntactic analysis only, providing fast feedback 
-for style and convention violations without semantic type checking.
+*Stop debating style in code reviews. Enforce it automatically.*

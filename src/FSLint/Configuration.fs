@@ -59,12 +59,9 @@ let private readFile (path: string) (maxRetries: int) =
       readLines []
     with
     | :? IOException when retryCount < maxRetries ->
-      eprintfn "[EditorConfig] File locked, retry %d/%d..."
-        (retryCount + 1) maxRetries
       Threading.Thread.Sleep 100
       attempt (retryCount + 1)
-    | ex ->
-      eprintfn "[EditorConfig] Read error: %s" ex.Message
+    | _ ->
       reraise ()
   attempt 0
 
@@ -75,14 +72,10 @@ let private findEditorConfig (startPath: string) =
     else
       let configPath = Path.Combine(dir, ".editorconfig")
       if File.Exists configPath then
-        eprintfn "[EditorConfig] Found: %s" configPath
         Some configPath
       else
         let parent = Directory.GetParent dir
-        if isNull parent then
-          eprintfn "[EditorConfig] Not found, searched up to root"
-          None
-        else search parent.FullName
+        if isNull parent then None else search parent.FullName
   search startPath
 
 let getSettings (rootPath: string): EditorConfig =
@@ -95,12 +88,8 @@ let getSettings (rootPath: string): EditorConfig =
     | Some configPath ->
       let lines = readFile configPath 5
       let settings = parseSettings lines "*.fs"
-      eprintfn "[EditorConfig] Loaded from %s:" configPath
-      eprintfn "  max_line_length = %d" settings.MaxLineLength
       settings
     | None ->
-      eprintfn "[EditorConfig] Using defaults"
       defaultSettings
-  with ex ->
-    eprintfn "[EditorConfig] Error reading config: %s" ex.Message
+  with _ ->
     defaultSettings

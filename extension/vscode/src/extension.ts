@@ -64,26 +64,21 @@ export function activate(context: vscode.ExtensionContext) {
   const serverPath = context.asAbsolutePath(
     path.join('bin', 'B2R2.FSLint.LanguageServer.dll')
   );
-
   const fs = require('fs');
   if (!fs.existsSync(serverPath)) {
     vscode.window.showErrorMessage(`FSLint server not found: ${serverPath}`);
     return;
   }
-
   const codeLensProvider = new FSLintCodeLensProvider();
-
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(
       { scheme: 'file', language: 'fsharp' },
       codeLensProvider
     )
   );
-
   const rootPath = workspaceFolders && workspaceFolders.length > 0 
     ? workspaceFolders[0].uri.fsPath 
     : process.env.HOME || process.env.USERPROFILE || '/';
-
   client = new LanguageClient(
     'fslint',
     'FSLint',
@@ -102,66 +97,39 @@ export function activate(context: vscode.ExtensionContext) {
       outputChannel: vscode.window.createOutputChannel('FSLint')
     }
   );
-
-  client.start().then(() => {    
-    const updateEditor = (editor: vscode.TextEditor | undefined) => {
-      if (editor && editor.document.languageId === 'fsharp') {
-        codeLensProvider.refresh();
-      }
-    };
-
+  client.start().then(() => {
+    console.log('[FSLINT] LSP client started in SAVE-ONLY mode');
     context.subscriptions.push(
       vscode.languages.onDidChangeDiagnostics(e => {
         const activeEditor = vscode.window.activeTextEditor;
         if (!activeEditor || activeEditor.document.languageId !== 'fsharp') {
           return;
         }
-        const activePath = activeEditor.document.uri.fsPath.toLowerCase().replace(/\\/g, '/');
-
+        const activePath =
+          activeEditor.document.uri.fsPath.toLowerCase().replace(/\\/g, '/');
         for (const uri of e.uris) {
           const diagPath = uri.fsPath.toLowerCase().replace(/\\/g, '/');
-          
           if (diagPath === activePath) {
-            updateEditor(activeEditor);
+            codeLensProvider.refresh();
             break;
           }
         }
       })
     );
-
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor(editor => {
-        updateEditor(editor);
-      })
-    );
-
-    context.subscriptions.push(
-      vscode.workspace.onDidChangeTextDocument(e => {
-        const editor = vscode.window.activeTextEditor;
-        if (editor && editor.document === e.document && editor.document.languageId === 'fsharp') {
-          setTimeout(() => updateEditor(editor), 300);
+        if (editor && editor.document.languageId === 'fsharp') {
+          codeLensProvider.refresh();
         }
       })
     );
-
-    context.subscriptions.push(
-      vscode.workspace.onDidOpenTextDocument(doc => {
-        if (doc.languageId === 'fsharp') {
-          const editor = vscode.window.visibleTextEditors.find(e => e.document === doc);
-          if (editor) {
-            setTimeout(() => updateEditor(editor), 500);
-          }
-        }
-      })
-    );
-
-    if (vscode.window.activeTextEditor) {
-      setTimeout(() => updateEditor(vscode.window.activeTextEditor), 1000);
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor && activeEditor.document.languageId === 'fsharp') {
+      codeLensProvider.refresh();
     }
   }).catch(err => {
     console.error('[FSLINT] Failed to start LSP client:', err);
   });
-
   context.subscriptions.push(
     vscode.commands.registerCommand('fslint.restart', async () => {
       if (client) {
@@ -170,7 +138,6 @@ export function activate(context: vscode.ExtensionContext) {
       }
     })
   );
-
   console.log('[FSLINT] Extension activated');
 }
 

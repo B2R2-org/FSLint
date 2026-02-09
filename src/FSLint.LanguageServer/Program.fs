@@ -14,8 +14,6 @@ type LspServer(rpc: JsonRpc) =
   let mutable hasScannedWorkspace = false
   let mutable editorConfig = Configuration.defaultSettings
   let mutable editorConfigWatcher: FileSystemWatcher option = None
-  let debounceTimers =
-    Collections.Concurrent.ConcurrentDictionary<string, Threading.Timer>()
 
   let toLspRange (range: range): LspRange =
     try
@@ -291,7 +289,7 @@ type LspServer(rpc: JsonRpc) =
           JProperty("textDocumentSync",
             JObject(
               JProperty("openClose", true),
-              JProperty("change", 1),
+              JProperty("change", 0),
               JProperty("save", JObject(JProperty("includeText", true)))
             )
           )
@@ -330,57 +328,6 @@ type LspServer(rpc: JsonRpc) =
           ()
       with ex ->
         eprintfn "[LSP] ERROR in didOpen: %s" ex.Message
-    } |> Async.StartAsTask :> Task
-
-  [<JsonRpcMethod("textDocument/didChange")>]
-  member _.DidChange(p: JToken) =
-    async {
-      try
-        let uri = p["textDocument"].["uri"].ToString()
-        let changes = p["contentChanges"] :?> JArray
-        if changes.Count > 0 then
-          let text = changes.[changes.Count - 1].["text"].ToString()
-          if uri.EndsWith(".fsproj") ||
-            uri.EndsWith(".sln") ||
-            uri.EndsWith(".slnx") then
-            match debounceTimers.TryGetValue(uri) with
-            | true, timer -> timer.Dispose()
-            | _ -> ()
-            let timer = new Threading.Timer(
-              (fun _ ->
-                async {
-                  if text.Contains LineConvention.WindowsLineEnding then
-                    let diagnostic =
-                      { Range = { Start = { Line = 0; Character = 0 }
-                                  End = { Line = 0; Character = 1 } }
-                        Severity = 2
-                        Source = "FSLint"
-                        Message = "Use Unix line endings 'LF'" }
-                    do! publishDiagnostics uri [| diagnostic |]
-                        |> Async.AwaitTask
-                  else
-                    do! publishDiagnostics uri [||] |> Async.AwaitTask
-                } |> Async.Start
-              ),
-              null, 300, Threading.Timeout.Infinite)
-            debounceTimers.[uri] <- timer
-          else
-            match debounceTimers.TryGetValue(uri) with
-            | true, timer -> timer.Dispose()
-            | _ -> ()
-            let timer = new Threading.Timer(
-              (fun _ ->
-                async {
-                  let diagnostics = lintDocument uri text
-                  do! publishDiagnostics uri diagnostics |> Async.AwaitTask
-                } |> Async.Start
-              ),
-              null, 300, Threading.Timeout.Infinite)
-            debounceTimers.[uri] <- timer
-        else
-          ()
-      with ex ->
-        eprintfn "[LSP] ERROR in didChange: %s" ex.Message
     } |> Async.StartAsTask :> Task
 
   [<JsonRpcMethod("textDocument/didSave")>]

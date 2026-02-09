@@ -77,12 +77,9 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
-### 1.0.1
+### 1.0.2
 
-**EditorConfig Integration**
-- Added support for `.editorconfig` `max_line_length` setting
-- Line length checks now adapt to project-specific requirements
-- Flexible configuration for teams with different style preferences
+- Linting is no longer performed in real time and is now executed on file save.
 
 ## Contributing
 

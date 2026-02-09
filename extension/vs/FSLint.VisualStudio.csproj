@@ -60,9 +60,6 @@
     <Compile Include="OutputWindowHelper.cs" />
     <Compile Include="DiagnosticStore.cs" />
     <Compile Include="LoggingStream.cs" />
-    <Compile Include="FSLintClassificationTypes.cs" />
-    <Compile Include="FSLintClassifier.cs" />
-    <Compile Include="FSLintClassifierProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>

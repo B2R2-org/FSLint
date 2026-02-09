@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/vsix-publish",
+  "categories": ["Coding"],
+  "identity": {
+    "internalName": "B2R2"
+  },
+  "overview": "README.md",
+  "priceCategory": "free",
+  "publisher": "B2R2",
+  "private": false,
+  "qna": true,
+  "repo": "https://github.com/B2R2-org/FSLint"
+}

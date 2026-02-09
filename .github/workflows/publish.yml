@@ -77,20 +77,12 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Verify version
-        shell: pwsh
-        run: |
-          $version = "$env:GITHUB_REF" -replace 'refs/tags/v', ''
-          $xml = [xml](Get-Content "extension\vs\source.extension.vsixmanifest")
-          $manifestVersion = $xml.PackageManifest.Metadata.Identity.Version
-          if ($manifestVersion -ne $version) {
-            Write-Error "Error: Version mismatch (manifest: $manifestVersion, tag: $version)"
-            exit 1
-          }
-
       - name: Build Language Server
         run: |
           dotnet build -c Release `
+            --nologo `
+            --verbosity quiet `
+            /p:GenerateDocumentationFile=false `
             src/FSLint.LanguageServer/B2R2.FSLint.LanguageServer.fsproj
 
       - name: Copy Language Server
@@ -104,10 +96,10 @@ jobs:
       - name: Build VS Extension
         working-directory: extension/vs
         run: |
-          dotnet restore FSLint.VisualStudio.slnx
-          msbuild /p:Configuration=Release /v:minimal
+          dotnet restore FSLint.VisualStudio.slnx --nologo --verbosity quiet 2>&1 | Out-Null
+          msbuild /p:Configuration=Release /v:quiet /nologo
 
-      - name: Verify VSIX created
+      - name: Verify VSIX
         shell: pwsh
         run: |
           if (-not (Test-Path "extension\vs\bin\Release\FSLint.VisualStudio.vsix")) {
@@ -115,56 +107,9 @@ jobs:
             exit 1
           }
 
-      - name: Create publishManifest.json
-        shell: pwsh
-        run: |
-          @{
-            '$schema' = 'http://json.schemastore.org/vsix-publish'
-            categories = @('Coding')
-            identity = @{ internalName = 'FSLint.VisualStudio' }
-            overview = 'README.md'
-            priceCategory = 'free'
-            publisher = 'B2R2'
-            private = $false
-            qna = $true
-            repo = 'https://github.com/B2R2-org/FSLint'
-          } | ConvertTo-Json -Depth 10 | Out-File 'extension/vs/publishManifest.json' -Encoding UTF8
-
       - name: Publish to Visual Studio Marketplace
-        shell: pwsh
-        working-directory: extension/vs
-        env:
-          VSIX_PAT: ${{ secrets.AZURE_TOKEN }}
-        run: |
-          $vswherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-
-          if (-not (Test-Path $vswherePath)) {
-            Write-Error "vswhere.exe not found"
-            exit 1
-          }
-
-          $vsPath = & $vswherePath -latest -products * `
-            -requires Microsoft.Component.MSBuild `
-            -property installationPath
-
-          if (-not $vsPath) {
-            Write-Error "Visual Studio not found"
-            exit 1
-          }
-
-          $vsixPublisher = Join-Path $vsPath "VSSDK\VisualStudioIntegration\Tools\Bin\VsixPublisher.exe"
-
-          if (-not (Test-Path $vsixPublisher)) {
-            Write-Error "VsixPublisher.exe not found"
-            exit 1
-          }
-
-          & $vsixPublisher publish `
-            -payload "bin\Release\FSLint.VisualStudio.vsix" `
-            -publishManifest "publishManifest.json" `
-            -personalAccessToken $env:VSIX_PAT `
-            -ignoreWarnings "VSIXValidatorWarning01,VSIXValidatorWarning02"
-
-          if ($LASTEXITCODE -ne 0) {
-            exit 1
-          }
+        uses: cezarypiatek/VsixPublisherAction@1.0
+        with:
+          extension-file: 'extension/vs/bin/Release/FSLint.VisualStudio.vsix'
+          publish-manifest-file: 'extension/vs/publishManifest.json'
+          personal-access-code: ${{ secrets.AZURE_TOKEN }}

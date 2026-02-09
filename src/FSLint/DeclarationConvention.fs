@@ -270,7 +270,13 @@ let check (src: ISourceText) decls =
         nextDecl.Range.StartLine - prevDecl.Range.EndLine
         |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
       if actualSpacing <> expectedSpacing then
-        reportWarn src nextDecl.Range "Use single blank line"
+        if expectedSpacing - actualSpacing = 1 then
+          Range.unionRanges prevDecl.Range nextDecl.Range
+          |> fun range -> reportWarn src range "Use single blank line"
+        else
+          Range.mkRange "" (Position.mkPos (prevDecl.Range.EndLine + 1) 0)
+            (Position.mkPos (nextDecl.Range.StartLine - 1) 0)
+          |> fun range -> reportWarn src range "Use single blank line"
       else
         ()
     else

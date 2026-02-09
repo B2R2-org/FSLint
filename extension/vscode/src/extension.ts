@@ -6,29 +6,6 @@ import {
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
-let diagnosticCollection: vscode.DiagnosticCollection;
-
-const warningDecoration = vscode.window.createTextEditorDecorationType({
-  backgroundColor: new vscode.ThemeColor('editorWarning.background'),
-  borderRadius: '2px',
-  light: {
-    backgroundColor: 'rgba(255, 100, 100, 0.15)',
-  },
-  dark: {
-    backgroundColor: 'rgba(255, 100, 100, 0.2)',
-  }
-});
-
-const errorDecoration = vscode.window.createTextEditorDecorationType({
-  backgroundColor: new vscode.ThemeColor('editorError.background'),
-  borderRadius: '2px',
-  light: {
-    backgroundColor: 'rgba(255, 100, 100, 0.15)',
-  },
-  dark: {
-    backgroundColor: 'rgba(255, 100, 100, 0.2)',
-  }
-});
 
 class FSLintCodeLensProvider implements vscode.CodeLensProvider {
   private _onDidChangeCodeLenses = new vscode.EventEmitter<void>();
@@ -82,34 +59,6 @@ class FSLintCodeLensProvider implements vscode.CodeLensProvider {
   }
 }
 
-function updateDecorations(editor: vscode.TextEditor) {
-  if (!editor || editor.document.languageId !== 'fsharp') {
-    return;
-  }
-
-  const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-  const fslintDiagnostics = diagnostics.filter(d => d.source === 'FSLint');
-
-  const warnings: vscode.DecorationOptions[] = [];
-  const errors: vscode.DecorationOptions[] = [];
-
-  for (const diag of fslintDiagnostics) {
-    const decoration: vscode.DecorationOptions = {
-      range: diag.range,
-      hoverMessage: `FSLint: ${diag.message}`
-    };
-
-    if (diag.severity === vscode.DiagnosticSeverity.Error) {
-      errors.push(decoration);
-    } else {
-      warnings.push(decoration);
-    }
-  }
-
-  editor.setDecorations(warningDecoration, warnings);
-  editor.setDecorations(errorDecoration, errors);
-}
-
 export function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const serverPath = context.asAbsolutePath(
@@ -158,7 +107,6 @@ export function activate(context: vscode.ExtensionContext) {
     const updateEditor = (editor: vscode.TextEditor | undefined) => {
       if (editor && editor.document.languageId === 'fsharp') {
         codeLensProvider.refresh();
-        updateDecorations(editor);
       }
     };
 

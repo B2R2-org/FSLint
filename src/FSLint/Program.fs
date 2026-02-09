@@ -430,7 +430,6 @@ and checkBinding src case binding =
   else
     ()
   DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
-  DeclarationConvention.checkUnnecessaryLineBreak src binding
   DeclarationConvention.checkComputationExprPlacement src binding
   TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo

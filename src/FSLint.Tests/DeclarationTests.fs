@@ -69,39 +69,6 @@ let processData input =
     linterForFs.Lint(FakeFsPath, code)
 
   [<TestMethod>]
-  member _.``[Declaration] Error - unnecessary line break``() =
-    let code =
-      """
-let func =
-  printfn "hello"
-"""
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, code)
-    ) |> ignore
-
-  [<TestMethod>]
-  member _.``[Declaration] Error - short function unnecessarily split``() =
-    let code =
-      """
-let add x y =
-  x + y
-"""
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, code)
-    ) |> ignore
-
-  [<TestMethod>]
-  member _.``[Declaration] Error - simple value unnecessarily split``() =
-    let code =
-      """
-let value =
-  42
-"""
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, code)
-    ) |> ignore
-
-  [<TestMethod>]
   member _.``[Declaration] Computation expression on next line - good``() =
     let code =
       "let loop () =\n" +

@@ -1,44 +1,17 @@
 module B2R2.FSLint.DeclarationConvention
 
 open System
+open FSharp.Compiler
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
-let private tryFindBlockCommentEndAfter lines startIdx =
-  lines
-  |> Array.mapi (fun i line -> i, line)
-  |> Array.skip (startIdx + 1)
-  |> Array.tryFind (fun (_, line: string) ->
-    let trimmed = line.TrimStart()
-    trimmed.StartsWith "*)" || line.TrimEnd().EndsWith "*)")
-  |> Option.map fst
-
-let private countLeadingDocComments lines startIdx =
-  lines
-  |> Array.mapi (fun i line -> i, line)
-  |> Array.skip startIdx
-  |> Array.takeWhile (fun (_, line: string) ->
-    let trimmed = line.TrimStart()
-    trimmed.StartsWith "///" || trimmed = "")
-  |> Array.filter (fun (_, line) ->
-    let trimmed = line.TrimStart()
-    trimmed.StartsWith "///")
-  |> Array.length
-
-let private countLeadingRegularComments lines startIdx =
-  lines
-  |> Array.mapi (fun i line -> i, line)
-  |> Array.skip startIdx
-  |> Array.takeWhile (fun (_, line: string) ->
-    let trimmed = line.TrimStart()
-    trimmed.StartsWith "//" && not (trimmed.StartsWith "///")
-    || trimmed = "")
-  |> Array.filter (fun (_, line) ->
-    let trimmed = line.TrimStart()
-    trimmed.StartsWith "//" && not (trimmed.StartsWith "///"))
-  |> Array.length
+/// Adjusts actual spacing by subtracting comment lines
+/// TODO: Condition directives checks
+let private adjustByComment trivia prev next expectedSpacing actualSpacing =
+  if Option.isSome (findDirectivesBetween trivia prev next) then expectedSpacing
+  else actualSpacing - countCommentLines trivia prev next
 
 let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   let normalCase =
@@ -53,50 +26,7 @@ let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   then normalCase - 1
   else normalCase
 
-/// Determines line breaks between declarations based on their types.
-/// Skips validation if compiler directives are present.
-/// Adjusts range when handling block comments (* *) or doc comments (///).
-let private adjustByComment src prevRange nextRange expect actual =
-  let createRangeBetweenDecl =
-    Range.mkRange "" (Position.mkPos (prevRange: range).EndLine 0)
-      (Position.mkPos (nextRange: range).StartLine 0)
-  let subStr = (src: ISourceText).GetSubTextFromRange createRangeBetweenDecl
-  if subStr.Contains("#") then
-    expect
-  else
-    let lines =
-      subStr.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
-      |> Array.map (fun line -> line.Trim('\r'))
-    if subStr.Trim() = "" || lines.Length <= 1 then
-      actual
-    else
-      let blockCommentStart =
-        lines
-        |> Array.tryFindIndex (fun line ->
-          (line.TrimStart()).StartsWith "(*")
-      let docCommentStart =
-        lines
-        |> Array.tryFindIndex (fun line ->
-          (line.TrimStart()).StartsWith "///")
-      let regularCommentStart =
-        lines
-        |> Array.tryFindIndex (fun line ->
-          let trimmed = line.TrimStart()
-          trimmed.StartsWith "//" && not (trimmed.StartsWith "///"))
-      match blockCommentStart, docCommentStart, regularCommentStart with
-      | Some startIdx, _, _ ->
-        match tryFindBlockCommentEndAfter lines startIdx with
-        | Some endIdx ->
-          actual - (endIdx - startIdx + 1)
-        | None ->
-          actual - (lines.Length - startIdx - 1)
-      | _, Some startIdx, _ ->
-        actual - countLeadingDocComments lines startIdx
-      | _, _, Some startIdx ->
-        actual - countLeadingRegularComments lines startIdx
-      | _ -> actual
-
-let checkEqualSpacing src patRange (equalRange: range) bodyRange retInfo =
+let checkEqualSpacing src trivia patRange equalRange bodyRange retInfo =
   let patRange =
     if Option.isSome (retInfo: option<SynBindingReturnInfo>) then
       let SynBindingReturnInfo(range = range) = retInfo.Value
@@ -104,25 +34,27 @@ let checkEqualSpacing src patRange (equalRange: range) bodyRange retInfo =
     else
       patRange
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
-    if patRange.EndColumn + 1 <> equalRange.StartColumn then
-      let gap = Range.unionRanges patRange.EndRange equalRange.StartRange
-      let gapStr = gap |> (src: ISourceText).GetSubTextFromRange
-      if gapStr.Contains "(*" then ()
-      else
+    if patRange.EndColumn + 1 <> (equalRange: range).StartColumn then
+      let commentBeforeEqual =
+        findCommentsBetween trivia patRange.EndRange equalRange.StartRange
+      if Option.isNone commentBeforeEqual then
         Range.mkRange "" patRange.End equalRange.Start
         |> reportEqaulBeforeSpacing src
-    elif equalRange.EndColumn + 1 <> bodyRange.StartColumn then
-      let checkComment =
-        let str =
-          Range.mkRange "" equalRange.End bodyRange.Start
-          |> src.GetSubTextFromRange
-        str.Contains "(*"
-      if checkComment then
-        ()
       else
+        ()
+    else
+      ()
+    if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
+      let commentAfterEqual =
+        findCommentsBetween trivia equalRange.EndRange bodyRange.StartRange
+      if Option.isNone commentAfterEqual then
         Range.mkRange "" equalRange.End bodyRange.Start
         |> reportEqaulAfterSpacing src
-    elif patRange.EndColumn = equalRange.StartColumn
+      else
+        ()
+    else
+      ()
+    if patRange.EndColumn = equalRange.StartColumn
       && equalRange.EndColumn = bodyRange.StartColumn then
       Range.mkRange "" patRange.End bodyRange.Start
       |> fun range -> reportWarn src range "Use single whitespace around '='"
@@ -131,19 +63,24 @@ let checkEqualSpacing src patRange (equalRange: range) bodyRange retInfo =
   else
     if patRange.EndLine = equalRange.StartLine then
       if patRange.EndColumn + 1 <> equalRange.StartColumn then
-        let gap = Range.unionRanges patRange.EndRange equalRange.StartRange
-        let gapStr = gap |> src.GetSubTextFromRange
-        if gapStr.Contains "(*" then
-          ()
-        else
+        let commentBeforeEqual =
+          findCommentsBetween trivia patRange.EndRange equalRange.StartRange
+        if Option.isNone commentBeforeEqual then
           Range.mkRange "" patRange.End equalRange.Start
           |> reportEqaulBeforeSpacing src
+        else
+          ()
       else
         ()
     else
       if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
-        Range.mkRange "" equalRange.End bodyRange.Start
-        |> reportEqaulAfterSpacing src
+        let commentAfterEqual =
+          findCommentsBetween trivia equalRange.EndRange bodyRange.StartRange
+        if Option.isNone commentAfterEqual then
+          Range.mkRange "" equalRange.End bodyRange.Start
+          |> reportEqaulAfterSpacing src
+        else
+          ()
       else
         ()
 
@@ -162,23 +99,19 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
   | None ->
     ()
 
-let checkAttributesLineSpacing src (attrs: SynAttributes) (moduleRange: range) =
-  let lastAttr = List.tryLast attrs
+let checkAttributesLineSpacing src trivia attrs (moduleRange: range) =
+  let lastAttr = List.tryLast (attrs: SynAttributes)
   if Option.isSome lastAttr then
-    let gap = Range.unionRanges lastAttr.Value.Range moduleRange
-    let str = (src: ISourceText).GetSubTextFromRange gap
-    str.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
-    |> Array.map (fun line -> line.TrimStart())
-    |> Array.exists (fun line -> line.Contains "///" || line.Contains "(*")
-    |> fun comment ->
-      if comment then ()
-      elif lastAttr.Value.Range.EndLine + 1 <> moduleRange.StartLine
-        && lastAttr.Value.Range.StartLine <> moduleRange.StartLine then
-        Range.mkRange "" (Position.mkPos (moduleRange.StartLine - 1) 0)
-          moduleRange.Start
-        |> reportNewLine src
-      else
-        ()
+    let attrRange = lastAttr.Value.Range
+    let hasComments = findCommentsBetween trivia attrRange moduleRange
+    if Option.isNone hasComments
+      && attrRange.EndLine + 1 <> moduleRange.StartLine
+      && attrRange.StartLine <> moduleRange.StartLine then
+      Range.mkRange "" (Position.mkPos (moduleRange.StartLine - 1) 0)
+        moduleRange.Start
+      |> reportNewLine src
+    else
+      ()
   else
     ()
 
@@ -195,17 +128,17 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   else
     ()
 
-let check (src: ISourceText) decls =
+let check (src: ISourceText) decls codeTrivia =
   decls
   |> List.pairwise
   |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
     if prevDecl.IsLet && nextDecl.IsLet then
-      let expectedSpacing = calculateSpacingBetweenDecls src prevDecl nextDecl
-      let actualSpacing =
+      let expected = calculateSpacingBetweenDecls src prevDecl nextDecl
+      let actual =
         nextDecl.Range.StartLine - prevDecl.Range.EndLine
-        |> adjustByComment src prevDecl.Range nextDecl.Range expectedSpacing
-      if actualSpacing <> expectedSpacing then
-        if expectedSpacing - actualSpacing = 1 then
+        |> adjustByComment codeTrivia prevDecl.Range nextDecl.Range expected
+      if actual <> expected then
+        if expected - actual = 1 then
           Range.unionRanges prevDecl.Range nextDecl.Range
           |> fun range -> reportWarn src range "Use single blank line"
         else

@@ -4,8 +4,10 @@ module B2R2.FSLint.Utils
 open System
 open System.IO
 open System.Text.RegularExpressions
+open FSharp.Compiler.Text
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Syntax
+open FSharp.Compiler.SyntaxTrivia
 
 let [<Literal>] FakeFsPath = "FakeFsPathForUnitTest.fs"
 
@@ -23,6 +25,40 @@ let extractComparisonOperator = function
     | SynExpr.Ident(ident = id) -> Some id.idText
     | _ -> None
   | _ -> None
+
+/// Checks if there are compiler directives between two ranges
+let findDirectivesBetween (trivia: ParsedInputTrivia) prev next =
+  trivia.ConditionalDirectives
+  |> List.tryFind (function
+    | ConditionalDirectiveTrivia.If(_, range)
+    | ConditionalDirectiveTrivia.Else range
+    | ConditionalDirectiveTrivia.EndIf range ->
+      range.StartLine > (prev: range).EndLine &&
+      range.EndLine < (next: range).StartLine
+  )
+
+/// Checks if there are comments between two ranges using trivia information
+let findCommentsBetween (trivia: ParsedInputTrivia) startRange endRange =
+  trivia.CodeComments
+  |> List.tryFind (function
+    | CommentTrivia.LineComment range
+    | CommentTrivia.BlockComment range ->
+      range.StartLine >= (startRange: range).EndLine
+      && range.EndLine <= (endRange: range).StartLine
+      && Range.rangeContainsRange (Range.unionRanges startRange endRange) range)
+
+/// Counts lines occupied by comments between two ranges
+let countCommentLines (trivia: ParsedInputTrivia) (prev: range) next =
+  trivia.CodeComments
+  |> List.filter (function
+    | CommentTrivia.LineComment r ->
+      r.StartLine > prev.EndLine && r.EndLine < (next: range).StartLine
+    | CommentTrivia.BlockComment r ->
+      r.StartLine > prev.EndLine && r.EndLine < next.StartLine
+  )
+  |> List.sumBy (function
+    | CommentTrivia.LineComment _ -> 1
+    | CommentTrivia.BlockComment r -> r.EndLine - r.StartLine + 1)
 
 /// Collects all .fs source files under the given root directory
 let getFsFiles (root: string) =

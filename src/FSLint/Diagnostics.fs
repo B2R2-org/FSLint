@@ -113,7 +113,10 @@ module CustomReports =
     reportWarn src range "Use whitespace around '..'"
 
   let reportBracketSpacingError src range =
-    reportWarn src range "Use single whitespace in brackets"
+    reportWarn src range "Use single whitespace between bracket and element"
+
+  let reportBracketSpacingIncludeComment src range =
+    reportWarn src range "Use single whitespace between bracket and comment"
 
   let reportBracketNoSpacingError src range =
     reportWarn src range "Remove whitespace in brackets"

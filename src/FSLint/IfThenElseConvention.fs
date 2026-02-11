@@ -7,24 +7,34 @@ open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
 let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia =
-  if trivia.IfKeyword.EndLine = (ifExpr: SynExpr).Range.StartLine
+  let ifAdjustedRange =
+    let ifRange = (ifExpr: SynExpr).Range.EndRange
+    let thenRange = trivia.ThenKeyword.StartRange
+    match findCommentsBetween ifRange thenRange with
+    | Some(CommentTrivia.LineComment range)
+    | Some(CommentTrivia.BlockComment range) ->
+      Range.unionRanges ifExpr.Range range
+    | _ -> ifRange
+  let thenAdjustedRange =
+    let keyRange = trivia.ThenKeyword.EndRange
+    let exprRange = (thenExpr: SynExpr).Range
+    match findCommentsBetween keyRange exprRange.StartRange with
+    | Some(CommentTrivia.LineComment range)
+    | Some(CommentTrivia.BlockComment range) ->
+      Range.unionRanges range exprRange
+    | _ -> exprRange
+  if trivia.IfKeyword.EndLine = ifExpr.Range.StartLine
     && trivia.IfKeyword.EndColumn + 1 <> ifExpr.Range.StartColumn then
     Range.mkRange "" trivia.IfKeyword.End ifExpr.Range.Start
     |> fun range -> reportWarn src range "Use single whitespace after 'if'"
   elif trivia.ThenKeyword.EndLine = ifExpr.Range.EndLine
-    && trivia.ThenKeyword.StartColumn - 1 <> ifExpr.Range.EndColumn then
-    Range.mkRange "" ifExpr.Range.End trivia.ThenKeyword.Start
-    |> fun range ->
-      let str = (src: ISourceText).GetSubTextFromRange range
-      if str.Contains "(*" then ()
-      else reportWarn src range "Use single whitespace before 'then'"
-  elif trivia.ThenKeyword.EndLine = (thenExpr: SynExpr).Range.StartLine
-    && trivia.ThenKeyword.EndColumn + 1 <> thenExpr.Range.StartColumn then
-    Range.mkRange "" trivia.ThenKeyword.End thenExpr.Range.Start
-    |> fun range ->
-      let str = (src: ISourceText).GetSubTextFromRange range
-      if str.Contains "(*" then ()
-      else reportWarn src range "Use single whitespace after 'then'"
+    && trivia.ThenKeyword.StartColumn - 1 <> ifAdjustedRange.EndColumn then
+    Range.mkRange "" ifAdjustedRange.End trivia.ThenKeyword.Start
+    |> fun range -> reportWarn src range "Use single whitespace before 'then'"
+  elif trivia.ThenKeyword.EndLine = thenExpr.Range.StartLine
+    && trivia.ThenKeyword.EndColumn + 1 <> thenAdjustedRange.StartColumn then
+    Range.mkRange "" trivia.ThenKeyword.End thenAdjustedRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace after 'then'"
   elif Option.isSome trivia.ElseKeyword
     && trivia.ElseKeyword.Value.EndLine = (elseExpr: SynExpr).Range.StartLine
     && trivia.ElseKeyword.Value.EndColumn + 1 <> elseExpr.Range.StartColumn then

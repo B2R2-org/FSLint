@@ -316,6 +316,8 @@ let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
     | _ -> ()
   | SynExpr.TypeApp _
   | SynExpr.DotGet _
+  | SynExpr.Const _
+  | SynExpr.ArrayOrListComputed _
   | SynExpr.DotLambda _ -> ()
   | expr -> warn $"[AppConvention] TODO: {expr}"
   match argExpr with

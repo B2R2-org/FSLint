@@ -1,6 +1,5 @@
 module B2R2.FSLint.ArrayOrListConvention
 
-open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
@@ -32,40 +31,39 @@ let checkElementSpacing src (elemAndSepRanges: Range list) =
       |> reportSemiColonAfterSpacing src
     else ()
 
-let checkBracketComp (src: ISourceText) (elemRange: range) fullrange warnRange =
-  let added =
-    if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then 2
-    else 1
-  (Position.mkPos (elemRange.EndLine + added) 0,
-    Position.mkPos (fullrange: range).EndLine 0)
-  ||> Range.mkRange ""
-  |> src.GetSubTextFromRange
-  |> fun subStr ->
-    subStr.Split([| '\n' |], StringSplitOptions.None)
-    |> fun strArr ->
-      let flagStartIsWrong =
-        (Array.head strArr).TrimStart().StartsWith "#if" |> not
-      let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
-      if flagEndIsWrong || flagStartIsWrong then
-        reportBracketSpacingError src warnRange
-      else
-        ()
+/// Calculate based on open bracket.
+let checkSymmetry src (elemRange: range) (fullRange: range) hasCommentInFront =
+  if hasCommentInFront then
+    ()
+  elif elemRange.StartLine = fullRange.StartLine then
+    if elemRange.EndLine = fullRange.EndLine then
+      ()
+    else
+      Range.mkRange "" elemRange.End fullRange.End
+      |> fun range -> reportBracketSymmetry src range
+  elif elemRange.StartLine <> fullRange.StartLine then
+    if elemRange.EndLine = fullRange.EndLine then
+      Range.mkRange "" elemRange.End fullRange.End
+      |> fun range -> reportBracketSymmetry src range
+    else
+      ()
+  else
+    ()
 
 /// Checks proper spacing inside brackets for list/array literals.
 /// Ensures single space after opening and before closing brackets.
-let checkBracketSpacing src distFstElemToOpenBracket (elemRange: range) range =
-  if (range: range).StartColumn + distFstElemToOpenBracket
-    <> elemRange.StartColumn then
-    Range.mkRange "" range.Start elemRange.Start
-    |> fun warnRange ->
-      try checkBracketComp src elemRange range warnRange
-      with _ -> reportBracketSpacingError src warnRange
-  elif (range: range).EndColumn - distFstElemToOpenBracket
-    <> elemRange.EndColumn then
-    Range.mkRange "" elemRange.End range.End
-    |> fun warnRange ->
-    try checkBracketComp src elemRange range warnRange
-    with _ -> reportBracketSpacingError src warnRange
+let checkBracketSpacing src distFstElemToOpenBracket fRange (eRange: range) =
+  if (fRange: range).StartColumn + distFstElemToOpenBracket
+    <> eRange.StartColumn
+    && fRange.StartLine = eRange.StartLine && fRange.EndLine = eRange.EndLine
+  then
+    Range.mkRange "" fRange.Start eRange.Start
+    |> reportBracketSpacingError src
+  elif (fRange: range).EndColumn - distFstElemToOpenBracket <> eRange.EndColumn
+    && fRange.StartLine = eRange.StartLine && fRange.EndLine = eRange.EndLine
+  then
+    Range.mkRange "" eRange.End fRange.End
+    |> reportBracketSpacingError src
   else
     ()
 
@@ -110,7 +108,9 @@ let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
 /// Checks proper spacing in empty list/array literals.
 /// Ensures no space inside empty brackets (e.g., "[]" or "[||]" not "[ ]").
 let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
-  if expr.IsEmpty && range.EndColumn - range.StartColumn <> enclosureWidth then
+  let hasComment = findCommentsBetween range.StartRange range.EndRange
+  if expr.IsEmpty && range.EndColumn - range.StartColumn <> enclosureWidth
+    && Option.isNone hasComment then
     Range.shiftStart 0 (enclosureWidth / 2) range
     |> Range.shiftEnd 0 (-enclosureWidth / 2)
     |> fun range -> reportWarn src range "Remove whitespace in empty arraylist"
@@ -135,42 +135,6 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
       ()
   )
 
-let checkEdgeCompFlag (src: ISourceText) (elemRange: range) (range: range) =
-  let added =
-    if src.GetLineString(elemRange.EndLine).TrimStart().StartsWith "(*" then 2
-    else 1
-  (Position.mkPos (elemRange.EndLine + added) 0,
-    Position.mkPos range.EndLine 0)
-  ||> Range.mkRange ""
-  |> src.GetSubTextFromRange
-  |> fun subStr ->
-    subStr.Split([| '\n' |], StringSplitOptions.None)
-    |> fun strArr ->
-      let flagStartIsWrong =
-        (Array.head strArr).TrimStart().StartsWith "#if" |> not
-      let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
-      if flagEndIsWrong || flagStartIsWrong then
-        reportWarn src elemRange "Move element inline with bracket"
-      else
-        ()
-
-/// Checks proper bracket-element alignment in multi-line list/array literals.
-let checkElemIsInlineWithBracket src isArray (range: range) (elemRange: range) =
-  let distFstElemToOpeningBracket = if isArray then 3 else 2
-  let isOnlyCommentInlineWithBracket =
-    (src: ISourceText).GetLineString(range.StartLine - 1).IndexOf "(*"
-    - distFstElemToOpeningBracket = range.StartColumn
-  if isOnlyCommentInlineWithBracket then elemRange.EndLine - 1
-  else elemRange.EndLine
-  |> fun endLineOfElem ->
-    if (elemRange.StartLine <> range.StartLine
-      && not isOnlyCommentInlineWithBracket)
-      || endLineOfElem <> range.EndLine then
-      try checkEdgeCompFlag src elemRange range
-      with _ -> reportWarn src elemRange "Move element inline with bracket"
-    else
-      ()
-
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.
 let checkTrailingSeparator src fRange eRange =
@@ -193,31 +157,24 @@ let checkTrailingSeparator src fRange eRange =
 
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
-let adjustRangeByComment (src: ISourceText) (range: range) (expr: SynExpr) =
-  range.StartLine - expr.Range.StartLine
-  |> fun startLineDiff ->
-    if startLineDiff <> 0 then Range.shiftEnd startLineDiff 0 range else range
-    |> fun rangeAdjusted ->
-      let endLineString =
-        if range.StartLine <> range.EndLine then
-          src.GetLineString(range.EndLine - 1)
-        else
-          src.GetSubTextFromRange range
-      endLineString.IndexOf "(*"
-      |> fun openCommentIdxAtEndLine ->
-        if openCommentIdxAtEndLine <> -1 then
-          let closeCommentIdxAtEndLine =
-            endLineString.IndexOf "*)"
-            |> fun idx -> if idx = -1 then idx else idx + 2
-          openCommentIdxAtEndLine - closeCommentIdxAtEndLine - 1
-          |> fun amt -> Range.shiftEnd 0 amt rangeAdjusted
-        else
-          rangeAdjusted
+let adjustRangeByComment (outerRange: range) (expr: SynExpr) =
+  (match findCommentsBetween outerRange.StartRange expr.Range.StartRange
+   with
+   | Some(CommentTrivia.LineComment range)
+   | Some(CommentTrivia.BlockComment range) ->
+     Range.unionRanges range expr.Range, true
+   | None -> expr.Range, false)
+  |> fun (exprRange, hasCommentInFront) ->
+    match findCommentsBetween exprRange.EndRange outerRange.EndRange with
+    | Some(CommentTrivia.LineComment range)
+    | Some(CommentTrivia.BlockComment range) ->
+      Range.unionRanges exprRange range, hasCommentInFront
+    | None -> exprRange, hasCommentInFront
 
 let checkCommon src isArray full elem =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
   checkTrailingSeparator src full elem
-  checkBracketSpacing src distFstElemToOpeningBracket elem full
+  checkBracketSpacing src distFstElemToOpeningBracket full elem
 
 let rec checkSingleLine src = function
   | SynExpr.Sequential _ as expr ->
@@ -249,20 +206,25 @@ let rec checkSingleLine src = function
   | SynExpr.App _ -> () (* No need to check string here *)
   | expr -> warn $"[checkSingleLine]TODO: {expr}"
 
-let checkMultiLine src isArray range = function
+let checkMultiLine src range = function
   | SynExpr.Sequential _ as expr ->
     checkOpeningBracketIsInlineWithLet src range
     collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
-    checkElemIsInlineWithBracket src isArray range expr.Range
   | SynExpr.ArrayOrListComputed _
   | SynExpr.Record _
   | SynExpr.App _
+  | SynExpr.Const _
+  | SynExpr.Paren _
   | SynExpr.ForEach _ -> () (* No need to check string here *)
   | expr -> warn $"[checkMultiLine]TODO: {expr}"
 
-let check src isArray (range: Range) expr =
-  let rangeAdjusted = adjustRangeByComment src range expr
-  checkCommon src isArray rangeAdjusted expr.Range
-  if range.StartLine = range.EndLine then checkSingleLine src expr
-  else checkMultiLine src isArray rangeAdjusted expr
+let check src isArray (fRange: Range) expr =
+  let elemRangeAdjusted, hasCommentInFront =
+    adjustRangeByComment fRange expr
+  checkCommon src isArray fRange elemRangeAdjusted
+  checkSymmetry src elemRangeAdjusted fRange hasCommentInFront
+  if fRange.StartLine = fRange.EndLine then
+    checkSingleLine src expr
+  else
+    checkMultiLine src fRange expr

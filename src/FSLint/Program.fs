@@ -137,7 +137,8 @@ and checkExpression src = function
     IfThenElseConvention.check src ifExpr thenExpr elseExpr range trivia
     checkExpression src ifExpr
     checkExpression src thenExpr
-    if Option.isSome elseExpr then checkExpression src (Option.get elseExpr)
+    if Option.isSome elseExpr
+    then checkExpression src (Option.get elseExpr)
     else ()
   | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
     checkExpression src expr
@@ -425,8 +426,8 @@ and checkBinding src case binding =
   checkPattern src case false trivia pat
   if Option.isSome trivia.EqualsRange
     && trivia.LeadingKeyword.IsNew |> not then
-    DeclarationConvention.checkEqualSpacing
-      src pat.Range trivia.EqualsRange.Value body.Range returnInfo
+    DeclarationConvention.checkEqualSpacing src pat.Range
+      trivia.EqualsRange.Value body.Range returnInfo
   else
     ()
   DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
@@ -445,8 +446,7 @@ and checkTypeDefnWithContext src context typeDefn =
   let SynTypeDefn(typeInfo = componentInfo
                   typeRepr = repr
                   members = explicitMembers) = typeDefn
-  let SynComponentInfo(typeParams = typeParams
-                       accessibility = typeAccess) = componentInfo
+  let SynComponentInfo(accessibility = typeAccess) = componentInfo
   typeAccess |> Option.iter (fun _ ->
     let explicitAccess = getAccessLevel typeAccess
     if explicitAccess <= context.ModuleAccess then
@@ -517,8 +517,7 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
         ClassDefinition.checkNestedTypeDefns src range typeDefns
       else
         ()
-      for typeDefn in typeDefns do
-        checkTypeDefnWithContext src context typeDefn
+      for typeDefn in typeDefns do checkTypeDefnWithContext src context typeDefn
     | SynModuleDecl.Open _
     | SynModuleDecl.HashDirective _
     | SynModuleDecl.Exception _
@@ -531,23 +530,29 @@ and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
   checkDeclarationsWithContext src decls { ModuleAccess = Public }
 
 let checkWithAST src = function
-  | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules)) ->
-    modules
-    |> List.iter (fun m ->
-      let SynModuleOrNamespace(longId = lid
-                               decls = decls
-                               attribs = attribs
-                               accessibility = access
-                               trivia = trivia) = m
-      match trivia.LeadingKeyword with
-      | SynModuleOrNamespaceLeadingKeyword.Module range ->
-        DeclarationConvention.checkAttributesLineSpacing src attribs range
-      | _ -> ()
-      for id in lid do
-        IdentifierConvention.check src PascalCase true id.idText id.idRange
-      { ModuleAccess = getAccessLevel access }
-      |> checkDeclarationsWithContext src decls
-    )
+  | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules
+                                             trivia = codeTrivia)) ->
+    try
+      asyncLocal.Value <- codeTrivia
+      modules
+      |> List.iter (fun m ->
+        let SynModuleOrNamespace(longId = lid
+                                 decls = decls
+                                 attribs = attribs
+                                 accessibility = access
+                                 trivia = trivia) = m
+        match trivia.LeadingKeyword with
+        | SynModuleOrNamespaceLeadingKeyword.Module range ->
+          DeclarationConvention.checkAttributesLineSpacing src attribs
+            range
+        | _ -> ()
+        for id in lid do
+          IdentifierConvention.check src PascalCase true id.idText id.idRange
+        { ModuleAccess = getAccessLevel access }
+        |> checkDeclarationsWithContext src decls
+      )
+    finally
+      asyncLocal.Value <- Unchecked.defaultof<ParsedInputTrivia>
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 

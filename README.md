@@ -11,30 +11,30 @@ guidelines. Unfortunately, existing tools like
 [FSharpLint](https://github.com/fsprojects/FSharpLint) does not meet our needs
 and is not actively maintained. So we decided to create our own linter.
 
-## VS Code Extension Development
+## Installation
 
-### Building the Extension
+### From Marketplace
+
+**VS Code:**
+- Install from [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=B2R2.fslint)
+- Or search for "FSLint" in VS Code Extensions view
+
+**Visual Studio:**
+- Install from [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=B2R2.B2R2)
+- Or use Extensions → Manage Extensions in Visual Studio
+
+### Manual Installation
+
+**VS Code:**
 ```bash
-# 1. Build F# Language Server
-cd src/FSLint.LanguageServer
-dotnet publish -c Release -o ../../vscode-extension/bin
-
-# 2. Build VS Code Extension
-cd ../../vscode-extension
-npm install
-npm run compile
-
-# 3. Package Extension (Optional)
-npm run package  # Creates fslint-1.0.0.vsix
+cd extension/vscode
+./build.sh
+code --install-extension fslint-*.vsix
 ```
 
-### Running in Development
-
-1. Open `vscode-extension/` folder in VS Code
-2. Press F5 to launch Extension Development Host
-3. Open any `.fs` file to see FSLint diagnostics
-
-### Installing the Extension
-```bash
-code --install-extension fslint-1.0.0.vsix
+**Visual Studio:**
+```powershell
+cd extension/vs
+.\build.ps1
+# Then install the generated .vsix file through Visual Studio
 ```

@@ -77,6 +77,11 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.0.3
+
+- Relax Declaration and ArrayOrList rules
+- Use ParsedInput instead of source-aware algorithm
+
 ### 1.0.2
 
 - Linting is no longer performed in real time and is now executed on file save.

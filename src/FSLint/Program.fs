@@ -70,7 +70,7 @@ and checkMatchClause (src: ISourceText) clause codeTrivia =
                      trivia = trivia) = clause
   if Option.isSome trivia.ArrowRange then
     PatternMatchingConvention.checkArrowSpacing
-      src pat.Range whenExpr expr.Range trivia.ArrowRange.Value
+      src pat.Range whenExpr expr.Range trivia.ArrowRange.Value codeTrivia
   else
     ()
   PatternMatchingConvention.checkBody src pat
@@ -135,6 +135,7 @@ and checkExpression src codeTrivia = function
                        trivia = trivia) ->
     NegationSimplificationConvention.check src ifExpr
     IfThenElseConvention.check src ifExpr thenExpr elseExpr range trivia
+      codeTrivia
     checkExpression src codeTrivia ifExpr
     checkExpression src codeTrivia thenExpr
     if Option.isSome elseExpr
@@ -163,11 +164,11 @@ and checkExpression src codeTrivia = function
     TryWithConvention.check src clauses
     for clause in clauses do checkMatchClause src clause codeTrivia
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
-    ArrayOrListConvention.check src isArray range expr
+    ArrayOrListConvention.check src isArray range expr codeTrivia
     checkExpression src codeTrivia expr
   | SynExpr.ArrayOrList(isArray, exprs, range) ->
     let enclosureWidth = if isArray then 4 else 2
-    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
+    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range codeTrivia
     for expr in exprs do checkExpression src codeTrivia expr
   | SynExpr.App(flag = flag
                 isInfix = isInfix
@@ -536,23 +537,26 @@ and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) codeTriv =
 let checkWithAST src = function
   | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules
                                              trivia = codeTrivia)) ->
-    modules
-    |> List.iter (fun m ->
-      let SynModuleOrNamespace(longId = lid
-                               decls = decls
-                               attribs = attribs
-                               accessibility = access
-                               trivia = trivia) = m
-      match trivia.LeadingKeyword with
-      | SynModuleOrNamespaceLeadingKeyword.Module range ->
-        DeclarationConvention.checkAttributesLineSpacing src codeTrivia attribs
-          range
-      | _ -> ()
-      for id in lid do
-        IdentifierConvention.check src PascalCase true id.idText id.idRange
-      { ModuleAccess = getAccessLevel access }
-      |> checkDeclarationsWithContext src decls codeTrivia
-    )
+    try
+      modules
+      |> List.iter (fun m ->
+        let SynModuleOrNamespace(longId = lid
+                                 decls = decls
+                                 attribs = attribs
+                                 accessibility = access
+                                 trivia = trivia) = m
+        match trivia.LeadingKeyword with
+        | SynModuleOrNamespaceLeadingKeyword.Module range ->
+          DeclarationConvention.checkAttributesLineSpacing src codeTrivia attribs
+            range
+        | _ -> ()
+        for id in lid do
+          IdentifierConvention.check src PascalCase true id.idText id.idRange
+        { ModuleAccess = getAccessLevel access }
+        |> checkDeclarationsWithContext src decls codeTrivia
+      )
+    finally
+      asyncLocal.Value <- Unchecked.defaultof<ParsedInputTrivia>
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 

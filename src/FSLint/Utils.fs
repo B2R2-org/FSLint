@@ -3,11 +3,14 @@ module B2R2.FSLint.Utils
 
 open System
 open System.IO
+open System.Threading
 open System.Text.RegularExpressions
 open FSharp.Compiler.Text
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
+
+let asyncLocal = AsyncLocal<ParsedInputTrivia>()
 
 let [<Literal>] FakeFsPath = "FakeFsPathForUnitTest.fs"
 

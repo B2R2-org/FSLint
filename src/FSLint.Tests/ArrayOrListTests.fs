@@ -55,16 +55,6 @@ type ArrayOrListTests() =
 [ startIdent..2 .. endIdent ]
 """
 
-  let goodCommentPositionTest =
-    """
-[ 1; 2; 3 (* Good *) ]
-"""
-
-  let badCommentPositionTest =
-    """
-[ 1; 2; 3(* Bad *) ]
-"""
-
   let goodMultiLineBracketSpacingTest =
     """
 [ 1
@@ -138,20 +128,6 @@ let bad = [
   3 ]
 """
 
-  let goodMultiLineCommentPositionTest =
-    """
-[ 1
-  2
-  3 (* Good *) ]
-"""
-
-  let badMultiLineCommentPositionTest =
-    """
-[ 1
-  2
-  3(* Bad *) ]
-"""
-
   let goodNestedBracketSpacingTest =
     """
 [ [ 1; 2 ]; [ 3; 4 ] ]
@@ -198,6 +174,43 @@ let bad = [
   let badNestedMixElementSpacingTest =
     """
 [ [| 1;2 |]; [| 3; 4 |] ]
+"""
+
+  let goodNestedSymmetry =
+    """
+[ [| 1
+     2 |]
+  [| 3
+     4 |] ]
+"""
+
+  let badNestedSymmetry =
+    """
+[ [| 1
+     2 |]
+  [| 3
+     4
+  |] ]
+"""
+
+  let goodIndentation =
+    """
+[
+  [|
+    1
+    2
+  |]
+]
+"""
+
+  let badIndentation =
+    """
+[
+  [|
+      1
+      2
+  |]
+ ]
 """
 
   [<TestMethod>]
@@ -283,13 +296,6 @@ let bad = [
     ) |> ignore
 
   [<TestMethod>]
-  member _.``[ArrayOrList] List Comment Position Test``() =
-    linterForFs.Lint(FakeFsPath, goodCommentPositionTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badCommentPositionTest)
-    ) |> ignore
-
-  [<TestMethod>]
   member _.``[ArrayOrList] List Bracket Spacing MultiLine Test``() =
     linterForFs.Lint(FakeFsPath, goodMultiLineBracketSpacingTest)
     Assert.ThrowsException<LintException>(fun () ->
@@ -323,13 +329,6 @@ let bad = [
     linterForFs.Lint(FakeFsPath, goodSeparatorNotInLineEndingTest)
     Assert.ThrowsException<LintException>(fun () ->
       linterForFs.Lint(FakeFsPath, badSeparatorNotInLineEndingTest)
-     ) |> ignore
-
-  [<TestMethod>]
-  member _.``[ArrayOrList] List Comment Position MultiLine Test``() =
-    linterForFs.Lint(FakeFsPath, goodMultiLineCommentPositionTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badMultiLineCommentPositionTest)
      ) |> ignore
 
   [<TestMethod>]

@@ -115,8 +115,11 @@ module CustomReports =
   let reportBracketSpacingError src range =
     reportWarn src range "Use single whitespace between bracket and element"
 
-  let reportBracketSpacingIncludeComment src range =
-    reportWarn src range "Use single whitespace between bracket and comment"
+  let reportBracketSymmetry src range =
+    reportWarn src range "Use consistent bracket placement"
+
+  let reportBracketIndentation src range =
+    reportWarn src range "Use 2 indentation"
 
   let reportBracketNoSpacingError src range =
     reportWarn src range "Remove whitespace in brackets"

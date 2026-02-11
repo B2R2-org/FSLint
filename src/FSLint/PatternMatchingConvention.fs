@@ -244,65 +244,44 @@ let private checkPatternSpacing src clauses =
   )
 
 /// Checks for missing or extra spaces around '->' in match cases.
-let checkArrowSpacing src patRange whenExpr bodyRange (arrowRange: range) =
+let checkArrowSpacing src patRange whenExpr (bodyRange: range) (arrowRange: range) codeTrivia =
   let patRange =
     if Option.isSome (whenExpr: option<SynExpr>) then whenExpr.Value.Range
     else patRange
+  let patRangeAdjusted =
+    match findCommentsBetween codeTrivia patRange.EndRange arrowRange.StartRange with
+    | Some(CommentTrivia.LineComment range)
+    | Some(CommentTrivia.BlockComment range) -> Range.unionRanges patRange range
+    | _ -> patRange
+  let bodyRangeAdjusted =
+    match findCommentsBetween codeTrivia arrowRange.EndRange bodyRange.StartRange with
+    | Some(CommentTrivia.LineComment range)
+    | Some(CommentTrivia.BlockComment range) ->
+      Range.unionRanges range bodyRange
+    | _ ->
+      bodyRange
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
-    if patRange.EndColumn + 1 <> arrowRange.StartColumn then
-      let gap = Range.mkRange "" patRange.End arrowRange.Start
-      let gapStr = gap |> (src: ISourceText).GetSubTextFromRange
-      if gapStr.TrimStart().StartsWith "(*" then
-        let commentIdxIngap = gapStr.IndexOf "(*"
-        if commentIdxIngap <> 1 then
-          let commentIdx = commentIdxIngap + patRange.EndColumn
-          Range.mkRange "" patRange.End
-            (Position.mkPos patRange.StartLine commentIdx)
-          |> fun range ->
-            reportWarn src range "Use single whitespace before '(*'"
-        else
-          ()
-      else
-        ()
-      if gapStr.TrimEnd().EndsWith "*)" then
-        let commentIdxIngap = gapStr.LastIndexOf "*)"
-        if arrowRange.StartColumn
-          <> patRange.EndColumn + commentIdxIngap + 3 then
-          let commentIdx = patRange.EndColumn + commentIdxIngap + 2
-          Range.mkRange "" (Position.mkPos patRange.StartLine commentIdx)
-            arrowRange.Start
-          |> fun range ->
-            reportWarn src range "Use single whitespace after '*)'"
-        else
-          ()
-      else
-        Range.mkRange "" patRange.End arrowRange.Start
+    if patRangeAdjusted.EndColumn + 1 <> arrowRange.StartColumn then
+        Range.mkRange "" patRangeAdjusted.End arrowRange.Start
         |> reportArrowBeforeSpacing src
-    elif arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
-      Range.mkRange "" arrowRange.End bodyRange.Start
-      |> fun range ->
-        let str = (src: ISourceText).GetSubTextFromRange range
-        if str.Contains "(*" then () else reportArrowAfterSpacing src range
-    elif patRange.EndColumn = arrowRange.StartColumn
-      && arrowRange.EndColumn = bodyRange.StartColumn then
-      Range.mkRange "" patRange.End bodyRange.Start
+    elif arrowRange.EndColumn + 1 <> bodyRangeAdjusted.StartColumn then
+      Range.mkRange "" arrowRange.End bodyRangeAdjusted.Start
+      |> fun range -> reportArrowAfterSpacing src range
+    elif patRangeAdjusted.EndColumn = arrowRange.StartColumn
+      && arrowRange.EndColumn = bodyRangeAdjusted.StartColumn then
+      Range.mkRange "" patRangeAdjusted.End bodyRangeAdjusted.Start
       |> fun range -> reportWarn src range "Use single whitespace around '->'"
     else
       ()
   else
     if patRange.EndLine = arrowRange.StartLine then
-      if patRange.EndColumn + 1 <> arrowRange.StartColumn then
-        let gap = Range.unionRanges patRange.EndRange arrowRange.StartRange
-        let gapStr = gap |> src.GetSubTextFromRange
-        if gapStr.Contains "(*" then
-          ()
-        else
-          Range.mkRange "" patRange.End arrowRange.Start
-          |> reportArrowBeforeSpacing src
+      if patRangeAdjusted.EndColumn + 1 <> arrowRange.StartColumn then
+        Range.mkRange "" patRangeAdjusted.End arrowRange.Start
+        |> reportArrowBeforeSpacing src
       else
         ()
-    elif arrowRange.EndColumn + 1 <> bodyRange.StartColumn then
-      Range.mkRange "" arrowRange.End bodyRange.Start
+    elif arrowRange.EndColumn + 1 <> bodyRangeAdjusted.StartColumn then
+      Range.mkRange "" arrowRange.End bodyRangeAdjusted.Start
       |> reportArrowAfterSpacing src
     else
       ()

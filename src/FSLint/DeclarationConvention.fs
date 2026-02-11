@@ -9,9 +9,9 @@ open Diagnostics
 
 /// Adjusts actual spacing by subtracting comment lines
 /// TODO: Condition directives checks
-let private adjustByComment trivia prev next expectedSpacing actualSpacing =
-  if Option.isSome (findDirectivesBetween trivia prev next) then expectedSpacing
-  else actualSpacing - countCommentLines trivia prev next
+let private adjustByComment prev next expectedSpacing actualSpacing =
+  if Option.isSome (findDirectivesBetween prev next) then expectedSpacing
+  else actualSpacing - countCommentLines prev next
 
 let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   let normalCase =
@@ -26,7 +26,7 @@ let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   then normalCase - 1
   else normalCase
 
-let checkEqualSpacing src trivia patRange equalRange bodyRange retInfo =
+let checkEqualSpacing src patRange equalRange bodyRange retInfo =
   let patRange =
     if Option.isSome (retInfo: option<SynBindingReturnInfo>) then
       let SynBindingReturnInfo(range = range) = retInfo.Value
@@ -36,7 +36,7 @@ let checkEqualSpacing src trivia patRange equalRange bodyRange retInfo =
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
     if patRange.EndColumn + 1 <> (equalRange: range).StartColumn then
       let commentBeforeEqual =
-        findCommentsBetween trivia patRange.EndRange equalRange.StartRange
+        findCommentsBetween patRange.EndRange equalRange.StartRange
       if Option.isNone commentBeforeEqual then
         Range.mkRange "" patRange.End equalRange.Start
         |> reportEqaulBeforeSpacing src
@@ -46,7 +46,7 @@ let checkEqualSpacing src trivia patRange equalRange bodyRange retInfo =
       ()
     if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
       let commentAfterEqual =
-        findCommentsBetween trivia equalRange.EndRange bodyRange.StartRange
+        findCommentsBetween equalRange.EndRange bodyRange.StartRange
       if Option.isNone commentAfterEqual then
         Range.mkRange "" equalRange.End bodyRange.Start
         |> reportEqaulAfterSpacing src
@@ -64,7 +64,7 @@ let checkEqualSpacing src trivia patRange equalRange bodyRange retInfo =
     if patRange.EndLine = equalRange.StartLine then
       if patRange.EndColumn + 1 <> equalRange.StartColumn then
         let commentBeforeEqual =
-          findCommentsBetween trivia patRange.EndRange equalRange.StartRange
+          findCommentsBetween patRange.EndRange equalRange.StartRange
         if Option.isNone commentBeforeEqual then
           Range.mkRange "" patRange.End equalRange.Start
           |> reportEqaulBeforeSpacing src
@@ -75,7 +75,7 @@ let checkEqualSpacing src trivia patRange equalRange bodyRange retInfo =
     else
       if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
         let commentAfterEqual =
-          findCommentsBetween trivia equalRange.EndRange bodyRange.StartRange
+          findCommentsBetween equalRange.EndRange bodyRange.StartRange
         if Option.isNone commentAfterEqual then
           Range.mkRange "" equalRange.End bodyRange.Start
           |> reportEqaulAfterSpacing src
@@ -99,12 +99,11 @@ let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
   | None ->
     ()
 
-let checkAttributesLineSpacing src trivia attrs (moduleRange: range) =
+let checkAttributesLineSpacing src attrs (moduleRange: range) =
   let lastAttr = List.tryLast (attrs: SynAttributes)
   if Option.isSome lastAttr then
     let attrRange = lastAttr.Value.Range
-    let hasComments = findCommentsBetween trivia attrRange moduleRange
-    if Option.isNone hasComments
+    if Option.isNone (findCommentsBetween attrRange moduleRange)
       && attrRange.EndLine + 1 <> moduleRange.StartLine
       && attrRange.StartLine <> moduleRange.StartLine then
       Range.mkRange "" (Position.mkPos (moduleRange.StartLine - 1) 0)
@@ -128,7 +127,7 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   else
     ()
 
-let check (src: ISourceText) decls codeTrivia =
+let check (src: ISourceText) decls =
   decls
   |> List.pairwise
   |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
@@ -136,7 +135,7 @@ let check (src: ISourceText) decls codeTrivia =
       let expected = calculateSpacingBetweenDecls src prevDecl nextDecl
       let actual =
         nextDecl.Range.StartLine - prevDecl.Range.EndLine
-        |> adjustByComment codeTrivia prevDecl.Range nextDecl.Range expected
+        |> adjustByComment prevDecl.Range nextDecl.Range expected
       if actual <> expected then
         if expected - actual = 1 then
           Range.unionRanges prevDecl.Range nextDecl.Range

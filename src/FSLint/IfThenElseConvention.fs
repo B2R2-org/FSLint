@@ -6,11 +6,11 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
-let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia codeTriv =
+let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia =
   let ifAdjustedRange =
     let ifRange = (ifExpr: SynExpr).Range.EndRange
     let thenRange = trivia.ThenKeyword.StartRange
-    match findCommentsBetween codeTriv ifRange thenRange with
+    match findCommentsBetween ifRange thenRange with
     | Some(CommentTrivia.LineComment range)
     | Some(CommentTrivia.BlockComment range) ->
       Range.unionRanges ifExpr.Range range
@@ -18,7 +18,7 @@ let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia codeTriv =
   let thenAdjustedRange =
     let keyRange = trivia.ThenKeyword.EndRange
     let exprRange = (thenExpr: SynExpr).Range
-    match findCommentsBetween codeTriv keyRange exprRange.StartRange with
+    match findCommentsBetween keyRange exprRange.StartRange with
     | Some(CommentTrivia.LineComment range)
     | Some(CommentTrivia.BlockComment range) ->
       Range.unionRanges range exprRange
@@ -43,17 +43,17 @@ let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia codeTriv =
   else
     ()
 
-let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia codeTri =
+let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
   match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
   | Some _ ->
-    checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia codeTri
+    checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
   | None ->
     let line =
       (src: ISourceText).GetLineString (thenExpr: SynExpr).Range.EndLine
     if line.TrimStart().StartsWith "elif" && Option.isSome elseExpr then
-      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia codeTri
+      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
     elif line.TrimStart().StartsWith "else" && Option.isSome elseExpr then
-      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia codeTri
+      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
     elif line.TrimStart().StartsWith "(*"
       || line.TrimStart().StartsWith "///" then
       Range.mkRange "" thenExpr.Range.Start (range: range).End

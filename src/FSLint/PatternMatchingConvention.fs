@@ -244,17 +244,18 @@ let private checkPatternSpacing src clauses =
   )
 
 /// Checks for missing or extra spaces around '->' in match cases.
-let checkArrowSpacing src patRange whenExpr (bodyRange: range) (arrowRange: range) codeTrivia =
+let checkArrowSpacing src patRange whenExpr (bodyRange: range)
+  (arrowRange: range) =
   let patRange =
     if Option.isSome (whenExpr: option<SynExpr>) then whenExpr.Value.Range
     else patRange
   let patRangeAdjusted =
-    match findCommentsBetween codeTrivia patRange.EndRange arrowRange.StartRange with
+    match findCommentsBetween patRange.EndRange arrowRange.StartRange with
     | Some(CommentTrivia.LineComment range)
     | Some(CommentTrivia.BlockComment range) -> Range.unionRanges patRange range
     | _ -> patRange
   let bodyRangeAdjusted =
-    match findCommentsBetween codeTrivia arrowRange.EndRange bodyRange.StartRange with
+    match findCommentsBetween arrowRange.EndRange bodyRange.StartRange with
     | Some(CommentTrivia.LineComment range)
     | Some(CommentTrivia.BlockComment range) ->
       Range.unionRanges range bodyRange

@@ -63,14 +63,14 @@ and checkSimplePattern src case = function
   | pat ->
     failwith $"{nameof checkSimplePattern} TODO: {pat}"
 
-and checkMatchClause (src: ISourceText) clause codeTrivia =
+and checkMatchClause (src: ISourceText) clause =
   let SynMatchClause(pat = pat
                      whenExpr = whenExpr
                      resultExpr = expr
                      trivia = trivia) = clause
   if Option.isSome trivia.ArrowRange then
     PatternMatchingConvention.checkArrowSpacing
-      src pat.Range whenExpr expr.Range trivia.ArrowRange.Value codeTrivia
+      src pat.Range whenExpr expr.Range trivia.ArrowRange.Value
   else
     ()
   PatternMatchingConvention.checkBody src pat
@@ -85,16 +85,16 @@ and checkMatchClause (src: ISourceText) clause codeTrivia =
   | _ -> ()
   if whenExpr.IsSome then
     FunctionCallConvention.checkMethodParenSpacing src whenExpr.Value
-    checkExpression src codeTrivia whenExpr.Value
+    checkExpression src whenExpr.Value
   else ()
-  checkExpression src codeTrivia expr
+  checkExpression src expr
 
-and checkExpression src codeTrivia = function
+and checkExpression src = function
   | SynExpr.Paren(expr = innerExpr) as expr ->
     ParenConvention.checkExpr src expr
-    checkExpression src codeTrivia innerExpr
+    checkExpression src innerExpr
   | SynExpr.Typed(expr = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.Lambda(args = args
                    body = body
                    range = lambdaRange
@@ -110,24 +110,24 @@ and checkExpression src codeTrivia = function
         ParenConvention.checkPat src pat
         TypeAnnotation.checkFieldWidthByPat src pat
         TypeAnnotation.checkParamTypeSpacing src pat
-      checkExpression src codeTrivia body
-      checkExpression src codeTrivia expr
+      checkExpression src body
+      checkExpression src expr
     else
-      checkExpression src codeTrivia body
+      checkExpression src body
   | SynExpr.LetOrUse(bindings = bindings; body = body) ->
-    checkBindings src LowerCamelCase bindings codeTrivia
-    checkExpression src codeTrivia body
+    checkBindings src LowerCamelCase bindings
+    checkExpression src body
   | SynExpr.ForEach(pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
     PatternMatchingConvention.checkBody src pat
-    checkExpression src codeTrivia enumExpr
-    checkExpression src codeTrivia bodyExpr
+    checkExpression src enumExpr
+    checkExpression src bodyExpr
   | SynExpr.Do(expr = expr)
   | SynExpr.DoBang(expr = expr)
   | SynExpr.For(doBody = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.While(whileExpr = whileExpr; doExpr = doExpr) ->
-    checkExpression src codeTrivia whileExpr
-    checkExpression src codeTrivia doExpr
+    checkExpression src whileExpr
+    checkExpression src doExpr
   | SynExpr.IfThenElse(ifExpr = ifExpr
                        thenExpr = thenExpr
                        elseExpr = elseExpr
@@ -135,41 +135,40 @@ and checkExpression src codeTrivia = function
                        trivia = trivia) ->
     NegationSimplificationConvention.check src ifExpr
     IfThenElseConvention.check src ifExpr thenExpr elseExpr range trivia
-      codeTrivia
-    checkExpression src codeTrivia ifExpr
-    checkExpression src codeTrivia thenExpr
+    checkExpression src ifExpr
+    checkExpression src thenExpr
     if Option.isSome elseExpr
-    then checkExpression src codeTrivia (Option.get elseExpr)
+    then checkExpression src (Option.get elseExpr)
     else ()
   | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
     PatternMatchingConvention.checkFormat src clauses
   | SynExpr.Match(expr = expr; clauses = clauses; trivia = trivia) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
     PatternMatchingConvention.checkBarIsSameColWithMatch src clauses trivia
     PatternMatchingConvention.checkFormat src clauses
-    for clause in clauses do checkMatchClause src clause codeTrivia
+    for clause in clauses do checkMatchClause src clause
   | SynExpr.MatchLambda(matchClauses = clauses) ->
-    for clause in clauses do checkMatchClause src clause codeTrivia
+    for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple(exprs = exprs; commaRanges = commaRanges) ->
     TupleConvention.check src exprs commaRanges
     for expr in exprs do
       FunctionCallConvention.checkMethodParenSpacing src expr
-      checkExpression src codeTrivia expr
+      checkExpression src expr
   | SynExpr.TryFinally(tryExpr = tryExpr; finallyExpr = finallyExpr) ->
-    checkExpression src codeTrivia tryExpr
-    checkExpression src codeTrivia finallyExpr
+    checkExpression src tryExpr
+    checkExpression src finallyExpr
   | SynExpr.TryWith(tryExpr = tryExpr; withCases = clauses) ->
-    checkExpression src codeTrivia tryExpr
+    checkExpression src tryExpr
     TryWithConvention.check src clauses
-    for clause in clauses do checkMatchClause src clause codeTrivia
+    for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
-    ArrayOrListConvention.check src isArray range expr codeTrivia
-    checkExpression src codeTrivia expr
+    ArrayOrListConvention.check src isArray range expr
+    checkExpression src expr
   | SynExpr.ArrayOrList(isArray, exprs, range) ->
     let enclosureWidth = if isArray then 4 else 2
-    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range codeTrivia
-    for expr in exprs do checkExpression src codeTrivia expr
+    ArrayOrListConvention.checkEmpty src enclosureWidth exprs range
+    for expr in exprs do checkExpression src expr
   | SynExpr.App(flag = flag
                 isInfix = isInfix
                 funcExpr = funcExpr
@@ -185,25 +184,25 @@ and checkExpression src codeTrivia = function
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix flag funcExpr argExpr
       AppConvention.checkUnaryOperatorSpacing src expr
-      checkExpression src codeTrivia funcExpr
-      checkExpression src codeTrivia argExpr
+      checkExpression src funcExpr
+      checkExpression src argExpr
   | SynExpr.Sequential(expr1 = expr1; expr2 = expr2) ->
-    checkExpression src codeTrivia expr1
-    checkExpression src codeTrivia expr2
+    checkExpression src expr1
+    checkExpression src expr2
   | SynExpr.DotSet(targetExpr = targetExpr; rhsExpr = rhsExpr) ->
-    checkExpression src codeTrivia targetExpr
-    checkExpression src codeTrivia rhsExpr
+    checkExpression src targetExpr
+    checkExpression src rhsExpr
   | SynExpr.DotGet(expr, dotm, longDotId, _) ->
     FunctionCallConvention.checkDotGetSpacing src expr dotm longDotId
     FunctionCallConvention.checkMethodParenSpacing src expr
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.YieldOrReturn(expr = expr)
   | SynExpr.YieldOrReturnFrom(expr = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.Upcast(expr = expr; targetType = targetType)
   | SynExpr.Downcast(expr = expr; targetType = targetType) ->
     TypeCastConvention.check src expr targetType
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.Const _ as expr ->
     ParenConvention.checkExpr src expr
   | SynExpr.TypeApp(expr = expr
@@ -212,35 +211,35 @@ and checkExpression src codeTrivia = function
                     greaterRange = greater
                     typeArgsRange = range) ->
     TypeUseConvention.check src expr typeArgs (Some less) greater range
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.ObjExpr(bindings = bindings; members = members) ->
-    checkBindings src LowerCamelCase bindings codeTrivia
-    checkMemberDefns src members false codeTrivia
+    checkBindings src LowerCamelCase bindings
+    checkMemberDefns src members false
   | SynExpr.ComputationExpr(expr = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.New(targetType = targetType; expr = expr) ->
     TypeConstructor.checkConstructorSpacing src targetType expr
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.LongIdentSet(expr = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.DotIndexedSet(objectExpr = objectExpr
                           indexArgs = indexArgs
                           valueExpr = valueExpr) ->
-    checkExpression src codeTrivia objectExpr
-    checkExpression src codeTrivia indexArgs
-    checkExpression src codeTrivia valueExpr
+    checkExpression src objectExpr
+    checkExpression src indexArgs
+    checkExpression src valueExpr
   | SynExpr.DotLambda(expr = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.Record(copyInfo = copyInfo
                    recordFields = recordFields
                    range = range) ->
     RecordConvention.checkConstructor src copyInfo recordFields range
     for recordField in recordFields do
       let SynExprRecordField(expr = expr) = recordField
-      if expr.IsSome then checkExpression src codeTrivia expr.Value
+      if expr.IsSome then checkExpression src expr.Value
       else ()
   | SynExpr.Lazy(expr = expr) ->
-    checkExpression src codeTrivia expr
+    checkExpression src expr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.DotIndexedGet _
@@ -267,18 +266,16 @@ and checkIdOpt src case = function
     IdentifierConvention.check src case true id.idText id.idRange
   | None -> failwith "?"
 
-and checkMemberDefns src members isDelegate codeTrivia =
+and checkMemberDefns src members isDelegate =
   for memberDefn in members do
     match memberDefn with
     | SynMemberDefn.Member(binding, _) ->
-      checkBinding src PascalCase binding codeTrivia
+      checkBinding src PascalCase binding
     | SynMemberDefn.GetSetMember(get, set, _, _) ->
-      if get.IsSome then checkBinding src PascalCase get.Value codeTrivia
-      else ()
-      if set.IsSome then checkBinding src PascalCase set.Value codeTrivia
-      else ()
+      if get.IsSome then checkBinding src PascalCase get.Value else ()
+      if set.IsSome then checkBinding src PascalCase set.Value else ()
     | SynMemberDefn.LetBindings(bindings = bindings) ->
-      checkBindings src LowerCamelCase bindings codeTrivia
+      checkBindings src LowerCamelCase bindings
     | SynMemberDefn.AbstractSlot(slotSig = SynValSig(ident = id
                                                      synType = synType
                                                      trivia = trivia)) ->
@@ -293,7 +290,7 @@ and checkMemberDefns src members isDelegate codeTrivia =
       IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.Interface(members = Some members) ->
       ClassMemberConvention.checkMemberOrder src members
-      checkMemberDefns src members isDelegate codeTrivia
+      checkMemberDefns src members isDelegate
     | SynMemberDefn.ValField(SynField(idOpt = idOpt), _) ->
       checkIdOpt src PascalCase idOpt
     | SynMemberDefn.AutoProperty(ident = id
@@ -303,9 +300,9 @@ and checkMemberDefns src members isDelegate codeTrivia =
       TypeAnnotation.checkMember src id typ
       ClassMemberConvention.checkAutoPropertySpacing src id typ expr trivia
       IdentifierConvention.check src PascalCase true id.idText id.idRange
-      checkExpression src codeTrivia expr
+      checkExpression src expr
     | SynMemberDefn.ImplicitInherit(inheritArgs = inheritArgs) ->
-      checkExpression src codeTrivia inheritArgs
+      checkExpression src inheritArgs
     | SynMemberDefn.ImplicitCtor _
     | SynMemberDefn.Inherit _ ->
       () (* no need to check this *)
@@ -350,18 +347,18 @@ and checkExceptionDefnRepr src repr =
   let SynUnionCase(ident = SynIdent(ident = id); range = range) = caseName
   IdentifierConvention.check src PascalCase true id.idText range
 
-and checkTypeDefnRepr src repr trivia codeTrivia =
+and checkTypeDefnRepr src repr trivia =
   match repr with
   | SynTypeDefnRepr.ObjectModel(kind, members, _) ->
     ClassDefinition.checkIdentifierWithParen src members
     ClassMemberConvention.checkMemberOrder src members
-    checkMemberDefns src members kind.IsDelegate codeTrivia
+    checkMemberDefns src members kind.IsDelegate
   | SynTypeDefnRepr.Simple(repr, _) ->
     checkTypeDefnSimpleRepr src trivia repr
   | SynTypeDefnRepr.Exception repr ->
     checkExceptionDefnRepr src repr
 
-and checkTypeDefn src defn codeTrivia =
+and checkTypeDefn src defn =
   let SynTypeDefn(typeInfo = info
                   typeRepr = repr
                   members = members
@@ -405,8 +402,8 @@ and checkTypeDefn src defn codeTrivia =
         trivia.EqualsRange
     | _ ->
       TypeConstructor.checkEqualSpacing src range repr.Range trivia.EqualsRange
-  checkTypeDefnRepr src repr trivia codeTrivia
-  checkMemberDefns src members false codeTrivia
+  checkTypeDefnRepr src repr trivia
+  checkMemberDefns src members false
 
 and hasAttr attrName attrs =
   attrs
@@ -418,7 +415,7 @@ and hasAttr attrName attrs =
     )
   )
 
-and checkBinding src case binding codeTrivia =
+and checkBinding src case binding =
   let SynBinding(headPat = pat
                  expr = body
                  attributes = attrs
@@ -429,8 +426,8 @@ and checkBinding src case binding codeTrivia =
   checkPattern src case false trivia pat
   if Option.isSome trivia.EqualsRange
     && trivia.LeadingKeyword.IsNew |> not then
-    DeclarationConvention.checkEqualSpacing
-      src codeTrivia pat.Range trivia.EqualsRange.Value body.Range returnInfo
+    DeclarationConvention.checkEqualSpacing src pat.Range
+      trivia.EqualsRange.Value body.Range returnInfo
   else
     ()
   DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
@@ -440,17 +437,16 @@ and checkBinding src case binding codeTrivia =
   PatternMatchingConvention.checkBody src pat
   ClassMemberConvention.checkSelfIdentifierUsage src pat body
   TypeAnnotation.checkExprAnnotation src body
-  checkExpression src codeTrivia body
+  checkExpression src body
 
-and checkBindings src case bindings codeTrivia =
-  for binding in bindings do checkBinding src case binding codeTrivia
+and checkBindings src case bindings =
+  for binding in bindings do checkBinding src case binding
 
-and checkTypeDefnWithContext src context typeDefn codeTrivia =
+and checkTypeDefnWithContext src context typeDefn =
   let SynTypeDefn(typeInfo = componentInfo
                   typeRepr = repr
                   members = explicitMembers) = typeDefn
-  let SynComponentInfo(typeParams = typeParams
-                       accessibility = typeAccess) = componentInfo
+  let SynComponentInfo(accessibility = typeAccess) = componentInfo
   typeAccess |> Option.iter (fun _ ->
     let explicitAccess = getAccessLevel typeAccess
     if explicitAccess <= context.ModuleAccess then
@@ -473,10 +469,10 @@ and checkTypeDefnWithContext src context typeDefn codeTrivia =
    | _ ->
      explicitMembers)
   |> List.iter (AccessModifierConvention.checkTypeMember src memberScopeContext)
-  checkTypeDefn src typeDefn codeTrivia
+  checkTypeDefn src typeDefn
 
-and checkDeclarationsWithContext src decls codeTrivia (context: CheckContext) =
-  DeclarationConvention.check src decls codeTrivia
+and checkDeclarationsWithContext src decls (context: CheckContext) =
+  DeclarationConvention.check src decls
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
@@ -489,7 +485,7 @@ and checkDeclarationsWithContext src decls codeTrivia (context: CheckContext) =
                            longId = lid
                            accessibility = access) = info
       if Option.isSome trivia.ModuleKeyword then
-        DeclarationConvention.checkAttributesLineSpacing src codeTrivia attrs
+        DeclarationConvention.checkAttributesLineSpacing src attrs
           trivia.ModuleKeyword.Value
       else
         ()
@@ -505,7 +501,7 @@ and checkDeclarationsWithContext src decls codeTrivia (context: CheckContext) =
           match access with
           | Some _ -> getAccessLevel access
           | None -> context.ModuleAccess }
-      |> checkDeclarationsWithContext src dls codeTrivia
+      |> checkDeclarationsWithContext src dls
     | SynModuleDecl.Let(_, bindings, range) ->
       let scopeContext =
         { ModuleAccess = context.ModuleAccess
@@ -513,16 +509,15 @@ and checkDeclarationsWithContext src decls codeTrivia (context: CheckContext) =
       for binding in bindings do
         AccessModifierConvention.checkLetBinding src binding scopeContext
       FunctionBodyConvention.checkBindings src range bindings
-      checkBindings src LowerCamelCase bindings codeTrivia
+      checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
-      checkExpression src codeTrivia expr
+      checkExpression src expr
     | SynModuleDecl.Types(typeDefns, range) ->
       if typeDefns.Length > 1 then
         ClassDefinition.checkNestedTypeDefns src range typeDefns
       else
         ()
-      for typeDefn in typeDefns do
-        checkTypeDefnWithContext src context typeDefn codeTrivia
+      for typeDefn in typeDefns do checkTypeDefnWithContext src context typeDefn
     | SynModuleDecl.Open _
     | SynModuleDecl.HashDirective _
     | SynModuleDecl.Exception _
@@ -531,13 +526,14 @@ and checkDeclarationsWithContext src decls codeTrivia (context: CheckContext) =
     | _ ->
       failwith $"{nameof checkDeclarations} TODO: {decl}"
 
-and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) codeTriv =
-  checkDeclarationsWithContext src decls codeTriv { ModuleAccess = Public }
+and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
+  checkDeclarationsWithContext src decls { ModuleAccess = Public }
 
 let checkWithAST src = function
   | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules
                                              trivia = codeTrivia)) ->
     try
+      asyncLocal.Value <- codeTrivia
       modules
       |> List.iter (fun m ->
         let SynModuleOrNamespace(longId = lid
@@ -547,13 +543,13 @@ let checkWithAST src = function
                                  trivia = trivia) = m
         match trivia.LeadingKeyword with
         | SynModuleOrNamespaceLeadingKeyword.Module range ->
-          DeclarationConvention.checkAttributesLineSpacing src codeTrivia attribs
+          DeclarationConvention.checkAttributesLineSpacing src attribs
             range
         | _ -> ()
         for id in lid do
           IdentifierConvention.check src PascalCase true id.idText id.idRange
         { ModuleAccess = getAccessLevel access }
-        |> checkDeclarationsWithContext src decls codeTrivia
+        |> checkDeclarationsWithContext src decls
       )
     finally
       asyncLocal.Value <- Unchecked.defaultof<ParsedInputTrivia>

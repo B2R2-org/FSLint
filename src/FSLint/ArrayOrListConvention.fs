@@ -107,8 +107,8 @@ let checkRangeOpSpacing src fstElem (rangeOfSecondElem: range) (opm: range) =
 
 /// Checks proper spacing in empty list/array literals.
 /// Ensures no space inside empty brackets (e.g., "[]" or "[||]" not "[ ]").
-let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) codeTriv =
-  let hasComment = findCommentsBetween codeTriv range.StartRange range.EndRange
+let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
+  let hasComment = findCommentsBetween range.StartRange range.EndRange
   if expr.IsEmpty && range.EndColumn - range.StartColumn <> enclosureWidth
     && Option.isNone hasComment then
     Range.shiftStart 0 (enclosureWidth / 2) range
@@ -157,15 +157,15 @@ let checkTrailingSeparator src fRange eRange =
 
 /// Adjusts the range to exclude comments (e.g., (* ... *)) inside brackets.
 /// Useful for spacing checks when comments are present.
-let adjustRangeByComment src (outerRange: range) (expr: SynExpr) triv =
-  (match findCommentsBetween triv outerRange.StartRange expr.Range.StartRange
+let adjustRangeByComment (outerRange: range) (expr: SynExpr) =
+  (match findCommentsBetween outerRange.StartRange expr.Range.StartRange
    with
    | Some(CommentTrivia.LineComment range)
    | Some(CommentTrivia.BlockComment range) ->
      Range.unionRanges range expr.Range, true
    | None -> expr.Range, false)
   |> fun (exprRange, hasCommentInFront) ->
-    match findCommentsBetween triv exprRange.EndRange outerRange.EndRange with
+    match findCommentsBetween exprRange.EndRange outerRange.EndRange with
     | Some(CommentTrivia.LineComment range)
     | Some(CommentTrivia.BlockComment range) ->
       Range.unionRanges exprRange range, hasCommentInFront
@@ -219,9 +219,9 @@ let checkMultiLine src range = function
   | SynExpr.ForEach _ -> () (* No need to check string here *)
   | expr -> warn $"[checkMultiLine]TODO: {expr}"
 
-let check src isArray (fRange: Range) expr codeTrivia =
+let check src isArray (fRange: Range) expr =
   let elemRangeAdjusted, hasCommentInFront =
-    adjustRangeByComment src fRange expr codeTrivia
+    adjustRangeByComment fRange expr
   checkCommon src isArray fRange elemRangeAdjusted
   checkSymmetry src elemRangeAdjusted fRange hasCommentInFront
   if fRange.StartLine = fRange.EndLine then

@@ -30,8 +30,8 @@ let extractComparisonOperator = function
   | _ -> None
 
 /// Checks if there are compiler directives between two ranges
-let findDirectivesBetween (trivia: ParsedInputTrivia) prev next =
-  trivia.ConditionalDirectives
+let findDirectivesBetween prev next =
+  asyncLocal.Value.ConditionalDirectives
   |> List.tryFind (function
     | ConditionalDirectiveTrivia.If(_, range)
     | ConditionalDirectiveTrivia.Else range
@@ -41,8 +41,8 @@ let findDirectivesBetween (trivia: ParsedInputTrivia) prev next =
   )
 
 /// Checks if there are comments between two ranges using trivia information
-let findCommentsBetween (trivia: ParsedInputTrivia) startRange endRange =
-  trivia.CodeComments
+let findCommentsBetween startRange endRange =
+  asyncLocal.Value.CodeComments
   |> List.tryFind (function
     | CommentTrivia.LineComment range
     | CommentTrivia.BlockComment range ->
@@ -51,8 +51,8 @@ let findCommentsBetween (trivia: ParsedInputTrivia) startRange endRange =
       && Range.rangeContainsRange (Range.unionRanges startRange endRange) range)
 
 /// Counts lines occupied by comments between two ranges
-let countCommentLines (trivia: ParsedInputTrivia) (prev: range) next =
-  trivia.CodeComments
+let countCommentLines (prev: range) next =
+  asyncLocal.Value.CodeComments
   |> List.filter (function
     | CommentTrivia.LineComment r ->
       r.StartLine > prev.EndLine && r.EndLine < (next: range).StartLine

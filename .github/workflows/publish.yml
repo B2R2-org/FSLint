@@ -6,6 +6,41 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
+  publish-nuget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify NuGet Token
+        run: |
+          if [ -z "${{ secrets.NUGET_TOKEN }}" ]; then
+            echo "Error: NUGET_TOKEN not set"
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+
+      - name: Restore project
+        run: dotnet restore
+
+      - name: Build project
+        run: dotnet build src/FSLint/B2R2.FSLint.fsproj -c Release --no-restore
+
+      - name: Pack
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          dotnet pack src/FSLint/B2R2.FSLint.fsproj -c Release --output . -p:Version=$VERSION
+
+      - name: Push
+        env:
+          TOKEN: ${{ secrets.NUGET_TOKEN }}
+        run: |
+          dotnet nuget push *.nupkg \
+            --source "https://api.nuget.org/v3/index.json" \
+            --api-key ${TOKEN} \
+            --skip-duplicate
+
   publish-vscode:
     runs-on: ubuntu-latest
     steps:

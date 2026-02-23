@@ -17,7 +17,7 @@ FSLint gives you **real-time style enforcement** without the wait. No dependency
 
 **Zero Setup** — Install and start linting. No config files required.
 
-**Instant Feedback** — See violations as you type, not after you push.
+**Instant Feedback** — See violations as you open and save, not after you push.
 
 **CI/CD Native** — File-level analysis works in any pipeline, any environment.
 
@@ -25,14 +25,14 @@ FSLint gives you **real-time style enforcement** without the wait. No dependency
 
 ## Quick Start
 
+**Visual Studio**
+```bash
+Extensions → Manage Extensions → Search "FSLint"
+```
+
 **VS Code**
 ```bash
 ext install B2R2.fslint
-```
-
-**Visual Studio**
-```
-Extensions → Manage Extensions → Search "FSLint"
 ```
 
 **Command Line (CI/CD)**
@@ -76,6 +76,11 @@ max_line_length = 120  # Default: 80
 ```
 
 ## Release Notes
+
+### 1.0.4
+
+- Relax Tuple Convention rules to better handle cases with inline and trailing comments
+- Refactor duplicated functions to improve maintainability and reduce redundancy
 
 ### 1.0.3
 

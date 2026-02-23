@@ -10,19 +10,11 @@ let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia =
   let ifAdjustedRange =
     let ifRange = (ifExpr: SynExpr).Range.EndRange
     let thenRange = trivia.ThenKeyword.StartRange
-    match findCommentsBetween ifRange thenRange with
-    | Some(CommentTrivia.LineComment range)
-    | Some(CommentTrivia.BlockComment range) ->
-      Range.unionRanges ifExpr.Range range
-    | _ -> ifRange
+    combineRangeWithComment ifRange thenRange true ifRange
   let thenAdjustedRange =
     let keyRange = trivia.ThenKeyword.EndRange
     let exprRange = (thenExpr: SynExpr).Range
-    match findCommentsBetween keyRange exprRange.StartRange with
-    | Some(CommentTrivia.LineComment range)
-    | Some(CommentTrivia.BlockComment range) ->
-      Range.unionRanges range exprRange
-    | _ -> exprRange
+    combineRangeWithComment keyRange exprRange.StartRange false exprRange
   if trivia.IfKeyword.EndLine = ifExpr.Range.StartLine
     && trivia.IfKeyword.EndColumn + 1 <> ifExpr.Range.StartColumn then
     Range.mkRange "" trivia.IfKeyword.End ifExpr.Range.Start

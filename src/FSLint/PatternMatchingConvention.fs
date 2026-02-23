@@ -64,16 +64,21 @@ let private collectElemAndOptSeparatorRanges (src: ISourceText) elementPats =
 
 /// Checks cons operator in the context is properly surrounded by single spaces.
 let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
-  if (lhsRange: range).EndColumn + 1 <> colonRange.StartColumn
-    && lhsRange.StartLine = colonRange.StartLine
+  let beforeColonAdjusted =
+    combineRangeWithComment lhsRange colonRange.StartRange true lhsRange
+  let afterColonAdjusted =
+    combineRangeWithComment colonRange.EndRange (rhsRange: range).StartRange
+      false rhsRange
+  if beforeColonAdjusted.EndColumn + 1 <> colonRange.StartColumn
+    && beforeColonAdjusted.StartLine = colonRange.StartLine
   then
-    Range.mkRange "" lhsRange.End colonRange.Start
-    |> fun range -> reportWarn src range "Use single whitespace around cons"
-  elif (rhsRange: range).StartColumn - 1 <> colonRange.EndColumn
-    && rhsRange.StartLine = colonRange.StartLine
+    Range.mkRange "" beforeColonAdjusted.End colonRange.Start
+    |> fun range -> reportWarn src range "Use single whitespace before ':'"
+  elif afterColonAdjusted.StartColumn - 1 <> colonRange.EndColumn
+    && afterColonAdjusted.StartLine = colonRange.StartLine
   then
-    Range.mkRange "" colonRange.End rhsRange.Start
-    |> fun range -> reportWarn src range "Use single whitespace around cons"
+    Range.mkRange "" colonRange.End afterColonAdjusted.Start
+    |> fun range -> reportWarn src range "Use single whitespace after ':'"
   else ()
 
 /// Checks if the given pattern contains record with incorrect bracket spacing,
@@ -250,16 +255,9 @@ let checkArrowSpacing src patRange whenExpr (bodyRange: range)
     if Option.isSome (whenExpr: option<SynExpr>) then whenExpr.Value.Range
     else patRange
   let patRangeAdjusted =
-    match findCommentsBetween patRange.EndRange arrowRange.StartRange with
-    | Some(CommentTrivia.LineComment range)
-    | Some(CommentTrivia.BlockComment range) -> Range.unionRanges patRange range
-    | _ -> patRange
+    combineRangeWithComment patRange arrowRange.StartRange true patRange
   let bodyRangeAdjusted =
-    match findCommentsBetween arrowRange.EndRange bodyRange.StartRange with
-    | Some(CommentTrivia.LineComment range)
-    | Some(CommentTrivia.BlockComment range) ->
-      Range.unionRanges range bodyRange
-    | _ ->
+    combineRangeWithComment arrowRange.EndRange bodyRange.StartRange false
       bodyRange
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
     if patRangeAdjusted.EndColumn + 1 <> arrowRange.StartColumn then
@@ -348,7 +346,8 @@ let rec checkBody (src: ISourceText) = function
       pats |> List.iter (fun pat -> checkBody src pat.Pattern)
   | SynPat.Paren(pat = pat) ->
     checkBody src pat
-  | SynPat.Tuple(elementPats = elementPats) ->
+  | SynPat.Tuple(elementPats = elementPats; commaRanges = commaRanges) ->
+    TupleConvention.checkPat src elementPats commaRanges
     elementPats |> List.iter (checkBody src)
   | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat)
   | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->

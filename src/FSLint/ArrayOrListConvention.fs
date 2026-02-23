@@ -160,14 +160,12 @@ let checkTrailingSeparator src fRange eRange =
 let adjustRangeByComment (outerRange: range) (expr: SynExpr) =
   (match findCommentsBetween outerRange.StartRange expr.Range.StartRange
    with
-   | Some(CommentTrivia.LineComment range)
-   | Some(CommentTrivia.BlockComment range) ->
+   | Some range ->
      Range.unionRanges range expr.Range, true
    | None -> expr.Range, false)
   |> fun (exprRange, hasCommentInFront) ->
     match findCommentsBetween exprRange.EndRange outerRange.EndRange with
-    | Some(CommentTrivia.LineComment range)
-    | Some(CommentTrivia.BlockComment range) ->
+    | Some range ->
       Range.unionRanges exprRange range, hasCommentInFront
     | None -> exprRange, hasCommentInFront
 

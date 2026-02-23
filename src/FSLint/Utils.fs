@@ -43,12 +43,21 @@ let findDirectivesBetween prev next =
 /// Checks if there are comments between two ranges using trivia information
 let findCommentsBetween startRange endRange =
   asyncLocal.Value.CodeComments
-  |> List.tryFind (function
+  |> List.tryPick (function
     | CommentTrivia.LineComment range
-    | CommentTrivia.BlockComment range ->
+    | CommentTrivia.BlockComment range when
       range.StartLine >= (startRange: range).EndLine
       && range.EndLine <= (endRange: range).StartLine
-      && Range.rangeContainsRange (Range.unionRanges startRange endRange) range)
+      && Range.rangeContainsRange (Range.unionRanges startRange endRange) range
+      -> Some range
+    | _ -> None)
+
+let combineRangeWithComment startPos endPos combineToStartPos returnRange =
+  match findCommentsBetween startPos endPos with
+  | Some range ->
+    if combineToStartPos then Range.unionRanges startPos range
+    else Range.unionRanges range endPos
+  | None -> returnRange
 
 /// Counts lines occupied by comments between two ranges
 let countCommentLines (prev: range) next =

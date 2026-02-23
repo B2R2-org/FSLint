@@ -44,7 +44,8 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.Paren(pat = pat) as synPat ->
     ParenConvention.checkPat src synPat
     checkPattern src case isArg trivia pat
-  | SynPat.Tuple(elementPats = pats) ->
+  | SynPat.Tuple(elementPats = pats; commaRanges = commaRanges) ->
+    TupleConvention.checkPat src pats commaRanges
     for pat in pats do checkPattern src case isArg trivia pat
   | SynPat.OptionalVal(ident = id) ->
     IdentifierConvention.check src LowerCamelCase true id.idText id.idRange

@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 /// In ArrayOrListConvention, tests unrelated to array/list differences use only
 /// lists for clarity, as not all cases require checking both types.
@@ -176,199 +174,109 @@ let bad = [
 [ [| 1;2 |]; [| 3; 4 |] ]
 """
 
-  let goodNestedSymmetry =
-    """
-[ [| 1
-     2 |]
-  [| 3
-     4 |] ]
-"""
-
-  let badNestedSymmetry =
-    """
-[ [| 1
-     2 |]
-  [| 3
-     4
-  |] ]
-"""
-
-  let goodIndentation =
-    """
-[
-  [|
-    1
-    2
-  |]
-]
-"""
-
-  let badIndentation =
-    """
-[
-  [|
-      1
-      2
-  |]
- ]
-"""
-
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test``() =
-    linterForFs.Lint(FakeFsPath, goodEmptyTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badEmptyTest)
-    ) |> ignore
+    lint goodEmptyTest
+    lintAssert badEmptyTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Array Empty Test``() =
-    linterForFs.Lint(FakeFsPath, goodArrayEmptyTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badArrayEmptyTest)
-    ) |> ignore
+    lint goodArrayEmptyTest
+    lintAssert badArrayEmptyTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBracketSpacingTest)
-    ) |> ignore
+    lint goodBracketSpacingTest
+    lintAssert badBracketSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Array Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodArrayBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badArrayBracketSpacingTest)
-    ) |> ignore
+    lint goodArrayBracketSpacingTest
+    lintAssert badArrayBracketSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List No Whitespace Between Element Test``() =
-    linterForFs.Lint(FakeFsPath, goodElementSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badNoWhitespaceBetweenElementsTest)
-    ) |> ignore
+    lint goodElementSpacingTest
+    lintAssert badNoWhitespaceBetweenElementsTest
 
-  /// Normal case already covered in 'No Whitespace Between Element' test.
+  (* Normal case already covered in 'No Whitespace Between Element' test. *)
   [<TestMethod>]
   member _.``[ArrayOrList] List Too Much Whitespace Between Element Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badTooMuchWhitespaceBetweenElementsTest)
-    ) |> ignore
+    lintAssert badTooMuchWhitespaceBetweenElementsTest
 
-  /// Normal case already covered in 'No Whitespace Between Element' test.
+  (* )Normal case already covered in 'No Whitespace Between Element' test. *)
   [<TestMethod>]
   member _.``[ArrayOrList] List Whitespace Before Separator Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badWhitespaceBeforeSeparatorTest)
-    ) |> ignore
+    lintAssert badWhitespaceBeforeSeparatorTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Range Operator Test``() =
-    linterForFs.Lint(FakeFsPath, goodRangeOperatorTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badRangeOperatorTest)
-    ) |> ignore
+    lint goodRangeOperatorTest
+    lintAssert badRangeOperatorTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Range Operator With Ident Test``() =
-    linterForFs.Lint(FakeFsPath, goodRangeOperatorWithIdentTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badRangeOperatorWithIdentTest)
-    ) |> ignore
+    lint goodRangeOperatorWithIdentTest
+    lintAssert badRangeOperatorWithIdentTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Range Operator With Step Test``() =
-    linterForFs.Lint(FakeFsPath, goodRangeOperatorWithStepTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badRangeOperatorWithStepTest)
-    ) |> ignore
+    lint goodRangeOperatorWithStepTest
+    lintAssert badRangeOperatorWithStepTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Range Operator With Step And Ident Test``() =
-    linterForFs.Lint(FakeFsPath,
-      goodRangeOperatorWithStepAndIdentTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badRangeOperatorWithStepAndIdentTest)
-    ) |> ignore
+    lint goodRangeOperatorWithStepAndIdentTest
+    lintAssert badRangeOperatorWithStepAndIdentTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Bracket Spacing MultiLine Test``() =
-    linterForFs.Lint(FakeFsPath, goodMultiLineBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badMultiLineBracketSpacingTest)
-    ) |> ignore
+    lint goodMultiLineBracketSpacingTest
+    lintAssert badMultiLineBracketSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Array Bracket Spacing MultiLine Test``() =
-    linterForFs.Lint(FakeFsPath, goodArrayMultiLineBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badArrayMultiLineBracketSpacingTest)
-    ) |> ignore
+    lint goodArrayMultiLineBracketSpacingTest
+    lintAssert badArrayMultiLineBracketSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Opening Bracket Inline With Let MultiLine Test``() =
-    linterForFs.Lint(FakeFsPath, goodOpeningBracketInlineWithLetTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badOpeningBracketInlineWithLetTest)
-    ) |> ignore
+    lint goodOpeningBracketInlineWithLetTest
+    lintAssert badOpeningBracketInlineWithLetTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Single Element Per Line Multiline Test``() =
-    linterForFs.Lint(FakeFsPath, goodSingleElementPerLineTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSingleElementPerLineTest)
-     ) |> ignore
+    lint goodSingleElementPerLineTest
+    lintAssert badSingleElementPerLineTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] List Separator Not In Line Ending Test``() =
-    linterForFs.Lint(FakeFsPath, goodSeparatorNotInLineEndingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSeparatorNotInLineEndingTest)
-     ) |> ignore
+    lint goodSeparatorNotInLineEndingTest
+    lintAssert badSeparatorNotInLineEndingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested List Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodNestedBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badNestedBracketSpacingTest)
-     ) |> ignore
+    lint goodNestedBracketSpacingTest
+    lintAssert badNestedBracketSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested List Element Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badNestedElementSpacingTest)
-     ) |> ignore
+    lintAssert badNestedElementSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested Mixed Array List Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodNestedMixBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badNestedMixBracketSpacingTest)
-     ) |> ignore
+    lint goodNestedMixBracketSpacingTest
+    lintAssert badNestedMixBracketSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested Mixed Array List Element Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badNestedMixElementSpacingTest)
-     ) |> ignore
+    lintAssert badNestedMixElementSpacingTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested Bracket Spacing In MultiLine Test``() =
-    linterForFs.Lint(FakeFsPath,
-      goodNestedBracketSpacingMultiLineTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badNestedBracketSpacingMultiLineTest)
-     ) |> ignore
+    lint goodNestedBracketSpacingMultiLineTest
+    lintAssert badNestedBracketSpacingMultiLineTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested Element Spacing In MultiLine Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badNestedElementSpacingMultiLineTest)
-     ) |> ignore
+    lintAssert badNestedElementSpacingMultiLineTest

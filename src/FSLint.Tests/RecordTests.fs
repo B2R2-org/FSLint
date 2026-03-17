@@ -77,39 +77,27 @@ type InsSize =
 
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
-    linterForFs.Lint(FakeFsPath, goodBracketPositionTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBracketPositionTest)
-    ) |> ignore
+    lint goodBracketPositionTest
+    lintAssert badBracketPositionTest
 
   [<TestMethod>]
   member _.``[Record] Bracket Position Inline With Equal Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBracketPositionWithEqualTest)
-    ) |> ignore
+    lintAssert badBracketPositionWithEqualTest
 
   [<TestMethod>]
   member _.``[Record] Field Type Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badFieldTypeSpacingTest)
-    ) |> ignore
+    lintAssert badFieldTypeSpacingTest
 
   [<TestMethod>]
   member _.``[Record] Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBracketSpacingTest)
-    ) |> ignore
+    lint goodBracketSpacingTest
+    lintAssert badBracketSpacingTest
 
   [<TestMethod>]
   member _.``[Record] Bracket Spacing MultiLine Test``() =
-    linterForFs.Lint(FakeFsPath, goodBracketSpacingMultiLineTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBracketSpacingMultiLineTest)
-    ) |> ignore
+    lint goodBracketSpacingMultiLineTest
+    lintAssert badBracketSpacingMultiLineTest
 
   [<TestMethod>]
   member _.``[Record] Operator Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badOperatorSpacingTest)
-    ) |> ignore
+    lintAssert badOperatorSpacingTest

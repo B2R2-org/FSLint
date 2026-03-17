@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type FunctionCallTests() =
@@ -27,35 +25,24 @@ type FunctionCallTests() =
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodNonCurriedFuncTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath,
-        badNonCurriedFuncBracketSpacingTest)
-     ) |> ignore
+    lint goodNonCurriedFuncTest
+    lintAssert badNonCurriedFuncBracketSpacingTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function App Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badNonCurriedFuncSpacingTest)
-     ) |> ignore
+    lintAssert badNonCurriedFuncSpacingTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function PascalCase Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCurriedFuncPascalCaseTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badCurriedFuncPascalCaseTest)
-     ) |> ignore
+    lint goodCurriedFuncPascalCaseTest
+    lintAssert badCurriedFuncPascalCaseTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function LowerCase Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCurriedFuncLowerCaseTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badCurriedFuncLowerCaseTest)
-     ) |> ignore
+    lint goodCurriedFuncLowerCaseTest
+    lintAssert badCurriedFuncLowerCaseTest
 
   [<TestMethod>]
   member _.``[FunctionCall] Curried Function Nested Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCurriedFuncPascalCaseNestedTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badCurriedFuncPascalCaseNestedTest)
-     ) |> ignore
+    lint goodCurriedFuncPascalCaseNestedTest
+    lintAssert badCurriedFuncPascalCaseNestedTest

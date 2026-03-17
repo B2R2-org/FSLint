@@ -13,7 +13,5 @@ type TypeConstructorTests() =
 
   [<TestMethod>]
   member _.``[TypeConstructor] Between Infix and Paren Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodConstructorSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badConstructorSpacingTest)
-     ) |> ignore
+    lint goodConstructorSpacingTest
+    lintAssert badConstructorSpacingTest

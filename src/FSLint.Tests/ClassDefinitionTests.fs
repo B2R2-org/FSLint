@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type ClassDefinitionTests() =
@@ -109,35 +107,25 @@ type ComplexClass (initialValue: int) =
 
   [<TestMethod>]
   member _.``[ClassDefinition] Constructor Parameter Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodImplicitCtorTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badImplicitCtorTest)
-    ) |> ignore
+    lint goodImplicitCtorTest
+    lintAssert badImplicitCtorTest
 
   [<TestMethod>]
   member _.``[ClassDefinition] Base Constructor Call Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodImplicitInheritTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badImplicitInheritTest)
-    ) |> ignore
+    lint goodImplicitInheritTest
+    lintAssert badImplicitInheritTest
 
   [<TestMethod>]
   member _.``[ClassDefinition] Explicit Base Class Call Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodExplicitInheritTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badExplicitInheritTest)
-    ) |> ignore
+    lint goodExplicitInheritTest
+    lintAssert badExplicitInheritTest
 
   [<TestMethod>]
   member _.``[ClassDefinition] Multiple Level Inheritance Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodNestedInheritTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badNestedInheritTest)
-    ) |> ignore
+    lint goodNestedInheritTest
+    lintAssert badNestedInheritTest
 
   [<TestMethod>]
   member _.``[ClassDefinition] Complex Class Definition Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodMixedCaseTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badMixedCaseTest)
-    ) |> ignore
+    lint goodMixedCaseTest
+    lintAssert badMixedCaseTest

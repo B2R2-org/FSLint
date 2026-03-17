@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type ClassMemberTests() =
@@ -57,28 +55,20 @@ type Class() =
 
   [<TestMethod>]
   member _.``[ClassMember] Between Infix and Paren Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodSpacingInfixParenTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSpacingInfixParenTest)
-     ) |> ignore
+    lint goodSpacingInfixParenTest
+    lintAssert badSpacingInfixParenTest
 
   [<TestMethod>]
   member _.``[ClassMember] Between Function and Paren Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodSpacingFunctionParenTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSpacingFunctionParenTest)
-     ) |> ignore
+    lint goodSpacingFunctionParenTest
+    lintAssert badSpacingFunctionParenTest
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Double Underscore Test``() =
-    linterForFs.Lint(FakeFsPath, goodSelfIdentifierUnderscoreTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSelfIdentifierUnderscoreTest)
-     ) |> ignore
+    lint goodSelfIdentifierUnderscoreTest
+    lintAssert badSelfIdentifierUnderscoreTest
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Unused Test``() =
-    linterForFs.Lint(FakeFsPath, goodSelfIdentifierUnusedTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSelfIdentifierUnusedTest)
-     ) |> ignore
+    lint goodSelfIdentifierUnusedTest
+    lintAssert badSelfIdentifierUnusedTest

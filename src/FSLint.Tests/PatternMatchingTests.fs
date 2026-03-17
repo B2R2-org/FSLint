@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type PatternMatchingTests() =
@@ -89,49 +87,33 @@ match x with
 
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodPatternBracketSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badPatternBracketSpacingTest)
-     ) |> ignore
+    lint goodPatternBracketSpacingTest
+    lintAssert badPatternBracketSpacingTest
 
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Element Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badPatternElementSpacingTest)
-     ) |> ignore
+    lintAssert badPatternElementSpacingTest
 
   [<TestMethod>]
   member _.``[PatternMatching] List In Pattern Cons Operator Test``() =
-    linterForFs.Lint(FakeFsPath, goodPatternConsOperatorTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badPatternConsOperatorTest)
-     ) |> ignore
+    lint goodPatternConsOperatorTest
+    lintAssert badPatternConsOperatorTest
 
   [<TestMethod>]
   member _.``[PatternMatching] Pattern And Bar Is Not Inline Test``() =
-    linterForFs.Lint(FakeFsPath, goodBarAndPatternIsInlineTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBarAndPatternIsInlineTest)
-     ) |> ignore
+    lint goodBarAndPatternIsInlineTest
+    lintAssert badBarAndPatternIsInlineTest
 
   [<TestMethod>]
   member _.``[PatternMatching] Match Keyword and Bar Is Same Column Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBarAndMatchNotSameColTest)
-     ) |> ignore
+    lintAssert badBarAndMatchNotSameColTest
 
   [<TestMethod>]
   member _.``[PatternMatching] Pattern and Bar Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodBarAndPatternSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBarAndPatternSpacingTest)
-     ) |> ignore
+    lint goodBarAndPatternSpacingTest
+    lintAssert badBarAndPatternSpacingTest
 
   [<TestMethod>]
   member _.``[PatternMatching] Pattern Arrow Spacing Test``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badArrowSpacingTest)
-     ) |> ignore
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badArrowSpacingWithWhenTest)
-     ) |> ignore
+    lintAssert badArrowSpacingTest
+    lintAssert badArrowSpacingWithWhenTest

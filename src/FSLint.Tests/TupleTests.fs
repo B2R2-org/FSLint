@@ -87,50 +87,30 @@ match bad with
 
   [<TestMethod>]
   member _.``[Tuple] Comma Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCommaSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSpacingBeforeCommaTest)
-     ) |> ignore
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badSpacingAfterCommaTest)
-     ) |> ignore
+    lint goodCommaSpacingTest
+    lintAssert badSpacingBeforeCommaTest
+    lintAssert badSpacingAfterCommaTest
 
   [<TestMethod>]
   member _.``[Tuple] MultiLine Comma Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCommaSpacingWithCommentTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBeforeCommaSpacingWithCommentTest)
-     ) |> ignore
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badAfterCommaSpacingWithCommentTest)
-     ) |> ignore
+    lint goodCommaSpacingWithCommentTest
+    lintAssert badBeforeCommaSpacingWithCommentTest
+    lintAssert badAfterCommaSpacingWithCommentTest
 
   [<TestMethod>]
   member _.``[Tuple] SingleLine Comma Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCommaSpacingWithCommentTest2)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badBeforeCommaSpacingWithCommentTest2)
-     ) |> ignore
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badAfterCommaSpacingWithCommentTest2)
-     ) |> ignore
+    lint goodCommaSpacingWithCommentTest2
+    lintAssert badBeforeCommaSpacingWithCommentTest2
+    lintAssert badAfterCommaSpacingWithCommentTest2
 
   [<TestMethod>]
   member _.``[Tuple] Cons Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodConsSpacingWithCommentTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badConsSpacingWithCommentTest)
-     ) |> ignore
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badConsSpacingWithCommentTest2)
-     ) |> ignore
+    lint goodConsSpacingWithCommentTest
+    lintAssert badConsSpacingWithCommentTest
+    lintAssert badConsSpacingWithCommentTest2
 
   [<TestMethod>]
   member _.``[Tuple] Pattern Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodCommaSpacingInPatternTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badCommaSpacingInPatternTest)
-     ) |> ignore
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badCommaSpacingInPatternTest2)
-     ) |> ignore
+    lint goodCommaSpacingInPatternTest
+    lintAssert badCommaSpacingInPatternTest
+    lintAssert badCommaSpacingInPatternTest2

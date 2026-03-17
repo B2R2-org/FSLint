@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type IfThenElseTests() =
@@ -60,33 +58,23 @@ type IfThenElseTests() =
 
   [<TestMethod>]
   member _.``[IfThenElse] Else Expression not Exist Test``() =
-    linterForFs.Lint(FakeFsPath, goodElseExprExistTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badElseExprExistTest)
-     ) |> ignore
+    lint goodElseExprExistTest
+    lintAssert badElseExprExistTest
 
   [<TestMethod>]
   member _.``[IfThenElse] Else Expression not Exist Test(2)``() =
-    linterForFs.Lint(FakeFsPath, goodElseExprExistTest2)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badElseExprExistTest2)
-     ) |> ignore
+    lint goodElseExprExistTest2
+    lintAssert badElseExprExistTest2
 
   [<TestMethod>]
   member _.``[IfThenElse] Keyword Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodKeywordSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badKeywordSpacingTest)
-     ) |> ignore
+    lint goodKeywordSpacingTest
+    lintAssert badKeywordSpacingTest
 
   [<TestMethod>]
   member _.``[IfThenElse] Keyword Spacing Test(2)``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badKeywordSpacingTest2)
-     ) |> ignore
+    lintAssert badKeywordSpacingTest2
 
   [<TestMethod>]
   member _.``[IfThenElse] Keyword Spacing Test(3)``() =
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badKeywordSpacingTest3)
-     ) |> ignore
+    lintAssert badKeywordSpacingTest3

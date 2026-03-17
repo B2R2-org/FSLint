@@ -13,26 +13,26 @@ let checkEmptySpacing src (range: range) =
   else
     ()
 
-/// Checks proper spacing inside brackets for paren.
-/// Ensures single space after opening and before closing brackets.
-let checkBracketSpacing (src: ISourceText) (range: range) =
-  let subStr = src.GetSubTextFromRange(range).Split '\n'
-  if subStr.Length = 1
-    && subStr[0].StartsWith "( " || subStr[0].EndsWith " )"
-  then reportBracketNoSpacingError src range
+/// Avoid extraneous white space
+let checkParenSpacing (src: ISourceText) (exprRange: range) (range: range) =
+  if exprRange.StartLine = range.StartLine then
+    if range.StartColumn + 1 <> exprRange.StartColumn then
+      Range.mkRange range.FileName range.Start exprRange.Start
+      |> fun range -> reportFrontParenInnerSpacing src range
+    else
+      ()
+  elif exprRange.EndLine = range.EndLine then
+    if exprRange.EndColumn + 1 <> range.EndColumn then
+      Range.mkRange range.FileName exprRange.End range.End
+      |> fun range -> reportBackParenInnerSpacing src range
+    else
+      ()
   else
-    if (Array.head subStr).StartsWith "( "
-      || ((Array.last subStr).EndsWith " )"
-      && (Array.last subStr).TrimStart() <> ")")
-    then reportBracketNoSpacingError src range
-    else ()
+    ()
 
 let rec checkExpr src = function
   | SynExpr.Paren(expr = expr; range = range) ->
-    if expr.Range.StartLine <> range.StartLine
-      || expr.Range.EndLine <> range.EndLine
-    then ()
-    else checkBracketSpacing src range
+    checkParenSpacing src expr.Range range
   | SynExpr.Const(SynConst.Unit, range) ->
     checkEmptySpacing src range
   | _ -> ()

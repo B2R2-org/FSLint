@@ -221,6 +221,9 @@ and checkExpression src = function
   | SynExpr.New(targetType = targetType; expr = expr) ->
     TypeConstructor.checkConstructorSpacing src targetType expr
     checkExpression src expr
+  | SynExpr.LongIdent(longDotId = lid) ->
+    let SynLongIdent(id = lid; dotRanges = dotRanges) = lid
+    FunctionCallConvention.checkDotsGetSpacing src lid dotRanges
   | SynExpr.LongIdentSet(expr = expr) ->
     checkExpression src expr
   | SynExpr.DotIndexedSet(objectExpr = objectExpr
@@ -249,7 +252,6 @@ and checkExpression src = function
   | SynExpr.Ident _
   | SynExpr.IndexRange _
   | SynExpr.InterpolatedString _
-  | SynExpr.LongIdent _
   | SynExpr.NamedIndexedPropertySet _
   | SynExpr.Null _
   | SynExpr.ObjExpr _

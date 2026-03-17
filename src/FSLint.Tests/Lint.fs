@@ -6,10 +6,10 @@ open B2R2.FSLint.Program
 open Microsoft.VisualStudio.TestTools.UnitTesting
 
 let lint context =
-  setStrictMode ()
+  isStrict <- true
   linterForFs.Lint(FakeFsPath, context)
 
 let lintAssert context =
-  setStrictMode ()
+  isStrict <- true
   Assert.ThrowsException<LintException>(fun () ->
     linterForFs.Lint(FakeFsPath, context)) |> ignore

@@ -36,23 +36,26 @@ let checkKeywordSpacing src ifExpr thenExpr elseExpr trivia =
     ()
 
 let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
-  match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
-  | Some _ ->
-    checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
-  | None ->
-    let line =
-      (src: ISourceText).GetLineString (thenExpr: SynExpr).Range.EndLine
-    if line.TrimStart().StartsWith "elif" && Option.isSome elseExpr then
+  if isStrict then
+    match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
+    | Some _ ->
       checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
-    elif line.TrimStart().StartsWith "else" && Option.isSome elseExpr then
-      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
-    elif line.TrimStart().StartsWith "(*"
-      || line.TrimStart().StartsWith "///" then
-      Range.mkRange "" thenExpr.Range.Start (range: range).End
-      |> (src: ISourceText).GetSubTextFromRange
-      |> fun thenToEndStr ->
-        if thenToEndStr.Contains "else " then ()
-        elif thenToEndStr.Contains("else" + Environment.NewLine) then ()
-        else reportWarn src trivia.IfToThenRange "Add else expression"
-    else
-      reportWarn src trivia.IfToThenRange "Add else expression"
+    | None ->
+      let line =
+        (src: ISourceText).GetLineString (thenExpr: SynExpr).Range.EndLine
+      if line.TrimStart().StartsWith "elif" && Option.isSome elseExpr then
+        checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
+      elif line.TrimStart().StartsWith "else" && Option.isSome elseExpr then
+        checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
+      elif line.TrimStart().StartsWith "(*"
+        || line.TrimStart().StartsWith "///" then
+        Range.mkRange "" thenExpr.Range.Start (range: range).End
+        |> (src: ISourceText).GetSubTextFromRange
+        |> fun thenToEndStr ->
+          if thenToEndStr.Contains "else " then ()
+          elif thenToEndStr.Contains("else" + Environment.NewLine) then ()
+          else reportWarn src trivia.IfToThenRange "Add else expression"
+      else
+        reportWarn src trivia.IfToThenRange "Add else expression"
+  else
+    ()

@@ -33,18 +33,21 @@ let checkElementSpacing src (elemAndSepRanges: Range list) =
 
 /// Calculate based on open bracket.
 let checkSymmetry src (elemRange: range) (fullRange: range) hasCommentInFront =
-  if hasCommentInFront then
-    ()
-  elif elemRange.StartLine = fullRange.StartLine then
-    if elemRange.EndLine = fullRange.EndLine then
+  if isStrict then
+    if hasCommentInFront then
       ()
-    else
-      Range.mkRange "" elemRange.End fullRange.End
-      |> fun range -> reportBracketSymmetry src range
-  elif elemRange.StartLine <> fullRange.StartLine then
-    if elemRange.EndLine = fullRange.EndLine then
-      Range.mkRange "" elemRange.End fullRange.End
-      |> fun range -> reportBracketSymmetry src range
+    elif elemRange.StartLine = fullRange.StartLine then
+      if elemRange.EndLine = fullRange.EndLine then
+        ()
+      else
+        Range.mkRange "" elemRange.End fullRange.End
+        |> fun range -> reportBracketSymmetry src range
+    elif elemRange.StartLine <> fullRange.StartLine then
+      if elemRange.EndLine = fullRange.EndLine then
+        Range.mkRange "" elemRange.End fullRange.End
+        |> fun range -> reportBracketSymmetry src range
+      else
+        ()
     else
       ()
   else
@@ -119,21 +122,24 @@ let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
 
 /// Checks proper placement of opening bracket after `let` keyword.
 let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
-  if src.GetLineString(range.StartLine - 1).TrimStart().StartsWith "let" then
-    reportWarn src range "Move bracket to next line after binding"
-  else
-    ()
+  if isStrict &&
+    src.GetLineString(range.StartLine - 1).TrimStart().StartsWith "let"
+  then reportWarn src range "Move bracket to next line after binding"
+  else ()
 
 /// Checks proper one element per line in multi-line list/array literals.
 let checkSingleElementPerLine src (elemRanges: Range list) =
-  elemRanges
-  |> List.groupBy (fun range -> range.StartLine)
-  |> List.iter (fun (_, ranges) ->
-    if ranges.Length > 1 then
-      ranges |> List.iter (reportSingleElementPerLineError src)
-    else
-      ()
-  )
+  if isStrict then
+    elemRanges
+    |> List.groupBy (fun range -> range.StartLine)
+    |> List.iter (fun (_, ranges) ->
+      if ranges.Length > 1 then
+        ranges |> List.iter (reportSingleElementPerLineError src)
+      else
+        ()
+    )
+  else
+    ()
 
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.

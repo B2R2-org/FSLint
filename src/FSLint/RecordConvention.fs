@@ -48,15 +48,19 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
 /// Checks that the '=' and '{' in a record definition are on the same line.
 /// Ensures record definitions follow the convention: `type T = { ... }`
 let private checkOpeningBracketPosition src range (trivia: SynTypeDefnTrivia) =
-  if trivia.EqualsRange.IsSome && (range: range).StartLine <> range.EndLine then
-    if trivia.EqualsRange.Value.StartLine = range.StartLine then
-      (src: ISourceText).GetLineString(range.StartLine - 1).Length
-      |> fun lastIdx ->
-        Range.mkRange "" range.Start (Position.mkPos range.StartLine lastIdx)
-      |> fun wRange -> reportWarn src wRange "Move '{' to next line"
-    else
-      ()
-  else ()
+  if isStrict then
+    if trivia.EqualsRange.IsSome && (range: range).StartLine <> range.EndLine
+    then
+      if trivia.EqualsRange.Value.StartLine = range.StartLine then
+        (src: ISourceText).GetLineString(range.StartLine - 1).Length
+        |> fun lastIdx ->
+          Range.mkRange "" range.Start (Position.mkPos range.StartLine lastIdx)
+        |> fun wRange -> reportWarn src wRange "Move '{' to next line"
+      else
+        ()
+    else ()
+  else
+    ()
 
 let private checkFieldCompFlag src fullRange innerRange ranges isOpenBracket =
   (Position.mkPos ((innerRange: range).EndLine + 1) 0,
@@ -83,8 +87,11 @@ let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
         || fullRange.EndLine <> innerRange.EndLine
         && checkFieldCompFlag src fullRange innerRange ranges isOpenBracket
       then
-        Range.mkRange "" (Position.mkPos fullRange.EndLine 0) fullRange.End
-        |> fun wRange -> reportWarn src wRange "Move to inline with bracket"
+        if isStrict then
+          Range.mkRange "" (Position.mkPos fullRange.EndLine 0) fullRange.End
+          |> fun wRange -> reportWarn src wRange "Move to inline with bracket"
+        else
+          ()
       elif fullRange.StartColumn + 2 <> innerRange.StartColumn
       then
         Range.mkRange "" fullRange.Start innerRange.Start
@@ -96,22 +103,25 @@ let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
       else ()
 
 let private checkBracketCompFlag src fullRange fieldRange exprRange =
-  if (fullRange: range).StartLine <> (fieldRange: range).StartLine then
-    reportWarn src fieldRange "Move '{' to inline with '='"
-  elif (exprRange: range).EndLine <> fullRange.EndLine then
-    (Position.mkPos (exprRange.EndLine + 1) 0,
-     Position.mkPos fullRange.EndLine 0)
-    ||> Range.mkRange ""
-    |> src.GetSubTextFromRange
-    |> fun subStr ->
-      let strArr = subStr.Split([| '\n' |], StringSplitOptions.None)
-      let flagStartWrong =
-        (Array.head strArr).TrimStart().StartsWith "#if" |> not
-      let flagEndWrong = Array.last strArr |> String.IsNullOrEmpty |> not
-      if flagStartWrong && flagEndWrong then
-        reportWarn src fullRange "Move field to inline with Bracket"
-      else
-        ()
+  if isStrict then
+    if (fullRange: range).StartLine <> (fieldRange: range).StartLine then
+      reportWarn src fieldRange "Move '{' to inline with '='"
+    elif (exprRange: range).EndLine <> fullRange.EndLine then
+      (Position.mkPos (exprRange.EndLine + 1) 0,
+       Position.mkPos fullRange.EndLine 0)
+      ||> Range.mkRange ""
+      |> src.GetSubTextFromRange
+      |> fun subStr ->
+        let strArr = subStr.Split([| '\n' |], StringSplitOptions.None)
+        let flagStartWrong =
+          (Array.head strArr).TrimStart().StartsWith "#if" |> not
+        let flagEndWrong = Array.last strArr |> String.IsNullOrEmpty |> not
+        if flagStartWrong && flagEndWrong then
+          reportWarn src fullRange "Move field to inline with Bracket"
+        else
+          ()
+    else
+      ()
   else
     ()
 
@@ -143,10 +153,13 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         | _ -> fieldRange
       if fieldRange.StartLine <> range.StartLine
         || exprRange.EndLine <> range.EndLine then
-        try
-          checkBracketCompFlag src range fieldRange exprRange
-        with _ ->
-          reportWarn src exprRange "Move field to inline with Bracket"
+        if isStrict then
+          try
+            checkBracketCompFlag src range fieldRange exprRange
+          with _ ->
+            reportWarn src exprRange "Move field to inline with Bracket"
+        else
+          ()
       elif fieldRange.StartColumn - 2 <> range.StartColumn then
         Range.mkRange "" range.Start fieldRange.Start
         |> reportLeftCurlyBraceSpacing src

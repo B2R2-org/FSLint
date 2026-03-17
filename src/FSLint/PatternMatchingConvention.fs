@@ -226,27 +226,30 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
 
 /// checks pattern cases with incorrect spacing or newlines.
 let private checkPatternSpacing src clauses =
-  let rec check src pat outerTrivia =
-    match pat with
-    | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat; trivia = trivia) ->
-      check src lhsPat outerTrivia
-      check src rhsPat (Some trivia.BarRange)
-    | _ ->
-      match outerTrivia with
-      | Some range ->
-        if pat.Range.StartLine <> range.StartLine then
-          reportWarn src pat.Range "Move '|' inline with pattern"
-        elif pat.Range.StartColumn - 2 <> range.StartColumn then
-          Range.mkRange "" range.Start pat.Range.Start
-          |> reportBarAfterSpacing src
-        else
+  if isStrict then
+    let rec check src pat outerTrivia =
+      match pat with
+      | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat; trivia = trivia) ->
+        check src lhsPat outerTrivia
+        check src rhsPat (Some trivia.BarRange)
+      | _ ->
+        match outerTrivia with
+        | Some range ->
+          if pat.Range.StartLine <> range.StartLine then
+            reportWarn src pat.Range "Move '|' inline with pattern"
+          elif pat.Range.StartColumn - 2 <> range.StartColumn then
+            Range.mkRange "" range.Start pat.Range.Start
+            |> reportBarAfterSpacing src
+          else
+            ()
+        | None ->
           ()
-      | None ->
-        ()
-  clauses
-  |> List.iter (fun (SynMatchClause(pat = pat; trivia = outerTrivia)) ->
-    check src pat outerTrivia.BarRange
-  )
+    clauses
+    |> List.iter (fun (SynMatchClause(pat = pat; trivia = outerTrivia)) ->
+      check src pat outerTrivia.BarRange
+    )
+  else
+    ()
 
 /// Checks for missing or extra spaces around '->' in match cases.
 let checkArrowSpacing src patRange whenExpr (bodyRange: range)
@@ -302,29 +305,32 @@ let checkParenTupleSpacing src (pats: SynPat list) =
 
 /// Checks that '|' is vertically aligned with its 'match' keyword.
 let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
-  let rec collectBarsFromPattern currentPat acc =
-    match currentPat with
-    | SynPat.Or(lhsPat = lhs; rhsPat = rhs; trivia = innerTrivia) ->
-      collectBarsFromPattern rhs
-        (collectBarsFromPattern lhs (innerTrivia.BarRange :: acc))
-    | _ ->
-      acc
-  clauses
-  |> List.iter (fun (SynMatchClause(pat = pat; trivia = outerTrivia)) ->
-    match outerTrivia.BarRange with
-    | Some barRange -> barRange :: collectBarsFromPattern pat []
-    | _ -> collectBarsFromPattern pat []
-    |> List.groupBy (fun range -> range.StartLine)
-    |> List.map (fun (line, ranges) ->
-      ranges |> List.minBy (fun range -> range.StartColumn)
+  if isStrict then
+    let rec collectBarsFromPattern currentPat acc =
+      match currentPat with
+      | SynPat.Or(lhsPat = lhs; rhsPat = rhs; trivia = innerTrivia) ->
+        collectBarsFromPattern rhs
+          (collectBarsFromPattern lhs (innerTrivia.BarRange :: acc))
+      | _ ->
+        acc
+    clauses
+    |> List.iter (fun (SynMatchClause(pat = pat; trivia = outerTrivia)) ->
+      match outerTrivia.BarRange with
+      | Some barRange -> barRange :: collectBarsFromPattern pat []
+      | _ -> collectBarsFromPattern pat []
+      |> List.groupBy (fun range -> range.StartLine)
+      |> List.map (fun (line, ranges) ->
+        ranges |> List.minBy (fun range -> range.StartColumn)
+      )
+      |> List.iter (fun barRange ->
+        if trivia.MatchKeyword.StartColumn <> barRange.StartColumn then
+          reportBarAndMatchError src barRange
+        else
+          ()
+      )
     )
-    |> List.iter (fun barRange ->
-      if trivia.MatchKeyword.StartColumn <> barRange.StartColumn then
-        reportBarAndMatchError src barRange
-      else
-        ()
-    )
-  )
+  else
+    ()
 
 let checkFormat src clauses = checkPatternSpacing src clauses
 

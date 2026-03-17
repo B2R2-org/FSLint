@@ -477,7 +477,7 @@ and checkTypeDefnWithContext src context typeDefn =
   checkTypeDefn src typeDefn
 
 and checkDeclarationsWithContext src decls (context: CheckContext) =
-  DeclarationConvention.check src decls
+  DeclarationConvention.checkSingleBlankLine src decls
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
@@ -664,6 +664,7 @@ let main args =
     Directory.GetCurrentDirectory()
     |> Configuration.getSettings
   editorConfig |> setCliEditorConfig
+  isStrict <- Array.contains "--strict" args
   if File.Exists args[0] then
     setCurrentFile args[0]
     let outcome = tryOutputToBuffer 0 args[0] editorConfig

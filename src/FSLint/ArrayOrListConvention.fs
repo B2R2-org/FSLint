@@ -210,6 +210,7 @@ let checkMultiLine src range = function
     collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
   | SynExpr.ArrayOrListComputed _
+  | SynExpr.Ident _
   | SynExpr.Record _
   | SynExpr.App _
   | SynExpr.Const _

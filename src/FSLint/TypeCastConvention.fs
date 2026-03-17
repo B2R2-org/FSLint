@@ -4,39 +4,14 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open Diagnostics
 
-let collectCastSymbolRangeFromSrc (src: ISourceText) (expr: SynExpr)
-  (targetType: SynType) =
-  try
-    let line = src.GetLineString(expr.Range.StartLine - 1)
-    let searchStartColumn = expr.Range.EndColumn
-    let searchEndColumn = targetType.Range.StartColumn
-    let symbolStr =
-      line.Substring(searchStartColumn, searchEndColumn - searchStartColumn)
-      |> fun s -> s.Trim()
-    let searchSubstring = line.Substring searchStartColumn
-    let relativeSymbolStart = searchSubstring.IndexOf symbolStr
-    if relativeSymbolStart = -1 then
-      Range.range0
-    else
-      let absoluteSymbolStart = searchStartColumn + relativeSymbolStart
-      let symbolEnd = absoluteSymbolStart + symbolStr.Length
-      (Position.mkPos expr.Range.StartLine absoluteSymbolStart,
-       Position.mkPos expr.Range.StartLine symbolEnd)
-      ||> Range.mkRange ""
-  with
-  (* TODO: Cannot detect multi line *)
-  :? System.ArgumentOutOfRangeException -> Range.range0
-
-/// Checks the spacing around the upcast operator (:>) in infix expressions.
-let check (src: ISourceText) expr (targetType: SynType) =
-  let symbolRange = collectCastSymbolRangeFromSrc src expr targetType
-  let symbolStr = symbolRange |> src.GetSubTextFromRange
-  if symbolRange.Equals Range.range0 then
+(* Because the AST does not provide the range of the symbol,
+this check is performed only when the cast expression and the
+target type are on the same line. *)
+let check (src: ISourceText) (expr: SynExpr) (targetType: SynType) symbolSize =
+  if expr.Range.EndLine = targetType.Range.StartLine
+    && targetType.Range.StartColumn - expr.Range.EndColumn - symbolSize <> 2
+  then
+    Range.mkRange expr.Range.FileName expr.Range.End targetType.Range.Start
+    |> fun range -> reportWarn src range "Use single whitespace around symbol"
+  else
     ()
-  elif expr.Range.EndColumn + 1 <> symbolRange.StartColumn then
-    Range.mkRange "" expr.Range.End symbolRange.Start
-    |> fun range -> reportWarn src range $"Use whitespace before {symbolStr}"
-  elif targetType.Range.StartColumn - 1 <> symbolRange.EndColumn then
-    Range.mkRange "" symbolRange.End targetType.Range.Start
-    |> fun range -> reportWarn src range $"Use whitespace after {symbolStr}"
-  else ()

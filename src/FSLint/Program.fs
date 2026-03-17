@@ -200,9 +200,11 @@ and checkExpression src = function
   | SynExpr.YieldOrReturn(expr = expr)
   | SynExpr.YieldOrReturnFrom(expr = expr) ->
     checkExpression src expr
-  | SynExpr.Upcast(expr = expr; targetType = targetType)
+  | SynExpr.Upcast(expr = expr; targetType = targetType) ->
+    TypeCastConvention.check src expr targetType 2
+    checkExpression src expr
   | SynExpr.Downcast(expr = expr; targetType = targetType) ->
-    TypeCastConvention.check src expr targetType
+    TypeCastConvention.check src expr targetType 3
     checkExpression src expr
   | SynExpr.Const _ as expr ->
     ParenConvention.checkExpr src expr

@@ -14,6 +14,7 @@ type LspServer(rpc: JsonRpc) =
   let mutable hasScannedWorkspace = false
   let mutable editorConfig = Configuration.defaultSettings
   let mutable editorConfigWatcher: FileSystemWatcher option = None
+  let mutable strictMode = false
 
   let toLspRange (range: range): LspRange =
     try
@@ -50,6 +51,7 @@ type LspServer(rpc: JsonRpc) =
 
   let lintDocument (uri: string) (content: string): LspDiagnostic[] =
     try
+      isStrict <- strictMode
       let sourceText = SourceText.ofString content
       let context: LintContext =
         { Errors = []
@@ -283,6 +285,17 @@ type LspServer(rpc: JsonRpc) =
     else
       eprintfn "[LSP] WARNING: No rootUri"
       editorConfig <- Configuration.defaultSettings
+    let initOptions = p["initializationOptions"]
+    if not (isNull initOptions) then
+      let strictVal = initOptions["strict"]
+      if not (isNull strictVal) then
+        strictMode <- strictVal.Value<bool>()
+        isStrict <- strictMode
+        eprintfn "[LSP] Strict mode: %b" strictMode
+      else
+        ()
+    else
+      ()
     JObject(
       JProperty("capabilities",
         JObject(
@@ -291,6 +304,11 @@ type LspServer(rpc: JsonRpc) =
               JProperty("openClose", true),
               JProperty("change", 0),
               JProperty("save", JObject(JProperty("includeText", true)))
+            )
+          ),
+          JProperty("workspace",
+            JObject(
+              JProperty("configuration", true)
             )
           )
         )
@@ -315,6 +333,34 @@ type LspServer(rpc: JsonRpc) =
         scanWorkspace () |> Async.Start
       ()
     }
+
+  [<JsonRpcMethod("workspace/didChangeConfiguration")>]
+  member _.DidChangeConfiguration(p: JToken) =
+    task {
+      try
+        let settings = p["settings"]
+        if not (isNull settings) then
+          let fslint = settings["fslint"]
+          if not (isNull fslint) then
+            let strictVal = fslint["strict"]
+            if not (isNull strictVal) then
+              let newStrict = strictVal.Value<bool>()
+              if newStrict <> strictMode then
+                strictMode <- newStrict
+                isStrict <- newStrict
+                eprintfn "[LSP] Strict mode changed to: %b" newStrict
+                scanWorkspace () |> Async.Start
+              else
+                ()
+            else
+              ()
+          else
+            ()
+        else
+          ()
+      with ex ->
+        eprintfn "[LSP] ERROR in didChangeConfiguration: %s" ex.Message
+    } :> Task
 
   [<JsonRpcMethod("textDocument/didOpen")>]
   member _.DidOpen(p: JToken) =

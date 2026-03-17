@@ -57,6 +57,7 @@
     <Compile Include="Package.cs" />
     <Compile Include="LanguageClient.cs" />
     <Compile Include="Configuration.cs" />
+    <Compile Include="FSLintOptions.cs" />
     <Compile Include="OutputWindowHelper.cs" />
     <Compile Include="DiagnosticStore.cs" />
     <Compile Include="LoggingStream.cs" />

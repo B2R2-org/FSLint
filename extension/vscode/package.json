@@ -65,6 +65,11 @@
           ],
           "default": "off",
           "description": "Trace LSP communication"
+        },
+        "fslint.strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable strict mode"
         }
       }
     }

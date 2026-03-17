@@ -11,16 +11,27 @@ namespace FSLint.VisualStudio
     [Guid(PackageGuidString)]
     [ProvideAutoLoad(UIContextGuids.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(UIContextGuids.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideOptionPage(typeof(FSLintOptions), "FSLint", "General", 0, 0, true)]
     public sealed class Package : AsyncPackage
     {
         public const string PackageGuidString = "9cbe68c1-132a-49cb-80fd-399060bd283c";
         private static string currentWorkspace = null;
+        internal static Package Instance { get; private set; }
 
-        protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
+        protected override async Task InitializeAsync(
+            CancellationToken cancellationToken,
+            IProgress<ServiceProgressData> progress)
         {
+            Instance = this;
+
             await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
             OutputWindowHelper.Initialize(this);
+
+            // Options 로드 후 LanguageClient strictMode 초기화
+            var options = GetDialogPage(typeof(FSLintOptions)) as FSLintOptions;
+            LanguageClient.StrictMode = options?.IsStrict ?? false;
+            OutputWindowHelper.WriteLine($"[FSLint] Loaded strict mode: {LanguageClient.StrictMode}");
 
             var dte = await GetServiceAsync(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
             string newWorkspace = GetWorkspacePath(dte);
@@ -43,13 +54,9 @@ namespace FSLint.VisualStudio
                 currentWorkspace = newWorkspace;
 
                 if (!string.IsNullOrEmpty(newWorkspace))
-                {
                     OutputWindowHelper.WriteLine($"Workspace: {newWorkspace}");
-                }
                 else
-                {
                     OutputWindowHelper.WriteLine("No workspace currently loaded");
-                }
 
                 OutputWindowHelper.WriteLine("Waiting for F# files to open...");
                 OutputWindowHelper.WriteLine("==========================================");
@@ -63,18 +70,14 @@ namespace FSLint.VisualStudio
             if (dte?.Solution != null)
             {
                 if (!string.IsNullOrEmpty(dte.Solution.FullName))
-                {
                     return System.IO.Path.GetDirectoryName(dte.Solution.FullName);
-                }
 
                 if (dte.Solution.Projects != null)
                 {
                     foreach (EnvDTE.Project project in dte.Solution.Projects)
                     {
                         if (!string.IsNullOrEmpty(project.FullName))
-                        {
                             return System.IO.Path.GetDirectoryName(project.FullName);
-                        }
                     }
                 }
             }

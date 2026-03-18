@@ -16,96 +16,63 @@ using Task = System.Threading.Tasks.Task;
 
 namespace FSLint.VisualStudio
 {
-
-    /// <summary>
-    /// FSLint Language Server Client for Visual Studio
-    /// Implements ILanguageClient to provide LSP-based F# linting
-    /// </summary>
     [ContentType("F#")]
     [Export(typeof(ILanguageClient))]
     public class LanguageClient : ILanguageClient
     {
-
         private Process serverProcess;
         private static bool hasScannedWorkspace = false;
         private static readonly object scanLock = new object();
         private static string lastWorkspaceRoot = null;
+        private static LanguageClient instance = null;
+
+        // Package.InitializeAsync에서 설정, RestartServerAsync에서 갱신
+        public static bool StrictMode { get; set; } = false;
+
+        public LanguageClient()
+        {
+            instance = this;
+        }
 
         [Import]
         internal SVsServiceProvider ServiceProvider { get; set; }
 
-        /// <summary>
-        /// Gets the name of the language client (displayed to the user)
-        /// </summary>
-        public string Name
-        {
-            get
-            {
-                return "FSLint Language Server";
-            }
-        }
+        public string Name => "FSLint Language Server";
 
-        /// <summary>
-        /// Gets the configuration section names.
-        /// Null means no custom configuration.
-        /// </summary>
-        public IEnumerable<string> ConfigurationSections
-        {
-            get
-            {
-                return null;
-            }
-        }
+        public IEnumerable<string> ConfigurationSections => null;
 
-        /// <summary>
-        /// Gets the initialization options to send when 'initialize' message
-        /// is sent.
-        /// Can be used to pass custom settings to the server.
-        /// </summary>
-        public object InitializationOptions
-        {
-            get
-            {
-                return null;
-            }
-        }
+        public object InitializationOptions => new { strict = StrictMode };
 
-        /// <summary>
-        /// Gets the list of file names to watch for changes.
-        /// Null means the server will handle file watching.
-        /// </summary>
         public IEnumerable<string> FilesToWatch
         {
-            get
-            {
-                yield return "**/*.fs";
-            }
+            get { yield return "**/*.fs"; }
         }
 
-        /// <summary>
-        /// Gets whether to show a notification when initialization fails
-        /// </summary>
-        public bool ShowNotificationOnInitializeFailed
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool ShowNotificationOnInitializeFailed => true;
 
-        /// <summary>
-        /// Raised when the language server is ready to receive messages
-        /// </summary>
         public event AsyncEventHandler<EventArgs> StartAsync;
-
-        /// <summary>
-        /// Raised when the language server should be stopped
-        /// </summary>
         public event AsyncEventHandler<EventArgs> StopAsync;
 
-        /// <summary>
-        /// Gets the workspace root path from the current solution
-        /// </summary>
+        public static async Task RestartServerAsync(bool isStrict)
+        {
+            StrictMode = isStrict;  // 먼저 저장
+            OutputWindowHelper.WriteLine($"[FSLint] Restarting server (strict: {isStrict})");
+
+            if (instance == null)
+            {
+                OutputWindowHelper.WriteLine("[FSLint] No instance to restart");
+                return;
+            }
+
+            if (instance.StopAsync != null)
+                await instance.StopAsync.InvokeAsync(instance, EventArgs.Empty);
+
+            await Task.Delay(500);
+
+            if (instance.StartAsync != null)
+                await instance.StartAsync.InvokeAsync(instance, EventArgs.Empty);
+        }
+
         private string GetWorkspaceRootPath()
         {
             try
@@ -115,23 +82,17 @@ namespace FSLint.VisualStudio
                 var dte = ServiceProvider.GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
 
                 if (dte == null)
-                {
                     return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                }
 
                 if (dte.Solution != null && !string.IsNullOrEmpty(dte.Solution.FullName))
-                {
                     return Path.GetDirectoryName(dte.Solution.FullName);
-                }
 
                 if (dte.Solution?.Projects != null)
                 {
                     foreach (EnvDTE.Project project in dte.Solution.Projects)
                     {
                         if (project != null && !string.IsNullOrEmpty(project.FullName))
-                        {
                             return Path.GetDirectoryName(project.FullName);
-                        }
                     }
                 }
             }
@@ -143,10 +104,6 @@ namespace FSLint.VisualStudio
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
 
-        /// <summary>
-        /// Called to activate the language server
-        /// This is where we start the server process and establish connection
-        /// </summary>
         public async Task<Connection> ActivateAsync(CancellationToken token)
         {
             await Task.Yield();
@@ -180,12 +137,15 @@ namespace FSLint.VisualStudio
                     lastWorkspaceRoot = workspaceRoot;
                     DiagnosticStore.Clear();
                 }
-                OutputWindowHelper.WriteLine($"[FSLint] Starting server for workspace: {workspaceRoot}");
+
+                string strictArg = StrictMode ? " --strict" : "";
+                OutputWindowHelper.WriteLine(
+                    $"[FSLint] Starting server for workspace: {workspaceRoot} (strict: {StrictMode})");
 
                 ProcessStartInfo info = new ProcessStartInfo
                 {
                     FileName = serverPath,
-                    Arguments = $"\"{workspaceRoot}\"",
+                    Arguments = $"\"{workspaceRoot}\"{strictArg}",
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -199,9 +159,7 @@ namespace FSLint.VisualStudio
                 serverProcess.ErrorDataReceived += (sender, e) =>
                 {
                     if (!string.IsNullOrEmpty(e.Data))
-                    {
                         OutputWindowHelper.WriteLine(e.Data);
-                    }
                 };
 
                 if (!serverProcess.Start())
@@ -218,16 +176,16 @@ namespace FSLint.VisualStudio
                     try
                     {
                         serverProcess.WaitForExit();
-                        OutputWindowHelper.WriteLine($"[FSLint] Server process exited with code: {serverProcess.ExitCode}");
+                        OutputWindowHelper.WriteLine(
+                            $"[FSLint] Server process exited with code: {serverProcess.ExitCode}");
 
                         if (serverProcess.ExitCode != 0 && StopAsync != null)
-                        {
                             _ = StopAsync.InvokeAsync(this, EventArgs.Empty);
-                        }
                     }
                     catch (Exception ex)
                     {
-                        OutputWindowHelper.WriteLine("[FSLint] Error monitoring process exit: " + ex.ToString());
+                        OutputWindowHelper.WriteLine(
+                            "[FSLint] Error monitoring process exit: " + ex.ToString());
                     }
                 });
 
@@ -238,29 +196,19 @@ namespace FSLint.VisualStudio
                     serverProcess.StandardInput.BaseStream,
                     "LSP Client -> Server");
 
-                Connection connection = new Connection(
-                    outputStream,
-                    inputStream
-                );
-
-                return connection;
+                return new Connection(outputStream, inputStream);
             }
             catch (Exception ex)
             {
                 OutputWindowHelper.WriteLine("[FSLint] ActivateAsync FAILED: " + ex.ToString());
 
                 if (StopAsync != null)
-                {
                     await StopAsync.InvokeAsync(this, EventArgs.Empty);
-                }
 
                 throw;
             }
         }
 
-        /// <summary>
-        /// Called when the extension is loaded
-        /// </summary>
         public async Task OnLoadedAsync()
         {
             try
@@ -268,13 +216,9 @@ namespace FSLint.VisualStudio
                 OutputWindowHelper.WriteLine("[FSLint] Language client loaded");
 
                 if (StartAsync != null)
-                {
                     await StartAsync.InvokeAsync(this, EventArgs.Empty);
-                }
                 else
-                {
                     OutputWindowHelper.WriteLine("[FSLint] WARNING: StartAsync event is null");
-                }
             }
             catch (Exception ex)
             {
@@ -283,9 +227,6 @@ namespace FSLint.VisualStudio
             }
         }
 
-        /// <summary>
-        /// Called when the server has been successfully initialized
-        /// </summary>
         public Task OnServerInitializedAsync()
         {
             lock (scanLock)
@@ -293,25 +234,21 @@ namespace FSLint.VisualStudio
                 if (!hasScannedWorkspace)
                 {
                     hasScannedWorkspace = true;
-                    OutputWindowHelper.WriteLine("[FSLint] Language server initialized - workspace scan started");
+                    OutputWindowHelper.WriteLine(
+                        $"[FSLint] Language server initialized (strict: {StrictMode})");
                 }
             }
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Called when server initialization has failed
-        /// </summary>
         public Task<InitializationFailureContext> OnServerInitializeFailedAsync(
             ILanguageClientInitializationInfo initializationState)
         {
             string statusMessage = initializationState?.StatusMessage ?? "Unknown error";
 
             if (initializationState?.InitializationException != null)
-            {
                 OutputWindowHelper.WriteLine("[FSLint] Initialization Exception: " +
-                                  initializationState.InitializationException.ToString());
-            }
+                    initializationState.InitializationException.ToString());
 
             var failureContext = new InitializationFailureContext
             {
@@ -324,11 +261,9 @@ namespace FSLint.VisualStudio
             };
 
             if (StopAsync != null)
-            {
                 _ = StopAsync.InvokeAsync(this, EventArgs.Empty);
-            }
 
             return Task.FromResult(failureContext);
         }
-  }
+    }
 }

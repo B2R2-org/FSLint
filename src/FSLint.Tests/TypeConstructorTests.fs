@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type TypeConstructorTests() =
@@ -13,7 +11,5 @@ type TypeConstructorTests() =
 
   [<TestMethod>]
   member _.``[TypeConstructor] Between Infix and Paren Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodConstructorSpacingTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badConstructorSpacingTest)
-     ) |> ignore
+    lint goodConstructorSpacingTest
+    lintAssert badConstructorSpacingTest

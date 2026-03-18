@@ -1,8 +1,6 @@
 namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
-open B2R2.FSLint
-open B2R2.FSLint.Program
 
 [<TestClass>]
 type AppTests() =
@@ -43,83 +41,56 @@ bad[ 1.. ]
 
   [<TestMethod>]
   member _.``[App] List Space Before and After Infix Test``() =
-    linterForFs.Lint(FakeFsPath, goodListSpaceInfixTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badListSpaceInfixTest)
-    ) |> ignore
+    lint goodListSpaceInfixTest
+    lintAssert badListSpaceInfixTest
 
   [<TestMethod>]
   member _.``[App] List App Indexer Bracket Spacing Test``() =
-    linterForFs.Lint(FakeFsPath, goodListAppIndexerTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badListAppIndexerTest)
-    ) |> ignore
+    lint goodListAppIndexerTest
+    lintAssert badListAppIndexerTest
 
   [<TestMethod>]
   member _.``[App] List App Indexer Index Range Test``() =
-    linterForFs.Lint(FakeFsPath, goodListAppIndexerInRangeTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badListAppIndexerInRangeTest)
-    ) |> ignore
+    lint goodListAppIndexerInRangeTest
+    lintAssert badListAppIndexerInRangeTest
 
   [<TestMethod>]
   member _.``[App] List Space Fununction Application Test``() =
-    linterForFs.Lint(FakeFsPath, goodListSpaceFunAppTest)
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, badListSpaceFunAppTest)
-    ) |> ignore
+    lint goodListSpaceFunAppTest
+    lintAssert badListSpaceFunAppTest
 
   [<TestMethod>]
   member _.``[UnaryOp] Negation without space - good``() =
-    let code = "let negate x = -x\n"
-    linterForFs.Lint(FakeFsPath, code)
+    "let negate x = -x\n" |> lint
 
   [<TestMethod>]
   member _.``[UnaryOp] Positive without space - good``() =
-    let code = "let positive x = +x\n"
-    linterForFs.Lint(FakeFsPath, code)
+    "let positive x = +x\n" |> lint
 
   [<TestMethod>]
   member _.``[UnaryOp] Negation in expression - good``() =
-    let code = "let compute x = -x + 10\n"
-    linterForFs.Lint(FakeFsPath, code)
+    "let compute x = -x + 10\n" |> lint
 
   [<TestMethod>]
   member _.``[UnaryOp] Binary minus is allowed with spaces``() =
-    let code = "let subtract x y = x - y\n"
-    linterForFs.Lint(FakeFsPath, code)
+    "let subtract x y = x - y\n" |> lint
 
   [<TestMethod>]
   member _.``[UnaryOp] Error - space between negation and operand``() =
-    let code = "let negate x = - x\n"
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, code)
-    ) |> ignore
+    "let negate x = - x\n" |> lintAssert
 
   [<TestMethod>]
   member _.``[UnaryOp] Error - space between positive and operand``() =
-    let code = "let positive x = + x\n"
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, code)
-    ) |> ignore
+    "let positive x = + x\n" |> lintAssert
 
   [<TestMethod>]
   member _.``[UnaryOp] Error - space in complex expression``() =
-    let code = "let compute x = - x + 10\n"
-    Assert.ThrowsException<LintException>(fun () ->
-      linterForFs.Lint(FakeFsPath, code)
-    ) |> ignore
+    "let compute x = - x + 10\n" |> lintAssert
 
   [<TestMethod>]
   member _.``[UnaryOp] DEBUG - with space``() =
-    let code = "let negate x = - x\n"
-    try
-      linterForFs.Lint(FakeFsPath, code)
-    with _ -> ()
+    try "let negate x = - x\n" |> lint with _ -> ()
 
   [<TestMethod>]
   member _.``[UnaryOp] DEBUG - without space``() =
-    let code = "let negate x = -x\n"
-    try
-      linterForFs.Lint(FakeFsPath, code)
-    with _ -> ()
+    try "let negate x = -x\n" |> lint with _ -> ()

@@ -5,7 +5,7 @@ open FSharp.Compiler.Syntax
 open Diagnostics
 
 let check (src: ISourceText) (clauses: SynMatchClause list) =
-  if clauses.Length = 1 then
+  if isStrict && clauses.Length = 1 then
     let SynMatchClause(pat = pat; trivia = trivia) = clauses.Head
     match trivia.BarRange with
     | Some barR when not pat.IsOr ->

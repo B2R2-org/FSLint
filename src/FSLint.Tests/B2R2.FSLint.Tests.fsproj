@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="MSTestSettings.fs" />
+    <Compile Include="Lint.fs" />
     <Compile Include="LineTests.fs" />
     <Compile Include="IdentifierTests.fs" />
     <Compile Include="ArgumentAssignmentTests.fs" />
@@ -30,6 +31,7 @@
     <Compile Include="TypeCastTests.fs" />
     <Compile Include="ClassDefinitionTests.fs" />
     <Compile Include="TypeUseTests.fs" />
+    <Compile Include="TryWithTests.fs" />
     <Compile Include="TypeAnnotationTests.fs" />
     <Compile Include="IndexedPropertyTests.fs" />
     <Compile Include="ArrayOrListTests.fs" />
@@ -39,6 +41,7 @@
     <Compile Include="TypeConstructorTests.fs" />
     <Compile Include="AppTests.fs" />
     <Compile Include="RecordTests.fs" />
+    <Compile Include="DotGetTests.fs" />
     <Compile Include="DeclarationTests.fs" />
     <Compile Include="FunctionBodyTests.fs" />
     <Compile Include="IfThenElseTests.fs" />

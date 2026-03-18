@@ -152,36 +152,39 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
   | _ -> acc
 
 let checkMemberOrder src (members: SynMemberDefn list) =
-  members
-  |> List.filter (fun m ->
-    match m with
-    | SynMemberDefn.ImplicitCtor _
-    | SynMemberDefn.ImplicitInherit _
-    | SynMemberDefn.Inherit _
-    | SynMemberDefn.Interface _ -> false
-    | _ -> true
-  )
-  |> List.pairwise
-  |> List.iter (fun (prev, next) ->
-    let prevKey = getMemberOrderKey prev
-    let nextKey = getMemberOrderKey next
-    if prevKey > nextKey then
-      let prevCat = getMemberCategory prev |> fst
-      let nextCat, range = getMemberCategory next
-      let prevScope = getMemberScope prev
-      let nextScope = getMemberScope next
-      if prevCat <> nextCat then
-        reportWarn src range
-          $"Move {nextCat} before {prevCat}"
-      elif prevScope <> nextScope then
-        reportWarn src range
-          "Move static member before instance members"
+  if isStrict then
+    members
+    |> List.filter (fun m ->
+      match m with
+      | SynMemberDefn.ImplicitCtor _
+      | SynMemberDefn.ImplicitInherit _
+      | SynMemberDefn.Inherit _
+      | SynMemberDefn.Interface _ -> false
+      | _ -> true
+    )
+    |> List.pairwise
+    |> List.iter (fun (prev, next) ->
+      let prevKey = getMemberOrderKey prev
+      let nextKey = getMemberOrderKey next
+      if prevKey > nextKey then
+        let prevCat = getMemberCategory prev |> fst
+        let nextCat, range = getMemberCategory next
+        let prevScope = getMemberScope prev
+        let nextScope = getMemberScope next
+        if prevCat <> nextCat then
+          reportWarn src range
+            $"Move {nextCat} before {prevCat}"
+        elif prevScope <> nextScope then
+          reportWarn src range
+            "Move static member before instance members"
+        else
+          reportWarn src range
+            "Fix member order by access level"
       else
-        reportWarn src range
-          "Fix member order by access level"
-    else
-      ()
-  )
+        ()
+    )
+  else
+    ()
 
 let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
   if (dotRanges: range list).Length = 1 then

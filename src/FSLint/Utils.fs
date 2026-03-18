@@ -12,6 +12,8 @@ open FSharp.Compiler.SyntaxTrivia
 
 let asyncLocal = AsyncLocal<ParsedInputTrivia>()
 
+let mutable isStrict = false
+
 let [<Literal>] FakeFsPath = "FakeFsPathForUnitTest.fs"
 
 let isPascalCase (methodName: string) =

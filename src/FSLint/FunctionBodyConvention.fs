@@ -26,20 +26,26 @@ let private isInsideStringLiteral (src: ISourceText) (range: range) lineIdx =
   totalTripleQuotes % 2 = 1
 
 let checkNested (src: ISourceText) range lineNums =
-  for lineNum in lineNums do
-    if src.GetLineString(lineNum - 1) <> "" then
-      reportWarn src range "Add blank line before nested"
-    else ()
+  if isStrict then
+    for lineNum in lineNums do
+      if src.GetLineString(lineNum - 1) <> "" then
+        reportWarn src range "Add blank line before nested"
+      else ()
+  else
+    ()
 
-let checkBlankLine (src: ISourceText) (range: range) lineNums =
-  for lineIdx in range.StartLine .. range.EndLine - 1 do
-    if List.contains (lineIdx + 1) lineNums then
-      ()
-    elif src.GetLineString lineIdx = "" then
-      if isInsideStringLiteral src range lineIdx then ()
-      else reportWarn src range "Remove empty line in function body."
-    else
-      ()
+let checkSingleBlankLine (src: ISourceText) (range: range) lineNums =
+  if isStrict then
+    for lineIdx in range.StartLine .. range.EndLine - 1 do
+      if List.contains (lineIdx + 1) lineNums then
+        ()
+      elif src.GetLineString lineIdx = "" then
+        if isInsideStringLiteral src range lineIdx then ()
+        else reportWarn src range "Remove empty line in function body."
+      else
+        ()
+  else
+    ()
 
 /// Checks whether each binding within the given range in the source text
 /// contains a newline within its scope. This helps enforce the convention
@@ -49,4 +55,4 @@ let checkBindings src range bindings =
   |> fun linenums ->
     checkNested src range linenums
     linenums
-    |> checkBlankLine src range
+    |> checkSingleBlankLine src range

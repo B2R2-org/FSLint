@@ -200,9 +200,11 @@ and checkExpression src = function
   | SynExpr.YieldOrReturn(expr = expr)
   | SynExpr.YieldOrReturnFrom(expr = expr) ->
     checkExpression src expr
-  | SynExpr.Upcast(expr = expr; targetType = targetType)
+  | SynExpr.Upcast(expr = expr; targetType = targetType) ->
+    TypeCastConvention.check src expr targetType 2
+    checkExpression src expr
   | SynExpr.Downcast(expr = expr; targetType = targetType) ->
-    TypeCastConvention.check src expr targetType
+    TypeCastConvention.check src expr targetType 3
     checkExpression src expr
   | SynExpr.Const _ as expr ->
     ParenConvention.checkExpr src expr
@@ -221,6 +223,9 @@ and checkExpression src = function
   | SynExpr.New(targetType = targetType; expr = expr) ->
     TypeConstructor.checkConstructorSpacing src targetType expr
     checkExpression src expr
+  | SynExpr.LongIdent(longDotId = lid) ->
+    let SynLongIdent(id = lid; dotRanges = dotRanges) = lid
+    FunctionCallConvention.checkDotsGetSpacing src lid dotRanges
   | SynExpr.LongIdentSet(expr = expr) ->
     checkExpression src expr
   | SynExpr.DotIndexedSet(objectExpr = objectExpr
@@ -249,7 +254,6 @@ and checkExpression src = function
   | SynExpr.Ident _
   | SynExpr.IndexRange _
   | SynExpr.InterpolatedString _
-  | SynExpr.LongIdent _
   | SynExpr.NamedIndexedPropertySet _
   | SynExpr.Null _
   | SynExpr.ObjExpr _
@@ -473,7 +477,7 @@ and checkTypeDefnWithContext src context typeDefn =
   checkTypeDefn src typeDefn
 
 and checkDeclarationsWithContext src decls (context: CheckContext) =
-  DeclarationConvention.check src decls
+  DeclarationConvention.checkSingleBlankLine src decls
   for decl in decls do
     match decl with
     | SynModuleDecl.ModuleAbbrev(ident = id) ->
@@ -660,6 +664,7 @@ let main args =
     Directory.GetCurrentDirectory()
     |> Configuration.getSettings
   editorConfig |> setCliEditorConfig
+  isStrict <- Array.contains "--strict" args
   if File.Exists args[0] then
     setCurrentFile args[0]
     let outcome = tryOutputToBuffer 0 args[0] editorConfig

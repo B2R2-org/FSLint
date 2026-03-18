@@ -94,7 +94,13 @@ export function activate(context: vscode.ExtensionContext) {
         { scheme: 'file', pattern: '**/*.sln' },
         { scheme: 'file', pattern: '**/*.slnx' }
       ],
-      outputChannel: vscode.window.createOutputChannel('FSLint')
+      outputChannel: vscode.window.createOutputChannel('FSLint'),
+      synchronize: {
+        configurationSection: 'fslint'
+      },
+      initializationOptions: {
+        strict: vscode.workspace.getConfiguration('fslint').get<boolean>('strict', false)
+      }
     }
   );
   client.start().then(() => {

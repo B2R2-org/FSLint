@@ -85,18 +85,21 @@ let checkEqualSpacing src patRange equalRange bodyRange retInfo =
         ()
 
 let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
-  let SynBinding(expr = body; trivia = trivia) = binding
-  match trivia.EqualsRange with
-  | Some eqRange ->
-    match body with
-    | SynExpr.Const(SynConst.String(synStringKind = stringKind), _)
-      when stringKind = SynStringKind.TripleQuote
-      && eqRange.StartLine = body.Range.StartLine
-      && (body.Range.StartLine <> body.Range.EndLine) ->
-        reportWarn src body.Range "Move '\"\"\"' to next line"
-    | _ ->
+  if isStrict then
+    let SynBinding(expr = body; trivia = trivia) = binding
+    match trivia.EqualsRange with
+    | Some eqRange ->
+      match body with
+      | SynExpr.Const(SynConst.String(synStringKind = stringKind), _)
+        when stringKind = SynStringKind.TripleQuote
+        && eqRange.StartLine = body.Range.StartLine
+        && (body.Range.StartLine <> body.Range.EndLine) ->
+          reportWarn src body.Range "Move '\"\"\"' to next line"
+      | _ ->
+        ()
+    | None ->
       ()
-  | None ->
+  else
     ()
 
 let checkAttributesLineSpacing src attrs (moduleRange: range) =
@@ -115,37 +118,43 @@ let checkAttributesLineSpacing src attrs (moduleRange: range) =
     ()
 
 let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
-  let SynBinding(expr = body; trivia = trivia) = binding
-  if trivia.EqualsRange.IsSome then
-    match body with
-    | SynExpr.ComputationExpr _
-    | SynExpr.App(argExpr = SynExpr.ComputationExpr _)
-      when trivia.EqualsRange.Value.EndLine = body.Range.StartLine ->
-      reportWarn src body.Range "Move computation expression to next line"
-    | _ ->
+  if isStrict then
+    let SynBinding(expr = body; trivia = trivia) = binding
+    if trivia.EqualsRange.IsSome then
+      match body with
+      | SynExpr.ComputationExpr _
+      | SynExpr.App(argExpr = SynExpr.ComputationExpr _)
+        when trivia.EqualsRange.Value.EndLine = body.Range.StartLine ->
+        reportWarn src body.Range "Move computation expression to next line"
+      | _ ->
+        ()
+    else
       ()
   else
     ()
 
-let check (src: ISourceText) decls =
-  decls
-  |> List.pairwise
-  |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
-    if prevDecl.IsLet && nextDecl.IsLet then
-      let expected = calculateSpacingBetweenDecls src prevDecl nextDecl
-      let actual =
-        nextDecl.Range.StartLine - prevDecl.Range.EndLine
-        |> adjustByComment prevDecl.Range nextDecl.Range expected
-      if actual <> expected then
-        if expected - actual = 1 then
-          Range.unionRanges prevDecl.Range nextDecl.Range
-          |> fun range -> reportWarn src range "Use single blank line"
+let checkSingleBlankLine (src: ISourceText) decls =
+  if isStrict then
+    decls
+    |> List.pairwise
+    |> List.iter (fun (prevDecl: SynModuleDecl, nextDecl) ->
+      if prevDecl.IsLet && nextDecl.IsLet then
+        let expected = calculateSpacingBetweenDecls src prevDecl nextDecl
+        let actual =
+          nextDecl.Range.StartLine - prevDecl.Range.EndLine
+          |> adjustByComment prevDecl.Range nextDecl.Range expected
+        if actual <> expected then
+          if expected - actual = 1 then
+            Range.unionRanges prevDecl.Range nextDecl.Range
+            |> fun range -> reportWarn src range "Use single blank line"
+          else
+            Range.mkRange "" (Position.mkPos (prevDecl.Range.EndLine + 1) 0)
+              (Position.mkPos (nextDecl.Range.StartLine - 1) 0)
+            |> fun range -> reportWarn src range "Use single blank line"
         else
-          Range.mkRange "" (Position.mkPos (prevDecl.Range.EndLine + 1) 0)
-            (Position.mkPos (nextDecl.Range.StartLine - 1) 0)
-          |> fun range -> reportWarn src range "Use single blank line"
+          ()
       else
         ()
-    else
-      ()
-  )
+    )
+  else
+    ()

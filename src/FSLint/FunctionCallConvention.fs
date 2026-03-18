@@ -194,13 +194,16 @@ let checkDotGetSpacing src (expr: SynExpr) (dotRange: range) longDotId =
       |> fun range -> reportWarn src range "Remove whitespace after '.'"
     else ()
 
-let checkDotsGetSpacing src (lid: LongIdent) dotRanges =
+let checkDotsGetSpacing (src: ISourceText) (lid: LongIdent) dotRanges =
   lid
   |> List.pairwise
   |> List.zip dotRanges
   |> List.iter (fun (dotRange: range, (front, back)) ->
     if front.idRange.EndLine = back.idRange.StartLine then
-      if front.idRange.EndColumn <> dotRange.StartColumn then
+      let gapStr =
+        Range.unionRanges front.idRange back.idRange |> src.GetSubTextFromRange
+      if gapStr.Contains(".(") || gapStr.Contains(").") then ()
+      elif front.idRange.EndColumn <> dotRange.StartColumn then
         Range.mkRange front.idRange.FileName front.idRange.End dotRange.Start
         |> fun range -> reportWarn src range "Remove whitespace before '.'"
       elif dotRange.EndColumn <> back.idRange.StartColumn then

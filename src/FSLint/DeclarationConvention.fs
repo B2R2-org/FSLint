@@ -143,14 +143,11 @@ let checkSingleBlankLine (src: ISourceText) decls =
         let actual =
           nextDecl.Range.StartLine - prevDecl.Range.EndLine
           |> adjustByComment prevDecl.Range nextDecl.Range expected
-        if actual <> expected then
-          if expected - actual = 1 then
-            Range.unionRanges prevDecl.Range nextDecl.Range
-            |> fun range -> reportWarn src range "Use single blank line"
-          else
-            Range.mkRange "" (Position.mkPos (prevDecl.Range.EndLine + 1) 0)
-              (Position.mkPos (nextDecl.Range.StartLine - 1) 0)
-            |> fun range -> reportWarn src range "Use single blank line"
+        if expected < actual then
+          (Position.mkPos (prevDecl.Range.EndLine + 1) 0,
+          Position.mkPos (nextDecl.Range.StartLine - 1) 0)
+          ||> Range.mkRange prevDecl.Range.FileName
+          |> fun range -> reportWarn src range "Use at most one blank line"
         else
           ()
       else

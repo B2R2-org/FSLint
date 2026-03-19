@@ -310,3 +310,29 @@ let checkDefinition src fields range trivia =
   checkOpeningBracketPosition src range trivia
   checkFieldIsInlineWithBracket src range fields
   checkFieldTypeSpacing src fields
+
+/// The separator information is not present in a regular anonymous record
+/// so it is excluded.
+let checkAnonymousRecord src recordFields =
+  if isStrict then
+    recordFields
+    |> List.iter (fun (id: SynLongIdent, oprRange: option<range>, expr) ->
+      if Option.isSome oprRange then
+        if id.Range.EndLine = oprRange.Value.StartLine
+          && oprRange.Value.StartLine = (expr: SynExpr).Range.StartLine
+        then
+          if id.Range.EndColumn + 1 <> oprRange.Value.StartColumn then
+            Range.mkRange id.Range.FileName id.Range.End oprRange.Value.Start
+            |> reportEqaulBeforeSpacing src
+          elif oprRange.Value.EndColumn + 1 <> expr.Range.StartColumn then
+            Range.mkRange id.Range.FileName oprRange.Value.End expr.Range.Start
+            |> reportEqaulAfterSpacing src
+          else
+            ()
+        else
+          ()
+      else
+        ()
+    )
+  else
+    ()

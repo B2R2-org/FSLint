@@ -91,6 +91,10 @@ and checkMatchClause (src: ISourceText) clause =
   checkExpression src expr
 
 and checkExpression src = function
+  | SynExpr.AnonRecd(copyInfo = info; recordFields = fields) ->
+    RecordConvention.checkAnonymousRecord src fields
+    if Option.isSome info then info.Value |> fst |> checkExpression src else ()
+    fields |> List.iter (fun (_, _, expr) -> checkExpression src expr)
   | SynExpr.Paren(expr = innerExpr) as expr ->
     ParenConvention.checkExpr src expr
     checkExpression src innerExpr

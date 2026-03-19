@@ -73,6 +73,26 @@ type InsSize =
 { field =value }
 """
 
+  let goodAnonRecdTest =
+    """
+let good = {| A = 1; B = 1 |}
+"""
+
+  let goodAnonRecdCopyTest =
+    """
+let good = {| original with Age = 31; Name = "Bob" |}
+"""
+
+  let badAnonRecdTest =
+    """
+let bad = {| A=1; B = 1 |}
+"""
+
+  let badAnonRecdCopyTest =
+    """
+let bad = {| original with Age = 31; Name="Bob" |}
+"""
+
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
     lint goodBracketPositionTest
@@ -99,3 +119,10 @@ type InsSize =
   [<TestMethod>]
   member _.``[Record] Operator Spacing Test``() =
     lintAssert badOperatorSpacingTest
+
+  [<TestMethod>]
+  member _.``[Record] Anonymous Operator Spacing Test``() =
+    lint goodAnonRecdTest
+    lint goodAnonRecdCopyTest
+    lintAssert badAnonRecdTest
+    lintAssert badAnonRecdCopyTest

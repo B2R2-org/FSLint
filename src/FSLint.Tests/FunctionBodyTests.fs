@@ -38,7 +38,71 @@ let fn () =
   let x = 1
   let y = 2
   x + y
+
+
 and bad = ()
+"""
+
+  let goodBindingWithObjExprTest =
+    """
+let good =
+  let a =
+    { new ITest with
+      member _.Foo() = ()
+      member _.Bar() = () }
+  0
+"""
+
+  let goodBindingWithObjExprTest2 =
+    """
+let good =
+  let a =
+    { new ITest with
+      member _.Foo() = ()
+
+      member _.Bar() = () }
+  0
+"""
+
+  let badBindingWithObjExprTest =
+    """
+let good =
+  let a =
+    { new ITest with
+      member _.Foo() = ()
+
+
+      member _.Bar() = () }
+  0
+"""
+
+  let goodBindingWithNestedTest =
+    """
+let good =
+  let fn =
+    let x = 1
+    let y = 2
+    x + y
+  and gn =
+    let x = 1
+    let y = 2
+    x + y
+  0
+"""
+
+  let badBindingWithNestedTest =
+    """
+let bad =
+  let fn =
+    let x = 1
+    let y = 2
+    x + y
+
+  and gn =
+    let x = 1
+    let y = 2
+    x + y
+  0
 """
 
   [<TestMethod>]
@@ -50,3 +114,14 @@ and bad = ()
   member _.``[FunctionBody] Recursive Binding NewLine Test``() =
     lint goodBindingWithAndKeywordTest
     lintAssert badBindingWithAndKeywordTest
+
+  [<TestMethod>]
+  member _.``[FunctionBody] Object Expression NewLine With Binding Test``() =
+    lint goodBindingWithObjExprTest
+    lint goodBindingWithObjExprTest2
+    lintAssert badBindingWithObjExprTest
+
+  [<TestMethod>]
+  member _.``[FunctionBody] Nested Binding Test``() =
+    lint goodBindingWithNestedTest
+    lintAssert badBindingWithNestedTest

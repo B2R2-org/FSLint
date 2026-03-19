@@ -517,7 +517,7 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
           TypeAccess = None }
       for binding in bindings do
         AccessModifierConvention.checkLetBinding src binding scopeContext
-      FunctionBodyConvention.checkBindings src range bindings
+      FunctionBodyConvention.checkBindings src bindings
       checkBindings src LowerCamelCase bindings
     | SynModuleDecl.Expr(expr = expr) ->
       checkExpression src expr

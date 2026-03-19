@@ -5,14 +5,14 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 [<TestClass>]
 type DeclarationTests() =
 
-  let goodTopBindingSpacingTest =
+  let goodBindingSingleSpacingTest =
     """
 let foo = 1
 
 let bar = 2
 """
 
-  let badTopBindingSpacingTest =
+  let goodBindingNoSpacingTest =
     """
 let foo = 1
 let bar = 2
@@ -28,8 +28,8 @@ let bar = 2
 
   [<TestMethod>]
   member _.``[ModuleDeclaration] Top Binding Spacing Test``() =
-    lint goodTopBindingSpacingTest
-    lintAssert badTopBindingSpacingTest
+    lint goodBindingSingleSpacingTest
+    lint goodBindingNoSpacingTest
 
   [<TestMethod>]
   member _.``[ModuleDeclaration] Top Binding Too Much Spacing Test``() =

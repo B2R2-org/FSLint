@@ -215,6 +215,9 @@ let checkMultiLine src range = function
     checkOpeningBracketIsInlineWithLet src range
     collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
+  | SynExpr.Match _
+  | SynExpr.MatchBang _
+  | SynExpr.MatchLambda _
   | SynExpr.ArrayOrListComputed _
   | SynExpr.Ident _
   | SynExpr.Record _

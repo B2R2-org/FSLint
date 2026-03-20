@@ -63,7 +63,7 @@ Developed at KAIST SoftSec Lab for the [B2R2 binary analysis platform](https://g
 - F# source files (`.fs`)
 
 ## Extension Settings
-
+- `fslint.strict` — Turn on strict mode (default: `false`)
 - `fslint.enable` — Toggle linting (default: `true`)
 - `fslint.trace.server` — Debug LSP communication
 
@@ -76,6 +76,10 @@ max_line_length = 120  # Default: 80
 ```
 
 ## Release Notes
+
+### 1.0.5
+
+- Add Strict Mode
 
 ### 1.0.4
 

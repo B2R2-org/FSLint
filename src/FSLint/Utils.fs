@@ -31,6 +31,9 @@ let extractComparisonOperator = function
     | _ -> None
   | _ -> None
 
+let isBlankLine (src: ISourceText) lineIdx =
+  src.GetLineString(lineIdx - 1) |> String.IsNullOrWhiteSpace
+
 /// Checks if there are compiler directives between two ranges
 let findDirectivesBetween prev next =
   asyncLocal.Value.ConditionalDirectives

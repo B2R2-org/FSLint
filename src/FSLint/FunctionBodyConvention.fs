@@ -5,47 +5,6 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open Diagnostics
 
-let private findIdxRange fileName lineNumber startCol endColExclusive line =
-  let rec loop pos acc =
-    if pos <= endColExclusive - 3 then
-      if (line: string).Substring(pos, 3) = "\"\"\"" then
-        let tripleQuoteRange =
-          Range.mkRange fileName (Position.mkPos lineNumber pos)
-            (Position.mkPos lineNumber (pos + 3))
-        loop (pos + 3) (tripleQuoteRange :: acc)
-      else
-        loop (pos + 1) acc
-    else
-      List.rev acc
-  loop startCol []
-
-let rec private unionRange acc ranges =
-  match ranges with
-  | startRange :: endRange :: rest ->
-    unionRange (Range.unionRanges startRange endRange :: acc) rest
-  | _ ->
-    List.rev acc
-
-let private getTripleQuoteRange (src: ISourceText) (range: range) =
-  [ range.StartLine .. range.EndLine ]
-  |> List.collect (fun lineNumber ->
-    let line = src.GetLineString(lineNumber - 1)
-    let startCol = if lineNumber = range.StartLine then range.StartColumn else 0
-    let endCol =
-      if lineNumber = range.EndLine then min range.EndColumn line.Length
-      else line.Length
-    if endCol - startCol < 3 then []
-    else findIdxRange range.FileName lineNumber startCol endCol line
-  )
-  |> unionRange []
-  |> fun ranges ->
-    ranges
-    |> List.map (fun r -> [ r.StartLine .. r.EndLine ])
-    |> List.concat
-
-let private isBlankLine (src: ISourceText) lineIdx =
-  src.GetLineString(lineIdx - 1) |> String.IsNullOrWhiteSpace
-
 let rec objExprRanges acc = function
   | SynExpr.ObjExpr(range = range) -> range :: acc
   | SynExpr.ComputationExpr(expr = expr)
@@ -88,14 +47,16 @@ let private checkObjExprNewline src (objExprRanges: range list) =
 let checkBinding src objRange (binding: SynBinding) =
   if isStrict then
     let range = binding.RangeOfBindingWithRhs
-    let tripleQuote = getTripleQuoteRange src range
+    let allowedBlankLines =
+      Set.union
+        (objRange |> Set.ofList)
+        (ClassDefinition.getTripleQuoteRange src range |> Set.ofList)
     [ range.StartLine .. range.EndLine ]
-    |> List.filter (fun line ->
-      List.contains line objRange |> not
-      && List.contains line tripleQuote |> not)
     |> List.iter (fun lineIdx ->
-      if isBlankLine src lineIdx then
-        Range.mkRange range.FileName (Position.mkPos lineIdx 0)
+      if isBlankLine src lineIdx
+        && not (Set.contains lineIdx allowedBlankLines) then
+        Range.mkRange range.FileName
+          (Position.mkPos lineIdx 0)
           (Position.mkPos lineIdx 1)
         |> fun range -> reportWarn src range "Remove blank line in let scope"
       else

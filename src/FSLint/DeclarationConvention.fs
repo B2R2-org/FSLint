@@ -84,24 +84,6 @@ let checkEqualSpacing src patRange equalRange bodyRange retInfo =
       else
         ()
 
-let checkLetAndMultilineRhsPlacement (src: ISourceText) (binding: SynBinding) =
-  if isStrict then
-    let SynBinding(expr = body; trivia = trivia) = binding
-    match trivia.EqualsRange with
-    | Some eqRange ->
-      match body with
-      | SynExpr.Const(SynConst.String(synStringKind = stringKind), _)
-        when stringKind = SynStringKind.TripleQuote
-        && eqRange.StartLine = body.Range.StartLine
-        && (body.Range.StartLine <> body.Range.EndLine) ->
-          reportWarn src body.Range "Move '\"\"\"' to next line"
-      | _ ->
-        ()
-    | None ->
-      ()
-  else
-    ()
-
 let checkAttributesLineSpacing src attrs (moduleRange: range) =
   let lastAttr = List.tryLast (attrs: SynAttributes)
   if Option.isSome lastAttr then

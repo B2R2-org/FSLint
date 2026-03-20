@@ -439,7 +439,6 @@ and checkBinding src case binding =
       trivia.EqualsRange.Value body.Range returnInfo
   else
     ()
-  DeclarationConvention.checkLetAndMultilineRhsPlacement src binding
   DeclarationConvention.checkComputationExprPlacement src binding
   TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
@@ -526,6 +525,7 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
         ClassDefinition.checkNestedTypeDefns src range typeDefns
       else
         ()
+      ClassDefinition.checkLineBreak src range
       for typeDefn in typeDefns do checkTypeDefnWithContext src context typeDefn
     | SynModuleDecl.Open _
     | SynModuleDecl.HashDirective _

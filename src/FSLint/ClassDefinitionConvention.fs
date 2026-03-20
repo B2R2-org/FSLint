@@ -180,19 +180,21 @@ let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
     ()
 
 let checkLineBreak src range =
-  let tripleQuote = getTripleQuoteRange src range
+  let tripleQuoteLines = getTripleQuoteRange src range |> Set.ofList
   let findMultiline src acc lineIdx =
-   if isBlankLine src lineIdx then
-     if acc >= 1 then
-       Range.mkRange range.FileName
-         (Position.mkPos (lineIdx - 1) 0) (Position.mkPos (lineIdx - 1) 1)
-       |> fun range -> reportWarn src range "Use at most single blank line"
-     else
-       ()
-     acc + 1
-   else
-     0
+    if Set.contains lineIdx tripleQuoteLines then
+      0
+    elif isBlankLine src lineIdx then
+      if acc >= 1 then
+        Range.mkRange range.FileName
+          (Position.mkPos (lineIdx - 1) 0)
+          (Position.mkPos (lineIdx - 1) 1)
+        |> fun range -> reportWarn src range "Use at most single blank line"
+        acc + 1
+      else
+        acc + 1
+    else
+      0
   [ range.StartLine .. range.EndLine ]
-  |> List.filter (fun line -> List.contains line tripleQuote |> not)
   |> List.fold (fun acc lineIdx -> findMultiline src acc lineIdx) 0
   |> ignore

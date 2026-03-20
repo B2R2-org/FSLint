@@ -47,15 +47,16 @@ let private checkObjExprNewline src (objExprRanges: range list) =
 let checkBinding src objRange (binding: SynBinding) =
   if isStrict then
     let range = binding.RangeOfBindingWithRhs
-    let tripleQuote = ClassDefinition.getTripleQuoteRange src range
+    let allowedBlankLines =
+      Set.union
+        (objRange |> Set.ofList)
+        (ClassDefinition.getTripleQuoteRange src range |> Set.ofList)
     [ range.StartLine .. range.EndLine ]
-    |> List.filter (fun line ->
-      List.contains line objRange |> not &&
-      List.contains line tripleQuote |> not
-    )
     |> List.iter (fun lineIdx ->
-      if isBlankLine src lineIdx then
-        Range.mkRange range.FileName (Position.mkPos lineIdx 0)
+      if isBlankLine src lineIdx
+        && not (Set.contains lineIdx allowedBlankLines) then
+        Range.mkRange range.FileName
+          (Position.mkPos lineIdx 0)
           (Position.mkPos lineIdx 1)
         |> fun range -> reportWarn src range "Remove blank line in let scope"
       else

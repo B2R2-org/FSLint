@@ -6,257 +6,101 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 open Diagnostics
 
-let private generalOperator =
-  [ "+"
-    "-"
-    "*"
-    "/"
-    "%"
-    "**"
-    "="
-    "<>"
-    "<"
-    ">"
-    "<="
-    ">="
-    "&&"
-    "||"
-    "&&&"
-    "|||"
-    "^^^"
-    "~~~"
-    "<<<"
-    ">>>"
-    "|>"
-    "<|"
-    ">>"
-    "<<"
-    "@"
-    "::"
-    "|"
-    "->"
-    "<-"
-    ":>"
-    ":?>"
-    ":?"
-    "!"
-    ":="
-    ".."
-    ".." ]
-  |> Set.ofList
+let makeSpaceRange (fromRange: range) (toRange: range) =
+  Range.mkRange fromRange.FileName fromRange.End toRange.Start
 
-let private isUnaryOperator (src: ISourceText) (operatorRange: range) =
-  try
-    let line = src.GetLineString(operatorRange.StartLine - 1)
-    let beforeOperator = line.Substring(0, operatorRange.StartColumn).TrimEnd()
-    if beforeOperator.Length > 0 then
-      let lastChar = beforeOperator[beforeOperator.Length - 1]
-      Char.IsLetterOrDigit lastChar || lastChar = ')' || lastChar = ']'
-    else
-      false
-  with
-    _ -> false
-
-let private isCustomOperator (src: ISourceText) (funcRange: range) =
-  let symbol = src.GetSubTextFromRange funcRange |> fun s -> s.Trim()
-  if symbol.Length = 0 then
-    false
+let private tryGetTextBetweenSameLine src leftRange rightRange =
+  if findDirectivesBetween leftRange rightRange |> Option.isSome then
+    None
   else
-    (symbol |> Seq.forall (fun c -> not (Char.IsLetterOrDigit c) && c <> '_'))
-    && not (Set.contains symbol generalOperator)
+    let leftAdjusted =
+      combineRangeWithComment leftRange rightRange true leftRange
+    let rightAdjusted =
+      combineRangeWithComment leftRange rightRange false rightRange
+    if leftAdjusted.EndLine <> rightAdjusted.StartLine
+      || rightAdjusted.StartColumn < leftAdjusted.EndColumn then
+      None
+    else
+      let line = (src: ISourceText).GetLineString(leftAdjusted.EndLine - 1)
+      let gap =
+        let size = rightAdjusted.StartColumn - leftAdjusted.EndColumn
+        line.Substring(leftAdjusted.EndColumn, size)
+      Some(leftAdjusted, rightAdjusted, gap)
 
-let private isOperator src = function
-  | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = triv); range = range) ->
-    triv
-    |> List.exists (function
-      | Some(IdentTrivia.OriginalNotation "=")
-        -> false
-      | Some(IdentTrivia.OriginalNotation _) -> true
-      | _ -> false
-    ) && isUnaryOperator src range
-  | _ -> false
-
-let private isEquality = function
+let private tryGetOperatorSymbol = function
   | SynExpr.LongIdent(longDotId = SynLongIdent(trivia = trivias)) ->
     trivias
-    |> List.exists (function
-      | Some(IdentTrivia.OriginalNotation "=") -> true
-      | _ -> false
-    )
+    |> List.tryPick (function
+      | Some(IdentTrivia.OriginalNotation op) -> Some op
+      | _ -> None)
+  | _ -> None
+
+let private isOperatorExpr expr = Option.isSome <| tryGetOperatorSymbol expr
+
+let private isUnaryOperatorExpr = function
+  | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ ident ])) ->
+    ident.idText = "op_UnaryNegation"
+    || ident.idText = "op_UnaryPlus"
+    || ident.idText = "op_LogicalNot"
   | _ -> false
 
-let rec private collectLastElementRange acc = function
-  | SynExpr.App(argExpr = argExpr) ->
-    match argExpr with
-    | SynExpr.App _ -> collectLastElementRange acc argExpr
-    | SynExpr.Tuple(exprs = exprs) -> (List.last exprs).Range
-    | _ -> argExpr.Range
-  | SynExpr.Tuple(exprs = exprs) -> (List.last exprs).Range
-  | expr -> expr.Range
-
-/// Retrieve the range of the element to the left of the operator from the given
-/// source text. This is useful for analyzing expressions in the source code.
-let private findLeftExprFromSource (src: ISourceText) (operatorRange: range) =
-  try
-    let line = src.GetLineString(operatorRange.StartLine - 1)
-    let beforeOperator = line.Substring(0, operatorRange.StartColumn)
-    let trimmed = beforeOperator.TrimEnd()
-    let leftElemEnd = trimmed.Length
-    let rec findStart i =
-      if i <= 0 then 0
-      elif System.Char.IsWhiteSpace trimmed[i - 1] then i
-      else findStart (i - 1)
-    let leftElemStart = findStart leftElemEnd
-    if leftElemStart < leftElemEnd then
-      (Position.mkPos operatorRange.StartLine leftElemStart,
-       Position.mkPos operatorRange.StartLine leftElemEnd)
-      ||> Range.mkRange ""
-      |> Some
-    else
-      None
-  with
-    _ -> None
-
-let private shouldCheckFuncSpacing funcExpr (argExpr: SynExpr) =
-  if argExpr.IsArrayOrListComputed then false
+let private checkUnaryOperatorSpacing src funcExpr (argExpr: SynExpr) =
+  if isUnaryOperatorExpr (funcExpr: SynExpr) then
+    match tryGetTextBetweenSameLine src funcExpr.Range argExpr.Range with
+    | Some(leftAdjusted, rightAdjusted, gap)
+      when gap |> Seq.exists Char.IsWhiteSpace ->
+      makeSpaceRange leftAdjusted rightAdjusted
+      |> fun range ->
+        reportWarn src range "Remove whitespace after unary operator"
+    | _ -> ()
   else
-    match funcExpr with
-    | SynExpr.DotGet _
-    | SynExpr.App(funcExpr = SynExpr.DotGet _) -> false
-    | SynExpr.Ident _ -> true
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ first ])) ->
-      first.idText.Length > 0 && not (Char.IsLower(first.idText[0]))
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = _ :: _ :: _)) -> false
-    | SynExpr.App(funcExpr = SynExpr.Ident _)
-    | SynExpr.App(funcExpr =
-      SynExpr.LongIdent(longDotId = SynLongIdent(id = [ _ ]))) -> true
+    ()
+
+let private checkInfixSpacing src funcExpr (argExpr: SynExpr) =
+  let isEqualityExpr expr =
+    match tryGetOperatorSymbol expr with
+    | Some "=" -> true
     | _ -> false
-
-let private ensureInfixSpacing src funcRange (subArgRange: range) argRange =
-  if (argRange: range).StartLine = (funcRange: range).StartLine
-    && argRange.StartColumn <> funcRange.EndColumn + 1 then
-    Range.mkRange "" funcRange.End argRange.Start |> reportInfixSpacing src
-  else ()
-  if subArgRange.StartLine = funcRange.StartLine
-    && funcRange.StartColumn <> subArgRange.EndColumn + 1 then
-    Range.mkRange "" subArgRange.End funcRange.Start |> reportInfixSpacing src
-  else
-    ()
-
-let private ensureAddressOfSpacing src (exprRange: range) (opRange: range) =
-  if opRange.StartLine = exprRange.StartLine
-    && opRange.EndColumn <> exprRange.StartColumn then
-    reportInfixSpacing src opRange
-  else
-    ()
-
-let private ensureFuncSpacing src (funcRange: range) (argRange: range) =
-  if (argRange.StartColumn - funcRange.EndColumn <> 1
-    && funcRange.StartLine = argRange.StartLine)
-    && not (isUnaryOperator src funcRange)
-    && not (isCustomOperator src funcRange)
-  then
-    Range.mkRange "" funcRange.End argRange.Start
-    |> fun range -> reportWarn src range "Use single whitespace in func app"
-  else ()
-
-/// Validates spacing around (=) operators ensuring proper whitespace.
-/// Checks for exact spacing requirements in assignment expressions.
-let private checkAssignSpacing src (fRange: range) (subArgRange: range) aRange =
-  if fRange.StartColumn <> subArgRange.EndColumn + 1 then
-    Range.mkRange "" subArgRange.End fRange.Start |> reportEqaulAfterSpacing src
-  elif fRange.EndColumn <> (aRange: range).StartColumn - 1 then
-    Range.mkRange "" fRange.End aRange.Start |> reportEqaulBeforeSpacing src
-  else
-    ()
-
-/// Check proper spacing in infix applications.
-/// Ensures a single space from the operator to each applied element
-/// (e.g., "a + b", not "a+b").
-let rec checkInfixSpacing src isInfix funcExpr (argExpr: SynExpr) =
-  let processSubExpression subFuncExpr (subArgExpr: SynExpr) subIsInfix =
-    if (isInfix || subIsInfix) && isOperator src subFuncExpr then
-      ensureInfixSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
-    elif isEquality subFuncExpr then
-      checkAssignSpacing src subFuncExpr.Range subArgExpr.Range argExpr.Range
-    else
-      ()
   match funcExpr with
-  | SynExpr.App(isInfix = isInfixInner; funcExpr = subFuncExpr
-                argExpr = subArgExpr) ->
-    processSubExpression subFuncExpr subArgExpr isInfixInner
-    match subArgExpr with
-    | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
-      checkInfixSpacing src isInfix funcExpr argExpr
-    | _ -> ()
-  | _ -> ()
-  match argExpr with
-  | SynExpr.App(isInfix = isInfixInner; funcExpr = subFuncExpr
-                argExpr = subArgExpr) ->
-    if isOperator src subFuncExpr then
-      match findLeftExprFromSource src subFuncExpr.Range with
-      | Some leafArgRange ->
-        let subArgRange = collectLastElementRange subArgExpr.Range subArgExpr
-        ensureInfixSpacing src subFuncExpr.Range leafArgRange subArgRange
-      | None -> ()
-    else
-      ()
-    checkInfixSpacing src (isInfixInner || isOperator src subFuncExpr)
-      subFuncExpr subArgExpr
-  | SynExpr.AddressOf(expr = expr; opRange = opRange) ->
-    ensureAddressOfSpacing src expr.Range opRange
-  | _ -> ()
-
-/// Check proper spacing in function applications.
-/// Ensures single space between each applied element
-/// (e.g., "fn 1 2", not "fn  1  2").
-let rec checkFuncSpacing src (funcExpr: SynExpr) (argExpr: SynExpr) =
-  if not argExpr.IsArrayOrListComputed || argExpr.IsParen then
-    match funcExpr with
-    | SynExpr.App(funcExpr = subFuncExpr; argExpr = subArgExpr) ->
-      ensureFuncSpacing src funcExpr.Range argExpr.Range
-      checkFuncSpacing src subFuncExpr subArgExpr
-    | SynExpr.Ident _ | SynExpr.LongIdent _ ->
-      ensureFuncSpacing src funcExpr.Range argExpr.Range
-    | SynExpr.Paren _ | SynExpr.DotGet _ -> ()
-    | _ ->
-      warn $"[checkFuncAppSpacing]TODO: {funcExpr}"
-  else
-    ()
-  match funcExpr with
-  | SynExpr.App(isInfix = false; funcExpr = innerFunc; argExpr = innerArg) ->
-    checkFuncSpacing src innerFunc innerArg
-  | _ -> ()
-
-let checkInfixOrFuncSpacing src isInfix funcExpr argExpr =
-  if isInfix then checkInfixSpacing src isInfix funcExpr argExpr
-  elif isOperator src funcExpr || shouldCheckFuncSpacing funcExpr argExpr
-  then checkFuncSpacing src funcExpr argExpr
-  else ()
-
-let checkUnaryOperatorSpacing (src: ISourceText) (expr: SynExpr) =
-  match expr with
-  | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
-    match funcExpr with
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = identList)) ->
-      match identList with
-      | [ id ] when
-        id.idText = "op_UnaryNegation" ||
-        id.idText = "op_UnaryPlus" ||
-        id.idText = "op_LogicalNot" ->
-          if funcExpr.Range.EndLine = argExpr.Range.StartLine then
-            let gap = argExpr.Range.StartColumn - funcExpr.Range.EndColumn
-            if gap > 0 then
-              Range.mkRange "" funcExpr.Range.End argExpr.Range.Start
-              |> fun range ->
-                reportWarn src range "Remove whitespace after unary operator"
-            else
-              ()
-          else
-            ()
+  | SynExpr.App(isInfix = true; funcExpr = opExpr; argExpr = leftExpr) ->
+    if isEqualityExpr opExpr then
+      match tryGetTextBetweenSameLine src leftExpr.Range opExpr.Range with
+      | Some(leftAdjusted, eqAdjusted, gap) when gap <> " " ->
+        makeSpaceRange leftAdjusted eqAdjusted |> reportEqaulAfterSpacing src
       | _ -> ()
-    | _ -> ()
+      match tryGetTextBetweenSameLine src opExpr.Range argExpr.Range with
+      | Some(eqAdjusted, rightAdjusted, gap) when gap <> " " ->
+        makeSpaceRange eqAdjusted rightAdjusted |> reportEqaulBeforeSpacing src
+      | _ -> ()
+    elif isOperatorExpr opExpr then
+      match tryGetTextBetweenSameLine src leftExpr.Range opExpr.Range with
+      | Some(leftAdjusted, opAdjusted, gap) when gap <> " " ->
+        makeSpaceRange leftAdjusted opAdjusted |> reportInfixSpacing src
+      | _ -> ()
+      match tryGetTextBetweenSameLine src opExpr.Range argExpr.Range with
+      | Some(opAdjusted, rightAdjusted, gap) when gap <> " " ->
+        makeSpaceRange opAdjusted rightAdjusted |> reportInfixSpacing src
+      | _ -> ()
+    else
+      ()
   | _ -> ()
+
+let private checkFuncSpacing src funcExpr (argExpr: SynExpr) =
+  if not (argExpr.IsArrayOrListComputed && not argExpr.IsParen)
+    && not (isUnaryOperatorExpr funcExpr)
+    && not (isOperatorExpr funcExpr)
+  then
+    match tryGetTextBetweenSameLine src funcExpr.Range argExpr.Range with
+    | Some(funcAdjusted, argAdjusted, gap)
+      when gap |> Seq.exists Char.IsWhiteSpace ->
+      if gap <> " " then
+        Range.mkRange "" funcAdjusted.End argAdjusted.Start
+        |> fun range -> reportWarn src range "Use single whitespace in func app"
+      else
+        ()
+    | _ -> ()
+  else
+    ()
 
 let checkLambdaArrowSpacing src pat body (trivia: SynExprLambdaTrivia) =
   if Option.isSome trivia.ArrowRange then
@@ -264,13 +108,11 @@ let checkLambdaArrowSpacing src pat body (trivia: SynExprLambdaTrivia) =
       && pat.EndColumn + 1 <> trivia.ArrowRange.Value.StartColumn
       && (body: range).StartColumn > pat.StartColumn
       && pat.EndColumn - pat.StartColumn > 1 then
-      Range.mkRange "" pat.End trivia.ArrowRange.Value.Start
-      |> reportArrowBeforeSpacing src
+      makeSpaceRange pat trivia.ArrowRange.Value |> reportArrowBeforeSpacing src
     elif body.StartLine = trivia.ArrowRange.Value.StartLine
       && body.StartColumn - 1 <> trivia.ArrowRange.Value.EndColumn
       && body.StartColumn > trivia.ArrowRange.Value.EndColumn then
-      Range.mkRange "" trivia.ArrowRange.Value.End body.Start
-      |> reportArrowAfterSpacing src
+      makeSpaceRange trivia.ArrowRange.Value body |> reportArrowAfterSpacing src
     else
       ()
   else
@@ -291,7 +133,7 @@ let checkLambdaKeywordSpacing (src: ISourceText) lambdaRange argsRange =
         if ws.Length <> 1 then
           Range.mkRange ""
             (Position.mkPos lambdaRange.StartLine
-            (lambdaRange.StartColumn + keywordLen))
+              (lambdaRange.StartColumn + keywordLen))
             argsRange.Start
           |> fun range ->
             reportWarn src range "Use single whitespace after Lambda"
@@ -300,38 +142,48 @@ let checkLambdaKeywordSpacing (src: ISourceText) lambdaRange argsRange =
   else
     ()
 
-let rec check src isInfix flag funcExpr (argExpr: SynExpr) =
+let rec check src isInfix funcExpr (argExpr: SynExpr) =
+  let isInfixAppExpr = function
+    | SynExpr.App(isInfix = true) -> true
+    | _ -> false
+  if isStrict then
+    if isInfix || isInfixAppExpr funcExpr then
+      checkInfixSpacing src funcExpr argExpr
+    else
+      checkUnaryOperatorSpacing src funcExpr argExpr
+      checkFuncSpacing src funcExpr argExpr
+  else
+    ()
   match funcExpr with
-  | SynExpr.App(isInfix = subIsInfix; funcExpr = subFuncExpr
-                argExpr = subArgExpr) ->
-    checkInfixOrFuncSpacing src subIsInfix funcExpr argExpr
-    check src subIsInfix flag subFuncExpr subArgExpr
-  | SynExpr.LongIdent _ ->
-    checkInfixOrFuncSpacing src isInfix funcExpr argExpr
+  | SynExpr.App(isInfix = subInfix; funcExpr = subFunc; argExpr = subArg) ->
+    check src subInfix subFunc subArg
   | SynExpr.Paren(expr = innerExpr) ->
     traverseParen src isInfix innerExpr
-  | SynExpr.Ident _ ->
-    match argExpr with
-    | SynExpr.Paren(expr = innerExpr) -> traverseParen src isInfix innerExpr
-    | _ -> ()
+  | SynExpr.Ident _
+  | SynExpr.LongIdent _
   | SynExpr.TypeApp _
   | SynExpr.DotGet _
   | SynExpr.Const _
   | SynExpr.ArrayOrListComputed _
   | SynExpr.DotLambda _ -> ()
-  | expr -> warn $"[AppConvention] TODO: {expr}"
+  | expr ->
+    warn $"[AppConvention] TODO(funcExpr): {expr}"
   match argExpr with
-  | SynExpr.App(isInfix = isInfix; funcExpr = funcExpr; argExpr = argExpr) ->
-    check src (isInfix || isOperator src funcExpr) flag funcExpr argExpr
+  | SynExpr.App(isInfix = subInfix; funcExpr = subFunc; argExpr = subArg) ->
+    check src subInfix subFunc subArg
   | SynExpr.Paren(expr = innerExpr) ->
     traverseParen src isInfix innerExpr
-  | SynExpr.AddressOf _ ->
-    checkInfixSpacing src true funcExpr argExpr
-  | _ -> ()
+  | SynExpr.AddressOf(expr = expr; opRange = opRange) ->
+    match tryGetTextBetweenSameLine src opRange expr.Range with
+    | Some(_, _, gap) when gap <> "" -> reportInfixSpacing src opRange
+    | _ -> ()
+  | _ ->
+    ()
 
 and traverseParen src isInfix = function
-  | SynExpr.App(flag = flag; funcExpr = subFuncExpr; argExpr = subArgExpr) ->
-    check src isInfix flag subFuncExpr subArgExpr
+  | SynExpr.App(isInfix = subIsInfix; funcExpr = funcExpr; argExpr = argExpr) ->
+    check src subIsInfix funcExpr argExpr
   | SynExpr.Lambda(body = body) ->
     traverseParen src isInfix body
-  | _ -> ()
+  | _ ->
+    ()

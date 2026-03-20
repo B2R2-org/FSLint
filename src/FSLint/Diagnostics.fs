@@ -106,8 +106,12 @@ module CustomReports =
   let reportNewLine src range =
     reportWarn src range "Remove unnecessary line break"
 
+/// We intentionally do not suggest a concrete fix here because some malformed
+/// operator-spacing cases (for example, generic-looking syntax parsed as infix
+/// operators) can require either adding or removing whitespace depending on how
+/// the code was parsed.
   let reportInfixSpacing src range =
-    reportWarn src range "Use whitespace around infix operator"
+    reportWarn src range "Incorrect operator spacing"
 
   let reportRangeOperatorError src range =
     reportWarn src range "Use whitespace around '..'"

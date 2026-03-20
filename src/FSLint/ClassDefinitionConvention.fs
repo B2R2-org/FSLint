@@ -9,6 +9,43 @@ let private extractTypeNameRange decl =
   let SynTyparDecl(typar = SynTypar(ident = ident)) = decl
   ident.idRange
 
+let private findIdxRange fileName lineNumber startCol endColExclusive line =
+  let rec loop pos acc =
+    if pos <= endColExclusive - 3 then
+      if (line: string).Substring(pos, 3) = "\"\"\"" then
+        let tripleQuoteRange =
+          Range.mkRange fileName (Position.mkPos lineNumber pos)
+            (Position.mkPos lineNumber (pos + 3))
+        loop (pos + 3) (tripleQuoteRange :: acc)
+      else
+        loop (pos + 1) acc
+    else
+      List.rev acc
+  loop startCol []
+
+let rec private unionRange acc ranges =
+  match ranges with
+  | startRange :: endRange :: rest ->
+    unionRange (Range.unionRanges startRange endRange :: acc) rest
+  | _ ->
+    List.rev acc
+
+let getTripleQuoteRange (src: ISourceText) (range: range) =
+  [ range.StartLine .. range.EndLine ]
+  |> List.collect (fun lineNumber ->
+    let line = src.GetLineString(lineNumber - 1)
+    let startCol = if lineNumber = range.StartLine then range.StartColumn else 0
+    let endCol =
+      if lineNumber = range.EndLine then min range.EndColumn line.Length
+      else line.Length
+    if endCol - startCol < 3 then []
+    else findIdxRange range.FileName lineNumber startCol endCol line
+  )
+  |> unionRange []
+  |> List.map (fun r -> [ r.StartLine .. r.EndLine ])
+  |> List.filter (fun ranges -> ranges.Length > 1)
+  |> List.concat
+
 let checkMultiLineIdentWithParen (src: ISourceText) ctorRange spaceRange =
   src.GetLineString((ctorRange: range).StartLine - 1)
   |> fun str ->
@@ -130,11 +167,32 @@ let checkSynTypar src idRange (typeParams: SynTyparDecls) =
   | _ -> warn "[checkSynTypar] TODO"
 
 let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
-  typeDefns
-  |> List.skip 1
-  |> List.map (fun (typeDefn: SynTypeDefn) -> typeDefn.Range.StartLine - 1)
-  |> List.iter (fun recurseIdx ->
-    if src.GetLineString(recurseIdx - 1) <> ""
-    then reportWarn src range "Add blank line before nested"
-    else ()
-  )
+  if isStrict then
+    typeDefns
+    |> List.skip 1
+    |> List.map (fun (typeDefn: SynTypeDefn) -> typeDefn.Range.StartLine - 1)
+    |> List.iter (fun recurseIdx ->
+      if src.GetLineString(recurseIdx - 1) <> ""
+      then reportWarn src range "Add blank line before nested"
+      else ()
+    )
+  else
+    ()
+
+let checkLineBreak src range =
+  let tripleQuote = getTripleQuoteRange src range
+  let findMultiline src acc lineIdx =
+   if isBlankLine src lineIdx then
+     if acc >= 1 then
+       Range.mkRange range.FileName
+         (Position.mkPos (lineIdx - 1) 0) (Position.mkPos (lineIdx - 1) 1)
+       |> fun range -> reportWarn src range "Use at most single blank line"
+     else
+       ()
+     acc + 1
+   else
+     0
+  [ range.StartLine .. range.EndLine ]
+  |> List.filter (fun line -> List.contains line tripleQuote |> not)
+  |> List.fold (fun acc lineIdx -> findMultiline src acc lineIdx) 0
+  |> ignore

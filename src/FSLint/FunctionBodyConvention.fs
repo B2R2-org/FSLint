@@ -34,7 +34,6 @@ let private getTripleQuoteRange (src: ISourceText) (range: range) =
     let endCol =
       if lineNumber = range.EndLine then min range.EndColumn line.Length
       else line.Length
-
     if endCol - startCol < 3 then []
     else findIdxRange range.FileName lineNumber startCol endCol line
   )

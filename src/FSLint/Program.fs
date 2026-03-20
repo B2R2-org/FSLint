@@ -31,7 +31,7 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
       ClassMemberConvention.checkStaticMemberSpacing src lid typarDecls
         args idTrivia
     else
-      ClassMemberConvention.checkMemberSpacing src lid extraId
+      ClassMemberConvention.checkMemberSpacing src lid typarDecls extraId
         dotRanges args
     PatternMatchingConvention.checkBody src pat
     for arg in args do checkPattern src LowerCamelCase true trivia arg
@@ -187,8 +187,7 @@ and checkExpression src = function
     | _ ->
       TypeUseConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
-      AppConvention.check src isInfix flag funcExpr argExpr
-      AppConvention.checkUnaryOperatorSpacing src expr
+      AppConvention.check src isInfix funcExpr argExpr
       checkExpression src funcExpr
       checkExpression src argExpr
   | SynExpr.Sequential(expr1 = expr1; expr2 = expr2) ->
@@ -511,7 +510,7 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
           | Some _ -> getAccessLevel access
           | None -> context.ModuleAccess }
       |> checkDeclarationsWithContext src dls
-    | SynModuleDecl.Let(_, bindings, range) ->
+    | SynModuleDecl.Let(_, bindings, _) ->
       let scopeContext =
         { ModuleAccess = context.ModuleAccess
           TypeAccess = None }

@@ -39,7 +39,7 @@ let checkColonSpace src (idRange: range) (sigRange: range) =
 
 let private checkGapBetweenArrays (src: ISourceText) (ranges: list<range>) =
   ranges
-  |>List.rev
+  |> List.rev
   |> List.pairwise
   |> List.iter (fun (front, back) ->
     let gap = Range.mkRange "" front.End back.End

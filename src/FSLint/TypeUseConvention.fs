@@ -88,7 +88,7 @@ let checkTypeElementSpacing src (typeArgs: SynType list) =
 /// Ensures proper spacing in type application expressions.
 let checkTypeAppParenSpacing src = function
   | SynExpr.App(flag = flag; funcExpr = funcExpr
-                argExpr = SynExpr.Paren(leftParenRange = parenRange)) ->
+                argExpr = SynExpr.Paren(leftParenRange = parenRange)) as expr ->
     match funcExpr with
     | SynExpr.TypeApp(expr = SynExpr.LongIdent(longDotId = longDotId)
                       range = typeRange) ->

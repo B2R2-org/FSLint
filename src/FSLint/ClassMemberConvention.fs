@@ -208,10 +208,23 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
   else
     true
 
+let private getEffectiveExtraIdRange (extraId: Ident option) lastId typarDecls =
+  match typarDecls with
+  | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
+  | _ ->
+    match extraId with
+    | Some id -> id.idRange
+    | None -> (lastId: Ident).idRange
+
+let private getEffectiveLastIdRange (lastId: Ident) typarDecls =
+  match typarDecls with
+  | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
+  | _ -> lastId.idRange
+
 /// Check the spacing between identifiers and parentheses based on their casing.
 /// If either identifier is in PascalCase, no space between the identifier and
 /// the opening parenthesis. If in lower case, ensures exactly one space exists.
-let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
+let checkMemberSpacing src longId typarDecls extraId dotRanges args =
   match (longId: LongIdent) with
   | id :: _ when id.idText = "this" || id.idText = "_" ->
     match args with
@@ -223,29 +236,32 @@ let checkMemberSpacing (src: ISourceText) longId extraId dotRanges args =
       reportMemberCurried src (Range.unionRanges range (List.last named).Range)
     | [ SynPat.Paren(range = range) ] ->
       let lastId = List.last longId
+      let effectiveExtraIdRange =
+        getEffectiveExtraIdRange extraId lastId typarDecls
+      let effectiveLastIdRange = getEffectiveLastIdRange lastId typarDecls
       if checkBackticMethodSpacing src dotRanges range then
-        if (extraId: Ident Option).IsSome
+        if (extraId: option<Ident>).IsSome
           && isPascalCase extraId.Value.idText
-          && extraId.Value.idRange.EndColumn <> range.StartColumn
+          && effectiveExtraIdRange.EndColumn <> range.StartColumn
         then
-          Range.mkRange "" extraId.Value.idRange.End range.Start
+          Range.mkRange "" effectiveExtraIdRange.End range.Start
           |> reportPascalCaseError src
-        elif (extraId: Ident Option).IsSome
-          && extraId.Value.idRange.EndColumn <> range.StartColumn
+        elif extraId.IsSome
+          && effectiveExtraIdRange.EndColumn <> range.StartColumn
         then
-          Range.mkRange "" extraId.Value.idRange.End range.Start
+          Range.mkRange "" effectiveExtraIdRange.End range.Start
           |> reportPascalCaseError src
         elif isPascalCase lastId.idText
           && extraId.IsNone
-          && lastId.idRange.EndColumn <> range.StartColumn
+          && effectiveLastIdRange.EndColumn <> range.StartColumn
         then
-          Range.mkRange "" lastId.idRange.End range.Start
+          Range.mkRange "" effectiveLastIdRange.End range.Start
           |> reportPascalCaseError src
-        elif isPascalCase lastId.idText |> not
+        elif not (isPascalCase lastId.idText)
           && extraId.IsNone
-          && lastId.idRange.EndColumn + 1 <> range.StartColumn
+          && effectiveLastIdRange.EndColumn + 1 <> range.StartColumn
         then
-          Range.mkRange "" lastId.idRange.End range.Start
+          Range.mkRange "" effectiveLastIdRange.End range.Start
           |> reportLowerCaseError src
         else ()
       else ()

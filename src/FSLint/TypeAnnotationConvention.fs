@@ -440,6 +440,10 @@ let checkPat src (pat: SynPat) = function
     checkColonSpace src pat.Range range
     checkWithNullBarSpacing src innerType trivia.BarRange
     checkTypeInternal src innerType
+  | SynType.AnonRecd(fields = fields; range = range) ->
+    checkColonSpace src pat.Range range
+    fields
+    |> List.iter (fun (id, typ) -> checkColonSpace src id.idRange typ.Range)
   | typ -> warn $"TODO: [Type Annotation] filename: {typ.Range.FileName} {typ}"
 
 let rec checkParamTypeSpacing src = function

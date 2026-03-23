@@ -124,6 +124,20 @@ let fn (x: list<int> -> string[] * string) = x
 let fn (x: list<int>->string[] * string) = x
 """
 
+  let goodAnonRecdTest =
+    """
+let good (item: {| Addr: Addr
+                   Name: string
+                   ELFSectionHeader: ELF.SectionHeader option |}) = ()
+"""
+
+  let badAnonRecdTest =
+    """
+let bad (item: {| Addr:Addr
+                  Name:string
+                  ELFSectionHeader:ELF.SectionHeader option |}) = ()
+"""
+
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
     lint goodEmptyParenTest
@@ -183,3 +197,8 @@ let fn (x: list<int>->string[] * string) = x
   member _.``Type Annotation Arrow Space Test``() =
     lint goodArrowSpacingTest
     lintAssert badArrowSpacingTest
+
+  [<TestMethod>]
+  member _.``Type Annotation AnonRecd Colon Space Test``() =
+    lint goodAnonRecdTest
+    lintAssert badAnonRecdTest

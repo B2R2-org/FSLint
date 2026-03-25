@@ -77,6 +77,10 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.0.7
+
+- Add missing cases of AnonRecd
+
 ### 1.0.6
 
 - Reduce false positives related to spacing rules across various contexts

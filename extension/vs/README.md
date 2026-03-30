@@ -77,6 +77,10 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.0.8
+
+- Remove warnings from multiline
+
 ### 1.0.7
 
 - Add missing cases of AnonRecd

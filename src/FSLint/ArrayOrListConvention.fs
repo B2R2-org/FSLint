@@ -215,17 +215,7 @@ let checkMultiLine src range = function
     checkOpeningBracketIsInlineWithLet src range
     collectElemAndOptionalSeparatorRanges [] expr
     |> checkSingleElementPerLine src
-  | SynExpr.Match _
-  | SynExpr.MatchBang _
-  | SynExpr.MatchLambda _
-  | SynExpr.ArrayOrListComputed _
-  | SynExpr.Ident _
-  | SynExpr.Record _
-  | SynExpr.App _
-  | SynExpr.Const _
-  | SynExpr.Paren _
-  | SynExpr.ForEach _ -> () (* No need to check string here *)
-  | expr -> warn $"[checkMultiLine]TODO: {expr}"
+  | _ -> ()
 
 let check src isArray (fRange: Range) expr =
   let elemRangeAdjusted, hasCommentInFront =

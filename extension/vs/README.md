@@ -77,12 +77,10 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
-### 1.0.8
+### 1.0.7 ~ 1.0.9
 
+- Add line break check to FunctionCall
 - Remove warnings from multiline
-
-### 1.0.7
-
 - Add missing cases of AnonRecd
 
 ### 1.0.6

@@ -39,7 +39,7 @@ let private getLineAfterExpr (src: ISourceText) (expr: SynExpr) =
   else
     ""
 
-let private ensureMethodSpacing src flag funcExpr =
+let private ensureMethodSpacing (src: ISourceText) flag funcExpr =
   match getMethodName funcExpr with
   | Some(methodName, methodRange) when methodName.Length > 0 ->
     let spaceRange =
@@ -47,7 +47,14 @@ let private ensureMethodSpacing src flag funcExpr =
        Position.mkPos methodRange.StartLine (methodRange.EndColumn + 1))
       ||> Range.mkRange ""
     if isPascalCase methodName && flag = ExprAtomicFlag.NonAtomic then
-      reportPascalCaseError src spaceRange
+      let checkExn =
+        try
+          src.GetSubTextFromRange spaceRange |> Some
+        with
+          | :? ArgumentOutOfRangeException -> None
+          | _ -> Some ""
+      if Option.isNone checkExn then ()
+      else reportPascalCaseError src spaceRange
     elif isPascalCase methodName |> not && flag = ExprAtomicFlag.Atomic then
       reportLowerCaseError src spaceRange
     else
@@ -74,10 +81,12 @@ let checkIdent src (ident: Ident) argExpr =
     let isIdentPascalCase = isPascalCase ident.idText
     if isIdentPascalCase
       && argExpr.Range.StartColumn <> ident.idRange.EndColumn
+      && ident.idRange.EndLine = argExpr.Range.StartLine
     then
       Range.mkRange "" ident.idRange.End argExpr.Range.Start
       |> reportPascalCaseError src
     elif argExpr.Range.StartColumn <> ident.idRange.EndColumn + 1
+      && ident.idRange.EndLine = argExpr.Range.StartLine
     then
       Range.mkRange "" ident.idRange.End argExpr.Range.Start
       |> reportLowerCaseError src

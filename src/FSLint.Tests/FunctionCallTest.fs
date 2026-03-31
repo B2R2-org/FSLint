@@ -23,6 +23,22 @@ type FunctionCallTests() =
 
   let badCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart ()"""
 
+  let goodParenNewLineTest =
+    """
+let good =
+  CountBackForBand
+    (fun src _ currentBand -> VisGraph.getLayer src = currentBand)
+    bandIndex true
+"""
+
+  let goodParenNewLineTest2 =
+    """
+let good =
+  countBackForBand
+    (fun src _ currentBand -> VisGraph.getLayer src = currentBand)
+    bandIndex true
+"""
+
   [<TestMethod>]
   member _.``[FunctionCall] Non Curried Function Bracket Spacing Test``() =
     lint goodNonCurriedFuncTest
@@ -46,3 +62,8 @@ type FunctionCallTests() =
   member _.``[FunctionCall] Curried Function Nested Spacing Test``() =
     lint goodCurriedFuncPascalCaseNestedTest
     lintAssert badCurriedFuncPascalCaseNestedTest
+
+  [<TestMethod>]
+  member _.``[FunctionCall] Paren New Line Test``() =
+    lint goodParenNewLineTest
+    lint goodParenNewLineTest2

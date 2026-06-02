@@ -93,6 +93,26 @@ let bad = {| A=1; B = 1 |}
 let bad = {| original with Age = 31; Name="Bob" |}
 """
 
+  let badAnonRecdLeftBracketSpacingTest =
+    """
+let bad = {|A = 1; B = 1 |}
+"""
+
+  let badAnonRecdRightBracketSpacingTest =
+    """
+let bad = {| A = 1; B = 1|}
+"""
+
+  let badAnonRecdCopyLeftBracketSpacingTest =
+    """
+let bad = {|original with Age = 31; Name = "Bob" |}
+"""
+
+  let badAnonRecdCopyRightBracketSpacingTest =
+    """
+let bad = {| original with Age = 31; Name = "Bob"|}
+"""
+
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
     lint goodBracketPositionTest
@@ -126,3 +146,10 @@ let bad = {| original with Age = 31; Name="Bob" |}
     lint goodAnonRecdCopyTest
     lintAssert badAnonRecdTest
     lintAssert badAnonRecdCopyTest
+
+  [<TestMethod>]
+  member _.``[Record] Anonymous Bracket Spacing Test``() =
+    lintAssert badAnonRecdLeftBracketSpacingTest
+    lintAssert badAnonRecdRightBracketSpacingTest
+    lintAssert badAnonRecdCopyLeftBracketSpacingTest
+    lintAssert badAnonRecdCopyRightBracketSpacingTest

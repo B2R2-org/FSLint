@@ -301,6 +301,68 @@ let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
     cases |> List.pairwise |> List.iter (checkInlineSpacing src)
   | _ -> ()
 
+let private findAnonRecdOpeningRange (src: ISourceText) (range: range) =
+  let line = src.GetLineString(range.StartLine - 1)
+  let startIndex =
+    line.IndexOf("{|", range.StartColumn, StringComparison.Ordinal)
+  if startIndex >= 0 then
+    (Position.mkPos range.StartLine startIndex,
+     Position.mkPos range.StartLine (startIndex + 2))
+    ||> Range.mkRange ""
+    |> Some
+  else
+    None
+
+let private checkAnonRecdBracketSpacing src fields range =
+  if not (List.isEmpty (fields: list<Ident * SynType>)) then
+    let firstId, _ = List.head fields
+    let _, lastType = List.last fields
+    match findAnonRecdOpeningRange src range with
+    | Some openingRange ->
+      if openingRange.EndColumn + 1 <> firstId.idRange.StartColumn
+        && openingRange.EndLine = firstId.idRange.StartLine
+      then
+        Range.mkRange "" openingRange.Start firstId.idRange.Start
+        |> reportLeftCurlyBraceSpacing src
+      elif lastType.Range.EndColumn + 3 <> range.EndColumn
+        && lastType.Range.EndLine = range.EndLine
+      then
+        Range.mkRange "" lastType.Range.End range.End
+        |> reportRightCurlyBraceSpacing src
+      else
+        ()
+    | None ->
+      ()
+  else
+    ()
+
+let rec checkAnonRecdType src = function
+  | SynType.AnonRecd(fields = fields; range = range) ->
+    checkAnonRecdBracketSpacing src fields range
+    fields
+    |> List.iter (fun (id, typ) ->
+      checkColonSpace src id.idRange typ.Range
+      checkTypeInternal src typ
+      checkAnonRecdType src typ)
+  | SynType.Fun(argType = argType; returnType = returnType) ->
+    checkAnonRecdType src argType
+    checkAnonRecdType src returnType
+  | SynType.Array(elementType = elementType)
+  | SynType.Paren(innerType = elementType)
+  | SynType.SignatureParameter(usedType = elementType)
+  | SynType.WithNull(innerType = elementType) ->
+    checkAnonRecdType src elementType
+  | SynType.App(typeName = typeName; typeArgs = typeArgs) ->
+    checkAnonRecdType src typeName
+    typeArgs |> List.iter (checkAnonRecdType src)
+  | SynType.Tuple(path = path) ->
+    path
+    |> List.iter (function
+      | SynTupleTypeSegment.Type synType -> checkAnonRecdType src synType
+      | _ -> ())
+  | _ ->
+    ()
+
 let checkMember src (id: Ident) (typ: option<SynType>) =
   match typ with
   | Some(SynType.LongIdent(longDotId = SynLongIdent(id = typeId))) ->
@@ -312,6 +374,7 @@ let checkMember src (id: Ident) (typ: option<SynType>) =
       checkColonSpace src id.idRange ranges
   | Some typ ->
     checkTypeInternal src typ
+    checkAnonRecdType src typ
   | _ ->
     ()
 
@@ -337,6 +400,7 @@ let extractColonPairs synType =
     | SynType.StaticConstantExpr _
     | SynType.StaticConstantNamed _
     | SynType.Anon _
+    | SynType.AnonRecd _
     | SynType.Var _
     | SynType.LongIdent _ ->
       acc
@@ -440,10 +504,9 @@ let checkPat src (pat: SynPat) = function
     checkColonSpace src pat.Range range
     checkWithNullBarSpacing src innerType trivia.BarRange
     checkTypeInternal src innerType
-  | SynType.AnonRecd(fields = fields; range = range) ->
+  | SynType.AnonRecd(range = range) as synType ->
     checkColonSpace src pat.Range range
-    fields
-    |> List.iter (fun (id, typ) -> checkColonSpace src id.idRange typ.Range)
+    checkAnonRecdType src synType
   | typ -> warn $"TODO: [Type Annotation] filename: {typ.Range.FileName} {typ}"
 
 let rec checkParamTypeSpacing src = function
@@ -557,9 +620,11 @@ let checkReturnInfo (src: ISourceText) (pat: SynPat) returnInfo =
     when tri.ColonRange.IsSome ->
       checkColonSpace src pat.Range range
       checkTypeInternal src typeName
+      checkAnonRecdType src typeName
   | _ ->
     ()
 
 let checkFunction src (pat: SynSimplePat) (typ: SynType) =
   checkColonSpace src pat.Range typ.Range
   checkTypeInternal src typ
+  checkAnonRecdType src typ

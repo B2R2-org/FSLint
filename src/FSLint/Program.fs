@@ -91,8 +91,11 @@ and checkMatchClause (src: ISourceText) clause =
   checkExpression src expr
 
 and checkExpression src = function
-  | SynExpr.AnonRecd(copyInfo = info; recordFields = fields) ->
-    RecordConvention.checkAnonymousRecord src fields
+  | SynExpr.AnonRecd(copyInfo = info
+                     recordFields = fields
+                     range = range
+                     trivia = trivia) ->
+    RecordConvention.checkAnonymousRecord src info fields range trivia
     if Option.isSome info then info.Value |> fst |> checkExpression src else ()
     fields |> List.iter (fun (_, _, expr) -> checkExpression src expr)
   | SynExpr.Paren(expr = innerExpr) as expr ->
@@ -295,6 +298,7 @@ and checkMemberDefns src members isDelegate =
           trivia.LeadingKeyword.Range
       TypeAnnotation.checkAbstractSlot src id synType
       TypeAnnotation.checkTypeAbbrevWithAnnotation src synType
+      TypeAnnotation.checkAnonRecdType src synType
       IdentifierConvention.check src PascalCase true id.idText id.idRange
     | SynMemberDefn.Interface(members = Some members) ->
       ClassMemberConvention.checkMemberOrder src members

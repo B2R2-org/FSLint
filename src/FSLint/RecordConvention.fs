@@ -311,9 +311,39 @@ let checkDefinition src fields range trivia =
   checkFieldIsInlineWithBracket src range fields
   checkFieldTypeSpacing src fields
 
+let private checkAnonymousRecordBracketSpacing src copyInfo
+  (recordFields: list<SynLongIdent * range option * SynExpr>) (range: range)
+  (trivia: SynExprAnonRecdTrivia) =
+  if not (List.isEmpty recordFields) then
+    let firstInnerRange =
+      match (copyInfo: option<SynExpr * _>) with
+      | Some(expr, _) -> expr.Range
+      | None ->
+        let id, _, _ = List.head recordFields
+        id.Range
+    let _, _, lastExpr = List.last recordFields
+    let lastInnerRange = (lastExpr: SynExpr).Range
+    let openingRange = trivia.OpeningBraceRange
+    if openingRange.EndColumn + 1 <> firstInnerRange.StartColumn
+      && openingRange.StartLine = firstInnerRange.StartLine
+    then
+      Range.mkRange "" openingRange.Start firstInnerRange.Start
+      |> reportLeftCurlyBraceSpacing src
+    elif lastInnerRange.EndColumn + 3 <> range.EndColumn
+      && lastInnerRange.EndLine = range.EndLine
+    then
+      Range.mkRange "" lastInnerRange.End range.End
+      |> reportRightCurlyBraceSpacing src
+    else
+      ()
+  else
+    ()
+
 /// The separator information is not present in a regular anonymous record
 /// so it is excluded.
-let checkAnonymousRecord src recordFields =
+let checkAnonymousRecord src copyInfo
+  (recordFields: list<SynLongIdent * range option * SynExpr>) range trivia =
+  checkAnonymousRecordBracketSpacing src copyInfo recordFields range trivia
   if isStrict then
     recordFields
     |> List.iter (fun (id: SynLongIdent, oprRange: option<range>, expr) ->
@@ -332,7 +362,6 @@ let checkAnonymousRecord src recordFields =
         else
           ()
       else
-        ()
-    )
+        ())
   else
     ()

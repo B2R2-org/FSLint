@@ -138,6 +138,51 @@ let bad (item: {| Addr:Addr
                   ELFSectionHeader:ELF.SectionHeader option |}) = ()
 """
 
+  let badAnonRecdLeftBracketSpacingTest =
+    """
+let bad (item: {|Addr: Addr; Name: string |}) = ()
+"""
+
+  let badAnonRecdRightBracketSpacingTest =
+    """
+let bad (item: {| Addr: Addr; Name: string|}) = ()
+"""
+
+  let badAnonRecdInnerTypeTest =
+    """
+let bad (item: {| Addr: Addr [] |}) = ()
+"""
+
+  let goodAbstractAnonRecdTest =
+    """
+type ITokenContextProvider =
+  abstract GetInstructionInfo:
+    Addr
+    -> {| Stmts: string[]
+          ReadAddrs: string[]
+          PCTargets: Addr[] |}
+"""
+
+  let badAbstractAnonRecdLeftBracketTest =
+    """
+type ITokenContextProvider =
+  abstract GetInstructionInfo:
+    Addr
+    -> {|Stmts: string[]
+         ReadAddrs: string[]
+         PCTargets: Addr[] |}
+"""
+
+  let badAbstractAnonRecdRightBracketTest =
+    """
+type ITokenContextProvider =
+  abstract GetInstructionInfo:
+    Addr
+    -> {| Stmts: string[]
+          ReadAddrs: string[]
+          PCTargets: Addr[]|}
+"""
+
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
     lint goodEmptyParenTest
@@ -202,3 +247,12 @@ let bad (item: {| Addr:Addr
   member _.``Type Annotation AnonRecd Colon Space Test``() =
     lint goodAnonRecdTest
     lintAssert badAnonRecdTest
+    lintAssert badAnonRecdLeftBracketSpacingTest
+    lintAssert badAnonRecdRightBracketSpacingTest
+    lintAssert badAnonRecdInnerTypeTest
+
+  [<TestMethod>]
+  member _.``Type Annotation Abstract AnonRecd Bracket Space Test``() =
+    lint goodAbstractAnonRecdTest
+    lintAssert badAbstractAnonRecdLeftBracketTest
+    lintAssert badAbstractAnonRecdRightBracketTest

@@ -77,7 +77,11 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
-### 1.0.7 ~ 1.0.9
+### 1.1.0
+
+  - Add Anonymous record pattern
+
+### 1.0.7 - 1.0.9
 
 - Add line break check to FunctionCall
 - Remove warnings from multiline

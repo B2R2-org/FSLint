@@ -77,6 +77,10 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.1.1
+
+  - Update package dependencies
+
 ### 1.1.0
 
   - Add Anonymous record pattern

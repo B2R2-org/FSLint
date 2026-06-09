@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://b2r2.org/B2R2</PackageProjectUrl>
     <PackageTags>Binary;B2R2;lint</PackageTags>
-    <NoWarn>NU1605</NoWarn>
+    <NoWarn>NU1605;NU1608</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>

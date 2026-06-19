@@ -77,6 +77,14 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.1.2
+
+ - Fixed deconstructive bindings.
+ - Upgraded package handling to suppress unnecessary warnings.
+ - Fixed whitespace checking inside function bodies.
+ - Added the --verbose option.
+ - Optimized per-file warning reporting for improved diagnostics.
+
 ### 1.1.1
 
   - Update package dependencies

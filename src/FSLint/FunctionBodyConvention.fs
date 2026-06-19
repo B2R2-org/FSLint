@@ -78,20 +78,16 @@ let private checkNested src (bindings: list<SynBinding>) =
     else
       None)
   |> List.iter (fun (prev, next) ->
-    if isStrict then
-      if prev.StartLine + 1 = next.StartLine then
-        (Position.mkPos (prev.StartLine + 1) 0,
-         Position.mkPos (prev.StartLine + 1) 0)
-        ||> Range.mkRange prev.FileName
-        |> fun range -> reportWarn src range "Use single blank line"
-      elif next.StartLine - prev.StartLine > 2 then
-        (Position.mkPos (prev.StartLine + 1) 0,
-         Position.mkPos (next.StartLine - 1) 0)
-        ||> Range.mkRange prev.FileName
-        |> fun range -> reportWarn src range "Use single blank line"
-      else
-        ()
-    elif next.StartLine - prev.StartLine > 2 then
+    let blankLineCount =
+      [ prev.StartLine + 1 .. next.StartLine - 1 ]
+      |> List.filter (isBlankLine src)
+      |> List.length
+    if isStrict && blankLineCount = 0 then
+      (Position.mkPos (prev.StartLine + 1) 0,
+       Position.mkPos (prev.StartLine + 1) 0)
+      ||> Range.mkRange prev.FileName
+      |> fun range -> reportWarn src range "Use single blank line"
+    elif blankLineCount > 1 then
       (Position.mkPos (prev.StartLine + 1) 0,
        Position.mkPos (next.StartLine - 1) 0)
       ||> Range.mkRange prev.FileName

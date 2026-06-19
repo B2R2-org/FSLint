@@ -43,6 +43,55 @@ let fn () =
 and bad = ()
 """
 
+  let goodBindingWithAndDocCommentTest =
+    """
+/// This is fn.
+let fn () =
+  let x = 1
+  let y = 2
+  x + y
+
+/// This is good.
+and good = ()
+"""
+
+  let goodBindingWithAndLineCommentTest =
+    """
+// This is fn.
+let fn () =
+  let x = 1
+  let y = 2
+  x + y
+
+// This is good.
+and good = ()
+"""
+
+  let goodBindingWithAndBlockCommentTest =
+    """
+(* This is fn. *)
+let fn () =
+  let x = 1
+  let y = 2
+  x + y
+
+(* This is good. *)
+and good = ()
+"""
+
+  let badBindingWithAndDocCommentTest =
+    """
+/// This is fn.
+let fn () =
+  let x = 1
+  let y = 2
+  x + y
+
+
+/// This is bad.
+and bad = ()
+"""
+
   let goodBindingWithObjExprTest =
     """
 let good =
@@ -105,6 +154,71 @@ let bad =
   0
 """
 
+  let goodNestedBindingWithDocCommentTest =
+    """
+let good =
+  /// fn doc
+  let fn =
+    let x = 1
+    let y = 2
+    x + y
+  /// gn doc
+  and gn =
+    let x = 1
+    let y = 2
+    x + y
+  0
+"""
+
+  let goodNestedBindingWithLineCommentTest =
+    """
+let good =
+  // fn comment
+  let fn =
+    let x = 1
+    let y = 2
+    x + y
+  // gn comment
+  and gn =
+    let x = 1
+    let y = 2
+    x + y
+  0
+"""
+
+  let goodNestedBindingWithBlockCommentTest =
+    """
+let good =
+  (* fn comment *)
+  let fn =
+    let x = 1
+    let y = 2
+    x + y
+  (* gn comment *)
+  and gn =
+    let x = 1
+    let y = 2
+    x + y
+  0
+"""
+
+  let badNestedBindingWithCommentTest =
+    """
+let bad =
+  /// fn doc
+  let fn =
+    let x = 1
+    let y = 2
+    x + y
+
+  /// gn doc
+  and gn =
+    let x = 1
+    let y = 2
+    x + y
+  0
+"""
+
   [<TestMethod>]
   member _.``[FunctionBody] Empty NewLine Test``() =
     lint goodEmptyNewLineTest
@@ -116,6 +230,13 @@ let bad =
     lintAssert badBindingWithAndKeywordTest
 
   [<TestMethod>]
+  member _.``[FunctionBody] Recursive Binding With Comment Test``() =
+    lint goodBindingWithAndDocCommentTest
+    lint goodBindingWithAndLineCommentTest
+    lint goodBindingWithAndBlockCommentTest
+    lintAssert badBindingWithAndDocCommentTest
+
+  [<TestMethod>]
   member _.``[FunctionBody] Object Expression NewLine With Binding Test``() =
     lint goodBindingWithObjExprTest
     lint goodBindingWithObjExprTest2
@@ -125,3 +246,10 @@ let bad =
   member _.``[FunctionBody] Nested Binding Test``() =
     lint goodBindingWithNestedTest
     lintAssert badBindingWithNestedTest
+
+  [<TestMethod>]
+  member _.``[FunctionBody] Nested Binding With Comment Test``() =
+    lint goodNestedBindingWithDocCommentTest
+    lint goodNestedBindingWithLineCommentTest
+    lint goodNestedBindingWithBlockCommentTest
+    lintAssert badNestedBindingWithCommentTest

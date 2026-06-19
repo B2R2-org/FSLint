@@ -5,7 +5,22 @@ open System.IO
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
+open B2R2.FsOptParse
 open Diagnostics
+
+type private Opts =
+  { Strict: bool
+    Verbose: bool }
+
+let private spec =
+  [ CmdOpt(descr = "Enforce strict linting rules.",
+           short = "-s", long = "--strict",
+           callback = fun opts _ -> { opts with Strict = true })
+    CmdOpt(descr = "Enable verbose output.",
+           short = "-v", long = "--verbose",
+           callback = fun opts _ -> { opts with Verbose = true }) ]
+
+let private defaultOpts = { Strict = false; Verbose = false }
 
 let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
   | SynPat.Attrib _
@@ -627,7 +642,10 @@ let tryOutputToBuffer (index: int) (path: string) editorConfig =
         Errors = [] }
 
 /// Runs linting jobs in parallel for all given files
-let runParallelByOrder editConfig (paths: string array) =
+let private runParallelByOrder editConfig opts (paths: string array) =
+  let writeVerboseLine (message: string) =
+    if opts.Verbose then Console.WriteLine message
+    else ()
   paths
    |> Array.mapi (fun i p -> async { return tryOutputToBuffer i p editConfig })
   |> Async.Parallel
@@ -637,21 +655,21 @@ let runParallelByOrder editConfig (paths: string array) =
     results
     |> Array.iter (fun result ->
     if not result.Ok then
-      Console.WriteLine ""
-      Console.WriteLine $"--- File: {result.Path}"
-      Console.WriteLine $"Linting file: {result.Path}"
+      writeVerboseLine ""
+      writeVerboseLine $"--- File: {result.Path}"
+      writeVerboseLine $"Linting file: {result.Path}"
       if not (List.isEmpty result.Errors) then
         reportWarns result.Errors result.Path
-        Console.WriteLine "Linting errors found"
-        Console.WriteLine ""
+        writeVerboseLine "Linting errors found"
+        writeVerboseLine ""
       elif not (String.IsNullOrEmpty result.Log) then
-        Console.WriteLine result.Log
-        Console.WriteLine "Linting errors found"
-        Console.WriteLine ""
+        writeVerboseLine result.Log
+        writeVerboseLine "Linting errors found"
+        writeVerboseLine ""
       else
         ()
     else
-      Console.WriteLine $"Linting file: {result.Path}"
+      writeVerboseLine $"Linting file: {result.Path}"
     )
     results |> Array.exists (fun r -> not r.Ok)
 
@@ -667,14 +685,16 @@ let linterForProjSln =
 let main args =
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   else ()
+  let rest, opts = OptParse.Parse(spec, "fslint", args, defaultOpts)
+  let path = List.head rest
   let editorConfig =
     Directory.GetCurrentDirectory()
     |> Configuration.getSettings
   editorConfig |> setCliEditorConfig
-  isStrict <- Array.contains "--strict" args
-  if File.Exists args[0] then
-    setCurrentFile args[0]
-    let outcome = tryOutputToBuffer 0 args[0] editorConfig
+  isStrict <- opts.Strict
+  if File.Exists path then
+    setCurrentFile path
+    let outcome = tryOutputToBuffer 0 path editorConfig
     if not outcome.Ok then
       Console.WriteLine $"--- File: {outcome.Path}"
       Console.Write outcome.Log
@@ -683,14 +703,14 @@ let main args =
       1
     else
       0
-  elif Directory.Exists args[0] then
-    getProjOrSlnFiles args[0]
+  elif Directory.Exists path then
+    getProjOrSlnFiles path
     |> Array.iter (fun p ->
       setCurrentFile p
       let bytes = File.ReadAllBytes p
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
     )
-    if getFsFiles args[0] |> runParallelByOrder editorConfig then 1 else 0
+    if getFsFiles path |> runParallelByOrder editorConfig opts then 1 else 0
   else
-    exitWithError $"File or directory '{args[0]}' not found"
+    exitWithError $"File or directory '{path}' not found"

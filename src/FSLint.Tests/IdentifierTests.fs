@@ -54,6 +54,26 @@ let _age = 30
 let age_ = 30
 """
 
+  let goodDeconstructBindingTest =
+    """
+type Test =
+  | Foo of int
+
+let x = Foo 42
+let (Foo n) = x
+"""
+
+  let goodTupleDeconstructBindingTest =
+    """
+let pair = (1, Some 2)
+let (a, Some b) = pair
+"""
+
+  let badFunctionDefNameTest =
+    """
+let Foo x = x + 1
+"""
+
   [<TestMethod>]
   member _.``[ID] Binding Lowercase Test``() =
     lint goodBindingLowercaseTest
@@ -78,3 +98,9 @@ let age_ = 30
   member _.``[ID] Binding Underscore Test``() =
     lint goodBindingUnderscoreTest
     lintAssert badBindingUnderscoreTest
+
+  [<TestMethod>]
+  member _.``[ID] Deconstruct Binding Test``() =
+    lint goodDeconstructBindingTest
+    lint goodTupleDeconstructBindingTest
+    lintAssert badFunctionDefNameTest

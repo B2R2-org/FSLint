@@ -22,7 +22,7 @@ let private spec =
 
 let private defaultOpts = { Strict = false; Verbose = false }
 
-let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
+let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
   | SynPat.Attrib _
   | SynPat.Const _
   | SynPat.Record _
@@ -31,16 +31,16 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
   | SynPat.Named(ident = SynIdent(ident = id); range = range) ->
     IdentifierConvention.check src case true id.idText range
   | SynPat.Typed(pat = pat; targetType = typ) ->
-    checkPattern src case isArg trivia pat
+    checkPattern src case true trivia pat
     TypeAnnotation.checkPat src pat typ
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
-    checkPattern src case isArg trivia lhs
-    checkPattern src case isArg trivia rhs
+    checkPattern src case true trivia lhs
+    checkPattern src case true trivia rhs
   | SynPat.LongIdent(lid, extraId, typarDecls, SynArgPats.Pats args,
                      _, range) as pat ->
     let SynLongIdent(id = lid; dotRanges = dotRanges; trivia = idTrivia) = lid
     let name = (List.last lid).idText
-    let case = if not (List.isEmpty args) && isArg then PascalCase else case
+    let case = if not (List.isEmpty args) && isSubPat then PascalCase else case
     IdentifierConvention.check src case true name range
     if trivia.LeadingKeyword.IsStaticMember then
       ClassMemberConvention.checkStaticMemberSpacing src lid typarDecls
@@ -58,15 +58,15 @@ let rec checkPattern src case isArg (trivia: SynBindingTrivia) = function
     AssignmentConvention.checkNamePatPairs src pat
   | SynPat.Paren(pat = pat) as synPat ->
     ParenConvention.checkPat src synPat
-    checkPattern src case isArg trivia pat
+    checkPattern src case true trivia pat
   | SynPat.Tuple(elementPats = pats; commaRanges = commaRanges) ->
     TupleConvention.checkPat src pats commaRanges
-    for pat in pats do checkPattern src case isArg trivia pat
+    for pat in pats do checkPattern src case true trivia pat
   | SynPat.OptionalVal(ident = id) ->
     IdentifierConvention.check src LowerCamelCase true id.idText id.idRange
   | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat) ->
-    checkPattern src case isArg trivia lhsPat
-    checkPattern src case isArg trivia rhsPat
+    checkPattern src case true trivia lhsPat
+    checkPattern src case true trivia rhsPat
   | pat ->
     failwith $"{nameof checkPattern} TODO: {pat}"
 

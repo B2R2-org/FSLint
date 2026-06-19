@@ -1,6 +1,9 @@
 B2R2.FSLint
 ===
 
+![](https://img.shields.io/github/license/B2R2-org/B2R2.svg?style=flat)
+[![](https://img.shields.io/nuget/v/B2R2.RearEnd.Launcher)](https://www.nuget.org/packages/B2R2.RearEnd.Launcher/)
+
 Linting tool for B2R2 projects written in F#.
 
 ## Motivation

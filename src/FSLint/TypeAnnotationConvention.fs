@@ -424,7 +424,7 @@ let rec checkTypeAbbrevWithAnnotation src = function
   | SynType.App(lessRange = lessRange
                 typeArgs = typeArgs
                 greaterRange = greaterRange
-                commaRanges = commaRanges) ->
+                commaRanges = commaRanges) when not (List.isEmpty typeArgs) ->
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
     typeArgs |> List.iter (checkLongIdentSpacing src)

@@ -41,6 +41,20 @@ type Class() =
   member __.A(p1, p2) = __.B()
 """
 
+  /// '__' whose body uses the self identifier should become 'this'.
+  let selfIdentifierDoubleUnderscoreUsedTest =
+    """
+type Class() =
+  member __.Foo = __.Bar + 1
+"""
+
+  /// '__' whose body does not use the self identifier should become '_'.
+  let selfIdentifierDoubleUnderscoreUnusedTest =
+    """
+type Class() =
+  member __.Foo = 42
+"""
+
   let goodSelfIdentifierUnusedTest =
     """
 type Class() =
@@ -108,6 +122,14 @@ type Class() =
   member _.``[ClassMember] Self Identifier Double Underscore Test``() =
     lint goodSelfIdentifierUnderscoreTest
     lintAssert badSelfIdentifierUnderscoreTest
+
+  [<TestMethod>]
+  member _.``[ClassMember] Double Underscore Used Becomes this``() =
+    lintAssertMsg "Change '__' to 'this'" selfIdentifierDoubleUnderscoreUsedTest
+
+  [<TestMethod>]
+  member _.``[ClassMember] Double Underscore Unused Becomes underscore``() =
+    lintAssertMsg "Change '__' to '_'" selfIdentifierDoubleUnderscoreUnusedTest
 
   [<TestMethod>]
   member _.``[ClassMember] Self Identifier Unused Test``() =

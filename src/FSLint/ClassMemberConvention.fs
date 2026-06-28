@@ -379,11 +379,15 @@ let checkSelfIdentifierUsage (src: ISourceText) pat body =
   match pat with
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty && id.Head.idText = "__" ->
-      reportWarn src id.Head.idRange "Change '__' to 'this'"
+      if findSelfIdentifierInApp src "__" false body then
+        reportWarn src id.Head.idRange "Change '__' to 'this'"
+      else
+        reportWarn src id.Head.idRange "Change '__' to '_'"
   | SynPat.LongIdent(longDotId = SynLongIdent(id = id))
     when not id.IsEmpty
       && (id.Head.idText = "this" || id.Head.idText = "self") ->
-    if findSelfIdentifierInApp src id.Head.idText false body then ()
+    if findSelfIdentifierInApp src id.Head.idText false body then
+      ()
     else
       [ id.Head.idRange.StartLine .. src.GetLineCount() - 1 ]
       |> List.map src.GetLineString

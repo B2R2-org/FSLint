@@ -77,6 +77,12 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.1.3
+
+ - Fixed a crash on type annotations with empty type arguments.
+ - Stopped emitting spurious warnings on `extern` declarations.
+ - Improved the self-identifier warning to suggest `_` or `this` based on usage.
+
 ### 1.1.2
 
  - Fixed deconstructive bindings.

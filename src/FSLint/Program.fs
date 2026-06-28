@@ -462,8 +462,14 @@ and checkBinding src case binding =
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
   ClassMemberConvention.checkSelfIdentifierUsage src pat body
-  TypeAnnotation.checkExprAnnotation src body
-  checkExpression src body
+  match trivia.LeadingKeyword with
+  | SynLeadingKeyword.Extern _ ->
+    (* `extern` declarations have a fully synthetic body, so body-based checks
+       do not apply. *)
+    ()
+  | _ ->
+    TypeAnnotation.checkExprAnnotation src body
+    checkExpression src body
 
 and checkBindings src case bindings =
   for binding in bindings do checkBinding src case binding

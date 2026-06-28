@@ -183,10 +183,24 @@ type ITokenContextProvider =
           PCTargets: Addr[]|}
 """
 
+  /// Regression for #155: an `extern` declaration has a fully synthetic body
+  /// (`failwith ...` plus a return-type `SynType.App` with empty type args).
+  /// The linter must not crash on it, and must not flag its synthetic body
+  /// (e.g. with a spurious func-application spacing warning).
+  let goodExternDeclTest =
+    """
+[<DllImport("libc", EntryPoint = "read", SetLastError = true)>]
+extern int private cRead(int fd, byte[] buf, int count)
+"""
+
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
     lint goodEmptyParenTest
     lintAssert badEmptyParenTest
+
+  [<TestMethod>]
+  member _.``Type Annotation Extern Decl Test``() =
+    lint goodExternDeclTest
 
   [<TestMethod>]
   member _.``Type Annotation Int Array Test``() =

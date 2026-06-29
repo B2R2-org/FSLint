@@ -77,6 +77,10 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.1.4
+
+  - Fixed colon-spacing checks for dotted typeAnnotations.
+
 ### 1.1.3
 
  - Fixed a crash on type annotations with empty type arguments.

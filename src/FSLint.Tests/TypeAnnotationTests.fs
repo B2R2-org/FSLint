@@ -193,6 +193,39 @@ type ITokenContextProvider =
 extern int private cRead(int fd, byte[] buf, int count)
 """
 
+  let goodQualifiedTypeAnnotationTest =
+    """
+type Class() =
+  member _.Foo(sb: System.Text.StringBuilder) = None
+"""
+
+  let badQualifiedTypeAnnotationTest =
+    """
+type Class() =
+  member _.Foo(sb:System.Text.StringBuilder) = None
+"""
+
+  let goodQualifiedTypeFunctionTest =
+    """
+let f (sb: System.Text.StringBuilder) = sb
+"""
+
+  let goodQualifiedTypeTupleTest =
+    """
+let f (a: System.Text.StringBuilder, b: int) = a
+"""
+
+  let goodQualifiedTypeGenericTest =
+    """
+let f (m: System.Collections.Generic.List<int>) = m
+"""
+
+  let badQualifiedTypeSpaceBeforeTest =
+    """
+type Class() =
+  member _.Foo(sb : System.Text.StringBuilder) = None
+"""
+
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
     lint goodEmptyParenTest
@@ -270,3 +303,12 @@ extern int private cRead(int fd, byte[] buf, int count)
     lint goodAbstractAnonRecdTest
     lintAssert badAbstractAnonRecdLeftBracketTest
     lintAssert badAbstractAnonRecdRightBracketTest
+
+  [<TestMethod>]
+  member _.``Type Annotation Qualified Type Test``() =
+    lint goodQualifiedTypeAnnotationTest
+    lint goodQualifiedTypeFunctionTest
+    lint goodQualifiedTypeTupleTest
+    lint goodQualifiedTypeGenericTest
+    lintAssert badQualifiedTypeAnnotationTest
+    lintAssert badQualifiedTypeSpaceBeforeTest

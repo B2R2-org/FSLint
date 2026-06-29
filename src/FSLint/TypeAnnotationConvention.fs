@@ -481,10 +481,8 @@ let checkWithNullBarSpacing src (innerType: SynType) (barRange: range) =
     ()
 
 let checkPat src (pat: SynPat) = function
-  | SynType.LongIdent(SynLongIdent([ id ], _, _)) ->
-    checkColonSpace src pat.Range id.idRange
-  | SynType.LongIdent(SynLongIdent([ id1; id2 ], _, _)) ->
-    Range.unionRanges id1.idRange id2.idRange
+  | SynType.LongIdent(SynLongIdent(ids, _, _)) when not (List.isEmpty ids) ->
+    Range.unionRanges (List.head ids).idRange (List.last ids).idRange
     |> checkColonSpace src pat.Range
   | SynType.App(range = range) ->
     checkColonSpace src pat.Range range

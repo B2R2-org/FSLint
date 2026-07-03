@@ -77,6 +77,12 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.1.5
+
+  - Fixed crashes on various expressions
+  - Fixed duplicate warnings
+  - Fixed a misleading line-ending message in the language server.
+
 ### 1.1.4
 
   - Fixed colon-spacing checks for dotted typeAnnotations.

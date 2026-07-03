@@ -204,7 +204,7 @@ type LspServer(rpc: JsonRpc) =
                                 End = { Line = 0; Character = 1 } }
                       Severity = 2
                       Source = "FSLint"
-                      Message = "Use Windows line endings 'LF'" }
+                      Message = "Use Unix line endings 'LF'" }
                   let normalizedPath = file.Replace("\\", "/")
                   let uri =
                     if normalizedPath.[0] = '/' then

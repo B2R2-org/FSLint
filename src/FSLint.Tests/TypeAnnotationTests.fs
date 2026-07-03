@@ -226,6 +226,32 @@ type Class() =
   member _.Foo(sb : System.Text.StringBuilder) = None
 """
 
+  let goodParenTypeAnnotationTest =
+    """
+let f (x: (int -> int)) = x
+"""
+
+  let badParenTypeAnnotationTest =
+    """
+let f (x:(int -> int)) = x
+"""
+
+  let badParenTypeArrowSpacingTest =
+    """
+let f (x: (int->int)) = x
+"""
+
+  let goodAnonTypeAnnotationTest =
+    """
+let f (x: _) = x
+"""
+
+  let duplicateColonTest =
+    """
+type Class() =
+  member _.Foo(sb:System.Text.StringBuilder) = None
+"""
+
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
     lint goodEmptyParenTest
@@ -312,3 +338,17 @@ type Class() =
     lint goodQualifiedTypeGenericTest
     lintAssert badQualifiedTypeAnnotationTest
     lintAssert badQualifiedTypeSpaceBeforeTest
+
+  [<TestMethod>]
+  member _.``Type Annotation Paren And Anon Type Test``() =
+    lint goodParenTypeAnnotationTest
+    lint goodAnonTypeAnnotationTest
+    lintAssert badParenTypeAnnotationTest
+    lintAssert badParenTypeArrowSpacingTest
+
+  [<TestMethod>]
+  member _.``Type Annotation No Duplicate Colon Warning Test``() =
+    let colonWarnings =
+      lintErrors duplicateColonTest
+      |> List.filter (fun e -> e.Message = "Use single whitespace after ':'")
+    Assert.AreEqual<int>(1, colonWarnings.Length)

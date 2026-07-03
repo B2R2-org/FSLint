@@ -52,14 +52,23 @@ module Diagnostics =
   let reportWarn (src: ISourceText) (range: range) message =
     match currentLintContext.Value with
     | Some context ->
-      let lineContent = src.GetLineString(range.StartLine - 1)
-      let columnIndicator = String.replicate range.StartColumn " " + "^"
-      let error =
-        { Range = range
-          Message = message
-          LineContent = lineContent
-          ColumnIndicator = columnIndicator }
-      context.Errors <- error :: context.Errors
+      let isDuplicate =
+        context.Errors
+        |> List.exists (fun e ->
+          e.Message = message
+          && e.Range.Start = range.Start
+          && e.Range.End = range.End)
+      if isDuplicate then
+        ()
+      else
+        let lineContent = src.GetLineString(range.StartLine - 1)
+        let columnIndicator = String.replicate range.StartColumn " " + "^"
+        let error =
+          { Range = range
+            Message = message
+            LineContent = lineContent
+            ColumnIndicator = columnIndicator }
+        context.Errors <- error :: context.Errors
     | None ->
       lock outputLock (fun () ->
         let fileName =

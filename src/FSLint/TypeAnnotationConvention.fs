@@ -505,6 +505,11 @@ let checkPat src (pat: SynPat) = function
   | SynType.AnonRecd(range = range) as synType ->
     checkColonSpace src pat.Range range
     checkAnonRecdType src synType
+  | SynType.Paren(innerType = innerType; range = range) ->
+    checkColonSpace src pat.Range range
+    checkTypeAbbrevWithAnnotation src innerType
+  | SynType.Anon range ->
+    checkColonSpace src pat.Range range
   | typ -> warn $"TODO: [Type Annotation] filename: {typ.Range.FileName} {typ}"
 
 let rec checkParamTypeSpacing src = function

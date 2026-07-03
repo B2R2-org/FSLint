@@ -31,6 +31,7 @@ let checkParenSpacing (src: ISourceText) (exprRange: range) (range: range) =
     ()
 
 let rec checkExpr src = function
+  | SynExpr.Paren(expr = SynExpr.TraitCall _) -> ()
   | SynExpr.Paren(expr = expr; range = range) ->
     checkParenSpacing src expr.Range range
   | SynExpr.Const(SynConst.Unit, range) ->

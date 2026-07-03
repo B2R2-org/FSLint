@@ -227,6 +227,9 @@ and checkExpression src = function
   | SynExpr.Downcast(expr = expr; targetType = targetType) ->
     TypeCastConvention.check src expr targetType 3
     checkExpression src expr
+  | SynExpr.TypeTest(expr = expr; targetType = targetType) ->
+    TypeCastConvention.check src expr targetType 2
+    checkExpression src expr
   | SynExpr.Const _ as expr ->
     ParenConvention.checkExpr src expr
   | SynExpr.TypeApp(expr = expr
@@ -267,6 +270,17 @@ and checkExpression src = function
       else ()
   | SynExpr.Lazy(expr = expr) ->
     checkExpression src expr
+  | SynExpr.InferredUpcast(expr = expr)
+  | SynExpr.InferredDowncast(expr = expr) ->
+    checkExpression src expr
+  | SynExpr.Quote(operator = operator; quotedExpr = quotedExpr) ->
+    checkExpression src operator
+    checkExpression src quotedExpr
+  | SynExpr.Dynamic(funcExpr = funcExpr; argExpr = argExpr) ->
+    checkExpression src funcExpr
+    checkExpression src argExpr
+  | SynExpr.TraitCall(argExpr = argExpr) ->
+    checkExpression src argExpr
   | SynExpr.AddressOf _
   | SynExpr.Assert _
   | SynExpr.DotIndexedGet _

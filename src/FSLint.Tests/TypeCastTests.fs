@@ -13,6 +13,10 @@ type TypeCastTests() =
 
   let badDowncastSpacingTest = """source:?>target"""
 
+  let goodTypeTestSpacingTest = """source :? target"""
+
+  let badTypeTestSpacingTest = """source:?target"""
+
   [<TestMethod>]
   member _.``[TypeCast] Upcast Spacing Test``() =
     lint goodUpcastSpacingTest
@@ -22,3 +26,8 @@ type TypeCastTests() =
   member _.``[TypeCast] Downcast Spacing Test``() =
     lint goodDowncastSpacingTest
     lintAssert badDowncastSpacingTest
+
+  [<TestMethod>]
+  member _.``[TypeCast] TypeTest Spacing Test``() =
+    lint goodTypeTestSpacingTest
+    lintAssert badTypeTestSpacingTest

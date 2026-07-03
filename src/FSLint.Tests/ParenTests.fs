@@ -13,6 +13,11 @@ type ParenTests() =
 
   let badBracketSpacingTest = """( 1, 2 )"""
 
+  let goodTraitCallTest =
+    """
+let inline callM (x: ^T) = (^T: (member M: int) x)
+"""
+
   [<TestMethod>]
   member _.``[Paren] Paren Empty Test``() =
     lint goodEmptyTest
@@ -22,3 +27,7 @@ type ParenTests() =
   member _.``[Paren] Paren Bracket Spacing Test``() =
     lint goodBracketSpacingTest
     lintAssert badBracketSpacingTest
+
+  [<TestMethod>]
+  member _.``[Paren] Trait Call No False Positive Test``() =
+    lint goodTraitCallTest

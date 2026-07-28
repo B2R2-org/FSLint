@@ -195,6 +195,8 @@ let rec checkSingleLine src = function
   | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
     checkSingleLine src funcExpr
     checkSingleLine src argExpr
+  | SynExpr.TypeApp(expr = expr) ->
+    checkSingleLine src expr
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _
   | SynExpr.Upcast _

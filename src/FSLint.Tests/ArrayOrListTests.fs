@@ -174,6 +174,32 @@ let bad = [
 [ [| 1;2 |]; [| 3; 4 |] ]
 """
 
+  let goodTypeAppInListTest = """[ typeof<int> ]"""
+
+  let goodTypeAppInArrayTest = """[| typeof<int> |]"""
+
+  let goodTypeAppMultiElementTest = """[ typeof<int>; typeof<string> ]"""
+
+  let goodNestedTypeAppTest = """[ typeof<Dictionary<int, string>> ]"""
+
+  let goodTypeAppApplicationTest = """[ Dictionary<int, string>() ]"""
+
+  let goodTypeAppInTupleTest = """[ (typeof<int>, 1) ]"""
+
+  let badTypeAppAngleSpacingTest = """[ typeof< int > ]"""
+
+  let badNestedTypeAppCommaTest = """[ typeof<Dictionary<int,string>> ]"""
+
+  let badTypeAppBracketSpacingTest = """[typeof<int>]"""
+
+  let badTypeAppSeparatorSpacingTest = """[ typeof<int>;typeof<string> ]"""
+
+  let badTypeAppTrailingSeparatorTest = """[ typeof<int>; ]"""
+
+  let goodTypeAppOutsideTest = """typeof<int>"""
+
+  let badTypeAppOutsideTest = """typeof< int >"""
+
   [<TestMethod>]
   member _.``[ArrayOrList] List Empty Test``() =
     lint goodEmptyTest
@@ -199,12 +225,10 @@ let bad = [
     lint goodElementSpacingTest
     lintAssert badNoWhitespaceBetweenElementsTest
 
-  (* Normal case already covered in 'No Whitespace Between Element' test. *)
   [<TestMethod>]
   member _.``[ArrayOrList] List Too Much Whitespace Between Element Test``() =
     lintAssert badTooMuchWhitespaceBetweenElementsTest
 
-  (* )Normal case already covered in 'No Whitespace Between Element' test. *)
   [<TestMethod>]
   member _.``[ArrayOrList] List Whitespace Before Separator Test``() =
     lintAssert badWhitespaceBeforeSeparatorTest
@@ -280,3 +304,25 @@ let bad = [
   [<TestMethod>]
   member _.``[ArrayOrList] Nested Element Spacing In MultiLine Test``() =
     lintAssert badNestedElementSpacingMultiLineTest
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] TypeApp Element Test``() =
+    lint goodTypeAppInListTest
+    lint goodTypeAppInArrayTest
+    lint goodTypeAppMultiElementTest
+    lint goodNestedTypeAppTest
+    lint goodTypeAppApplicationTest
+    lint goodTypeAppInTupleTest
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] TypeApp Element Spacing Test``() =
+    lintAssert badTypeAppAngleSpacingTest
+    lintAssert badNestedTypeAppCommaTest
+    lintAssert badTypeAppBracketSpacingTest
+    lintAssert badTypeAppSeparatorSpacingTest
+    lintAssert badTypeAppTrailingSeparatorTest
+
+  [<TestMethod>]
+  member _.``[ArrayOrList] TypeApp Outside List Test``() =
+    lint goodTypeAppOutsideTest
+    lintAssert badTypeAppOutsideTest

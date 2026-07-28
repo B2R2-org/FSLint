@@ -66,8 +66,8 @@ let private checkCommaSeparator src (typeStr: string) typeRange =
 let checkTypeElementSpacing src (typeArgs: SynType list) =
   let getEffectiveTypeStr (src: ISourceText) (typeRange: range) =
     let lineStr = src.GetLineString(typeRange.StartLine - 1)
-    if lineStr.EndsWith "," then lineStr[0..lineStr.Length - 2]
-    else lineStr
+    if lineStr.EndsWith "," then lineStr[0..lineStr.Length - 2], true
+    else lineStr, false
   let unionRange =
     Range.unionRanges typeArgs.Head.Range (List.last typeArgs).Range
   (typeArgs: SynType list)
@@ -77,9 +77,11 @@ let checkTypeElementSpacing src (typeArgs: SynType list) =
     if typeStr.Contains '*' then
       checkStarSeparator src typeStr unionRange
     else
-      let effectiveTypeStr = getEffectiveTypeStr src typeRange
+      let effectiveTypeStr, isWrapped = getEffectiveTypeStr src typeRange
       if effectiveTypeStr.IndexOf ',' <> -1 then
         checkCommaSeparator src effectiveTypeStr unionRange
+      elif isWrapped && effectiveTypeStr.EndsWith " " then
+        reportCommaBeforeSpacing src unionRange
       else
         ()
   )

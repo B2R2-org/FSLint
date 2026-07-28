@@ -77,6 +77,10 @@ max_line_length = 120  # Default: 80
 
 ## Release Notes
 
+### 1.1.6
+
+  - Added support for omitted TypeApp expressions.
+
 ### 1.1.5
 
   - Fixed crashes on various expressions

@@ -451,8 +451,7 @@ let main _ =
     Console.SetOut(Console.Error)
     use rpc = new JsonRpc(stdout, stdin)
     rpc.TraceSource <-
-      new Diagnostics.TraceSource(
-        "FSLintLSP", Diagnostics.SourceLevels.Information)
+      new Diagnostics.TraceSource("FSLintLSP", Diagnostics.SourceLevels.Off)
     let server = LspServer(rpc)
     rpc.AddLocalRpcTarget(server)
     rpc.StartListening()

@@ -703,6 +703,7 @@ let linterForProjSln =
 
 [<EntryPoint>]
 let main args =
+  System.Diagnostics.Trace.Listeners.Clear()
   if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
   else ()
   let rest, opts = OptParse.Parse(spec, "fslint", args, defaultOpts)

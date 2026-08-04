@@ -442,6 +442,7 @@ type LspServer(rpc: JsonRpc) =
 
 [<EntryPoint>]
 let main _ =
+  Diagnostics.Trace.Listeners.Clear()
   try
     eprintfn "========================================="
     eprintfn "FSLint Language Server Starting"

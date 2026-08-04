@@ -149,6 +149,9 @@ and checkTypeInternal src synType =
                 typeArgs = typeArgs)
     when lessRange.IsSome && greaterRange.IsSome ->
     checkCommaSpacing src typeArgs commaRanges
+    typeArgs
+    |> List.map (fun typeArg -> typeArg.Range)
+    |> LineBreakConvention.checkUniformPlacement src
     checkExprToLessSpacing src typeName lessRange
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange

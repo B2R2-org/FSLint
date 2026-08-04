@@ -332,7 +332,20 @@ let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
   else
     ()
 
-let checkFormat src clauses = checkPatternSpacing src clauses
+/// Every case body must either stay inline with its '->' or break onto its own
+/// line; mixing the two styles within one match is reported. This applies to
+/// `function` just as much as to `match`, so it is exposed separately from
+/// `checkFormat`, whose other checks are driven from the `match` keyword.
+let checkUniformCaseBody src clauses =
+  clauses
+  |> List.choose (fun (SynMatchClause(resultExpr = expr; trivia = trivia)) ->
+    trivia.ArrowRange
+    |> Option.map (fun arrow -> arrow, (expr: SynExpr).Range))
+  |> LineBreakConvention.checkUniformBreak src
+
+let checkFormat src clauses =
+  checkPatternSpacing src clauses
+  checkUniformCaseBody src clauses
 
 let rec checkBody (src: ISourceText) = function
   | SynPat.ArrayOrList(isArray, elementPats, range) ->

@@ -42,6 +42,7 @@ let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
     let name = (List.last lid).idText
     let case = if not (List.isEmpty args) && isSubPat then PascalCase else case
     IdentifierConvention.check src case true name range
+    if isSubPat then () else LineBreakConvention.checkParameters src args
     if trivia.LeadingKeyword.IsStaticMember then
       ClassMemberConvention.checkStaticMemberSpacing src lid typarDecls
         args idTrivia
@@ -172,18 +173,27 @@ and checkExpression src = function
     PatternMatchingConvention.checkFormat src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.MatchLambda(matchClauses = clauses) ->
+    PatternMatchingConvention.checkUniformCaseBody src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple(exprs = exprs; commaRanges = commaRanges) ->
     TupleConvention.check src exprs commaRanges
     for expr in exprs do
       FunctionCallConvention.checkMethodParenSpacing src expr
       checkExpression src expr
-  | SynExpr.TryFinally(tryExpr = tryExpr; finallyExpr = finallyExpr) ->
+  | SynExpr.TryFinally(tryExpr = tryExpr
+                       finallyExpr = finallyExpr
+                       trivia = tryFinallyTrivia) ->
+    TryWithConvention.checkFinallyLayout src tryExpr finallyExpr
+      tryFinallyTrivia
     checkExpression src tryExpr
     checkExpression src finallyExpr
-  | SynExpr.TryWith(tryExpr = tryExpr; withCases = clauses) ->
+  | SynExpr.TryWith(tryExpr = tryExpr
+                    withCases = clauses
+                    trivia = tryWithTrivia) ->
     checkExpression src tryExpr
     TryWithConvention.check src clauses
+    TryWithConvention.checkLayout src tryExpr clauses tryWithTrivia
+    PatternMatchingConvention.checkUniformCaseBody src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
     ArrayOrListConvention.check src isArray range expr

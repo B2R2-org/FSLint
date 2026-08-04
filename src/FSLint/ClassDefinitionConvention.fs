@@ -63,6 +63,8 @@ let checkIdentifierWithParen (src: ISourceText) members =
     | SynMemberDefn.ImplicitCtor(accessibility = accessibility
                                  ctorArgs = ctorArgs
                                  range = range) ->
+      LineBreakConvention.checkParameters src [ ctorArgs ]
+      TypeAnnotation.checkParamTypeSpacing src ctorArgs
       match accessibility with
       | Some(SynAccess.Internal idRange)
       | Some(SynAccess.Public idRange)
@@ -72,7 +74,6 @@ let checkIdentifierWithParen (src: ISourceText) members =
           |> fun wRange -> reportPascalCaseError src wRange
         else
           ()
-        TypeAnnotation.checkParamTypeSpacing src ctorArgs
       | _ ->
         Range.mkRange "" range.End ctorArgs.Range.Start
         |> checkMultiLineIdentWithParen src ctorArgs.Range
@@ -164,6 +165,9 @@ let checkSynTypar src idRange (typeParams: SynTyparDecls) =
     checkNameBracketSpacing src idRange range
     checkBracketElementSpacingInTypar src decls
     checkBracketSpacingInTypar src decls constraints range
+    decls
+    |> List.map extractTypeNameRange
+    |> LineBreakConvention.checkUniformPlacement src
   | _ -> warn "[checkSynTypar] TODO"
 
 let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =

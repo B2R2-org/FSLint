@@ -53,8 +53,10 @@ let private collectElemAndOptSeparatorRanges (src: ISourceText) elementPats =
   let elementRanges = List.map (fun (pat: SynPat) -> pat.Range) elementPats
   let rec interleave elements separators acc =
     match elements, separators with
-    | [], [] -> List.rev acc
-    | [ elem ], [] -> List.rev (elem :: acc)
+    | [], [] ->
+      List.rev acc
+    | [ elem ], [] ->
+      List.rev (elem :: acc)
     | elem :: restElems, sep :: restSeps ->
       interleave restElems restSeps (sep :: elem :: acc)
     | _ ->
@@ -79,7 +81,8 @@ let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   then
     Range.mkRange "" colonRange.End afterColonAdjusted.Start
     |> fun range -> reportWarn src range "Use single whitespace after ':'"
-  else ()
+  else
+    ()
 
 /// Checks if the given pattern contains record with incorrect bracket spacing,
 /// such as `{field}` instead of `{ field }`, within the specified range.
@@ -90,7 +93,8 @@ let private checkRecordBracketSpacing src (range: range) (innerRange: range) =
   elif range.EndColumn - 2 <> innerRange.EndColumn then
     Range.mkRange "" innerRange.End range.End
     |> reportRightCurlyBraceSpacing src
-  else ()
+  else
+    ()
 
 /// Checks for incorrect spacing in record pattern matching.
 let private checkRecordFuncSpacing src = function
@@ -173,7 +177,8 @@ let private checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
             match subStr[index + 1] with
             | ' ' when index < subStr.Length - 2 && subStr.[index + 2] = ' ' ->
               reportSemiColonAfterSpacing src field.Range
-            | ' ' -> ()
+            | ' ' ->
+              ()
             | _ ->
               reportSemiColonAfterSpacing src field.Range
           else
@@ -193,15 +198,18 @@ let rec private checkRecordInPattern src (idRange: range) = function
       | Some startRange, Some endRange, Some range ->
         Range.unionRanges startRange endRange
         |> checkRecordBracketSpacing src range
-      | _ -> ()
+      | _ ->
+        ()
       if not field.IsParen && idRange.EndColumn + 1 <> field.Range.StartColumn
       then reportWarn src field.Range "Use single whitespace"
       else ()
       checkRecordFuncSpacing src field
       checkRecordOperatorSpacing src field
       checkRecordSeparatorSpacing src field
-  | _ :: _ -> warn $"[RecordPattern]TODO: Various Args"
-  | [] -> ()
+  | _ :: _ ->
+    warn $"[RecordPattern]TODO: Various Args"
+  | [] ->
+    ()
 
 and private checkLongIdentPatternCase src typarDecls argPats = function
   | [ qualifier; method: Ident ]
@@ -222,7 +230,8 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
          id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argPats.Patterns.Head.Range.Start
     |> reportPascalCaseError src
-  | _ -> ()
+  | _ ->
+    ()
 
 /// checks pattern cases with incorrect spacing or newlines.
 let private checkPatternSpacing src clauses =
@@ -252,8 +261,11 @@ let private checkPatternSpacing src clauses =
     ()
 
 /// Checks for missing or extra spaces around '->' in match cases.
-let checkArrowSpacing src patRange whenExpr (bodyRange: range)
-  (arrowRange: range) =
+let checkArrowSpacing src
+                      patRange
+                      whenExpr
+                      (bodyRange: range)
+                      (arrowRange: range) =
   let patRange =
     if Option.isSome (whenExpr: option<SynExpr>) then whenExpr.Value.Range
     else patRange
@@ -372,7 +384,8 @@ let rec checkBody (src: ISourceText) = function
   | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->
     checkBody src lhsPat
     checkBody src rhsPat
-  | _ -> () (* no need to check this *)
+  | _ ->
+    () (* no need to check this *)
 
 and private checkArrayOrList src isArray elementPats (range: range) =
   if elementPats.IsEmpty then

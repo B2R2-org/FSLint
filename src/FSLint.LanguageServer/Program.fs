@@ -248,7 +248,8 @@ type LspServer(rpc: JsonRpc) =
     | Some watcher ->
       watcher.Dispose()
       editorConfigWatcher <- None
-    | None -> ()
+    | None ->
+      ()
 
   [<JsonRpcMethod("initialize")>]
   member _.Initialize(p: JToken) =
@@ -416,7 +417,8 @@ type LspServer(rpc: JsonRpc) =
               do! publishDiagnostics uri [||] |> Async.AwaitTask
         else
           match p["text"] with
-          | null -> ()
+          | null ->
+            ()
           | text ->
             let content = text.ToString()
             let diagnostics = lintDocument uri content

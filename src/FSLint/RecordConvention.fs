@@ -26,7 +26,8 @@ let private checkBracketSpacing src (range: range) (innerRange: range) =
   elif range.EndColumn - 2 <> innerRange.EndColumn then
     Range.mkRange "" innerRange.End range.End
     |> reportRightCurlyBraceSpacing src
-  else ()
+  else
+    ()
 
 /// Checks for correct spacing around ':' in record field definitions.
 /// Ensures the format `Field: type`.
@@ -42,7 +43,8 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
           reportWarn src colonRange "Use ': ' between field and type"
         else
           ()
-    else ()
+    else
+      ()
   ) fields
 
 /// Checks that the '=' and '{' in a record definition are on the same line.
@@ -58,7 +60,8 @@ let private checkOpeningBracketPosition src range (trivia: SynTypeDefnTrivia) =
         |> fun wRange -> reportWarn src wRange "Move '{' to next line"
       else
         ()
-    else ()
+    else
+      ()
   else
     ()
 
@@ -100,7 +103,8 @@ let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
       then
         Range.mkRange "" innerRange.End fullRange.End
         |> reportRightCurlyBraceSpacing src
-      else ()
+      else
+        ()
 
 let private checkBracketCompFlag src fullRange fieldRange exprRange =
   if isStrict then
@@ -142,8 +146,10 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
       elif exprRange.EndColumn + 2 <> range.EndColumn then
         Range.mkRange "" exprRange.End range.End
         |> reportRightCurlyBraceSpacing src
-      else ()
-    | _ -> ()
+      else
+        ()
+    | _ ->
+      ()
   elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
     match getFieldRange (List.head fields), getExprRange (List.last fields) with
     | Some fieldRange, Some exprRange ->
@@ -168,7 +174,8 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
         |> reportRightCurlyBraceSpacing src
       else
         ()
-    | _ -> ()
+    | _ ->
+      ()
   else
     ()
 
@@ -190,8 +197,10 @@ let rec private checkOperatorSpacing src = function
         |> reportEqaulAfterSpacing src
       else
         checkOperatorSpacing src rest
-    | _ -> checkOperatorSpacing src rest
-  | [] -> ()
+    | _ ->
+      checkOperatorSpacing src rest
+  | [] ->
+    ()
 
 let private collectFieldsInfo fields =
   fields
@@ -226,10 +235,12 @@ let checkSeparatorSpacing src fields =
              (separatorRange.StartColumn + 1))
           ||> Range.mkRange ""
           |> reportTrailingSeparator src
-        else ()
+        else
+          ()
       else
         ()
-    | _ -> ()
+    | _ ->
+      ()
   )
 
 let checkRecordPat (src: ISourceText) = function
@@ -311,13 +322,19 @@ let checkDefinition src fields range trivia =
   checkFieldIsInlineWithBracket src range fields
   checkFieldTypeSpacing src fields
 
-let private checkAnonymousRecordBracketSpacing src copyInfo
-  (recordFields: list<SynLongIdent * range option * SynExpr>) (range: range)
-  (trivia: SynExprAnonRecdTrivia) =
+let private checkAnonymousRecordBracketSpacing src
+                                               copyInfo
+                                               (recordFields:
+                                                 list<SynLongIdent *
+                                                      range option *
+                                                      SynExpr>)
+                                               (range: range)
+                                               (trivia: SynExprAnonRecdTrivia) =
   if not (List.isEmpty recordFields) then
     let firstInnerRange =
       match (copyInfo: option<SynExpr * _>) with
-      | Some(expr, _) -> expr.Range
+      | Some(expr, _) ->
+        expr.Range
       | None ->
         let id, _, _ = List.head recordFields
         id.Range
@@ -341,8 +358,13 @@ let private checkAnonymousRecordBracketSpacing src copyInfo
 
 /// The separator information is not present in a regular anonymous record
 /// so it is excluded.
-let checkAnonymousRecord src copyInfo
-  (recordFields: list<SynLongIdent * range option * SynExpr>) range trivia =
+let checkAnonymousRecord src
+                         copyInfo
+                         (recordFields: list<SynLongIdent *
+                                             range option *
+                                             SynExpr>)
+                         range
+                         trivia =
   checkAnonymousRecordBracketSpacing src copyInfo recordFields range trivia
   if isStrict then
     recordFields

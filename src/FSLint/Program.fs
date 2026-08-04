@@ -99,11 +99,13 @@ and checkMatchClause (src: ISourceText) clause =
     AssignmentConvention.checkNamePatPairs src pats
   | SynPat.LongIdent(argPats = SynArgPats.Pats pats) ->
     PatternMatchingConvention.checkParenTupleSpacing src pats
-  | _ -> ()
+  | _ ->
+    ()
   if whenExpr.IsSome then
     FunctionCallConvention.checkMethodParenSpacing src whenExpr.Value
     checkExpression src whenExpr.Value
-  else ()
+  else
+    ()
   checkExpression src expr
 
 and checkExpression src = function
@@ -314,7 +316,8 @@ and checkExpression src = function
 and checkIdOpt src case = function
   | Some(id: Ident) ->
     IdentifierConvention.check src case true id.idText id.idRange
-  | None -> failwith "?"
+  | None ->
+    failwith "?"
 
 and checkMemberDefns src members isDelegate =
   for memberDefn in members do
@@ -552,7 +555,8 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
         { ModuleAccess = context.ModuleAccess
           TypeAccess = None }
         |> AccessModifierConvention.checkNestModule src access rg
-      | _ -> ()
+      | _ ->
+        ()
       { ModuleAccess =
           match access with
           | Some _ -> getAccessLevel access
@@ -602,7 +606,8 @@ let checkWithAST src = function
         | SynModuleOrNamespaceLeadingKeyword.Module range ->
           DeclarationConvention.checkAttributesLineSpacing src attribs
             range
-        | _ -> ()
+        | _ ->
+          ()
         for id in lid do
           IdentifierConvention.check src PascalCase true id.idText id.idRange
         { ModuleAccess = getAccessLevel access }

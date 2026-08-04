@@ -17,7 +17,8 @@ let checkAsSpacing src (idRange: range) (asRange: range) (selfRange: range) =
     ()
 
 let checkEqualSpacing src (idRange: range) (reprRange: range) equalRange =
-  if Option.isNone equalRange then ()
+  if Option.isNone equalRange then
+    ()
   else
     if idRange.EndLine = (equalRange.Value: range).StartLine
       && idRange.EndColumn + 1 <> equalRange.Value.StartColumn then

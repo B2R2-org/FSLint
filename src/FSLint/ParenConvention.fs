@@ -31,12 +31,14 @@ let checkParenSpacing (src: ISourceText) (exprRange: range) (range: range) =
     ()
 
 let rec checkExpr src = function
-  | SynExpr.Paren(expr = SynExpr.TraitCall _) -> ()
+  | SynExpr.Paren(expr = SynExpr.TraitCall _) ->
+    ()
   | SynExpr.Paren(expr = expr; range = range) ->
     checkParenSpacing src expr.Range range
   | SynExpr.Const(SynConst.Unit, range) ->
     checkEmptySpacing src range
-  | _ -> ()
+  | _ ->
+    ()
 
 let rec checkPat src = function
   | SynPat.Paren(SynPat.Const(constant = SynConst.Unit), range) ->
@@ -48,7 +50,8 @@ let rec checkPat src = function
     elif range.EndColumn - 1 <> pat.Range.EndColumn then
       Range.mkRange "" pat.Range.End range.End
       |> reportBackParenInnerSpacing src
-    else ()
+    else
+      ()
     checkPat src pat
   | SynPat.Tuple(elementPats = elementPats) ->
     List.iter (checkPat src) elementPats

@@ -33,7 +33,8 @@ let private tryGetOperatorSymbol = function
     |> List.tryPick (function
       | Some(IdentTrivia.OriginalNotation op) -> Some op
       | _ -> None)
-  | _ -> None
+  | _ ->
+    None
 
 let private isOperatorExpr expr = Option.isSome <| tryGetOperatorSymbol expr
 
@@ -42,7 +43,8 @@ let private isUnaryOperatorExpr = function
     ident.idText = "op_UnaryNegation"
     || ident.idText = "op_UnaryPlus"
     || ident.idText = "op_LogicalNot"
-  | _ -> false
+  | _ ->
+    false
 
 let private checkUnaryOperatorSpacing src funcExpr (argExpr: SynExpr) =
   if isUnaryOperatorExpr (funcExpr: SynExpr) then
@@ -52,7 +54,8 @@ let private checkUnaryOperatorSpacing src funcExpr (argExpr: SynExpr) =
       makeSpaceRange leftAdjusted rightAdjusted
       |> fun range ->
         reportWarn src range "Remove whitespace after unary operator"
-    | _ -> ()
+    | _ ->
+      ()
   else
     ()
 
@@ -67,23 +70,28 @@ let private checkInfixSpacing src funcExpr (argExpr: SynExpr) =
       match tryGetTextBetweenSameLine src leftExpr.Range opExpr.Range with
       | Some(leftAdjusted, eqAdjusted, gap) when gap <> " " ->
         makeSpaceRange leftAdjusted eqAdjusted |> reportEqaulAfterSpacing src
-      | _ -> ()
+      | _ ->
+        ()
       match tryGetTextBetweenSameLine src opExpr.Range argExpr.Range with
       | Some(eqAdjusted, rightAdjusted, gap) when gap <> " " ->
         makeSpaceRange eqAdjusted rightAdjusted |> reportEqaulBeforeSpacing src
-      | _ -> ()
+      | _ ->
+        ()
     elif isOperatorExpr opExpr then
       match tryGetTextBetweenSameLine src leftExpr.Range opExpr.Range with
       | Some(leftAdjusted, opAdjusted, gap) when gap <> " " ->
         makeSpaceRange leftAdjusted opAdjusted |> reportInfixSpacing src
-      | _ -> ()
+      | _ ->
+        ()
       match tryGetTextBetweenSameLine src opExpr.Range argExpr.Range with
       | Some(opAdjusted, rightAdjusted, gap) when gap <> " " ->
         makeSpaceRange opAdjusted rightAdjusted |> reportInfixSpacing src
-      | _ -> ()
+      | _ ->
+        ()
     else
       ()
-  | _ -> ()
+  | _ ->
+    ()
 
 let private checkFuncSpacing src funcExpr (argExpr: SynExpr) =
   if not (argExpr.IsArrayOrListComputed && not argExpr.IsParen)
@@ -98,7 +106,8 @@ let private checkFuncSpacing src funcExpr (argExpr: SynExpr) =
         |> fun range -> reportWarn src range "Use single whitespace in func app"
       else
         ()
-    | _ -> ()
+    | _ ->
+      ()
   else
     ()
 
@@ -165,7 +174,8 @@ let rec check src isInfix funcExpr (argExpr: SynExpr) =
   | SynExpr.DotGet _
   | SynExpr.Const _
   | SynExpr.ArrayOrListComputed _
-  | SynExpr.DotLambda _ -> ()
+  | SynExpr.DotLambda _ ->
+    ()
   | expr ->
     warn $"[AppConvention] TODO(funcExpr): {expr}"
   match argExpr with

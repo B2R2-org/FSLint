@@ -91,12 +91,14 @@ let checkIdentifierWithParen (src: ISourceText) members =
         |> fun wRange -> reportPascalCaseError src wRange
       else
         ()
-    | _ -> ()
+    | _ ->
+      ()
   )
 
 let checkAttributesLineSpacing src (attribute: SynAttributes) trivia =
   let lastAttr = List.tryLast attribute
-  if Option.isNone lastAttr then ()
+  if Option.isNone lastAttr then
+    ()
   else
     match (trivia: SynTypeDefnTrivia).LeadingKeyword with
     | SynTypeDefnLeadingKeyword.StaticType(typeRange = range)
@@ -168,7 +170,8 @@ let checkSynTypar src idRange (typeParams: SynTyparDecls) =
     decls
     |> List.map extractTypeNameRange
     |> LineBreakConvention.checkUniformPlacement src
-  | _ -> warn "[checkSynTypar] TODO"
+  | _ ->
+    warn "[checkSynTypar] TODO"
 
 let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
   if isStrict then

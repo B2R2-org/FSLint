@@ -6,13 +6,15 @@ open FSharp.Compiler.Syntax
 open Diagnostics
 
 let rec objExprRanges acc = function
-  | SynExpr.ObjExpr(range = range) -> range :: acc
+  | SynExpr.ObjExpr(range = range) ->
+    range :: acc
   | SynExpr.ComputationExpr(expr = expr)
   | SynExpr.TryWith(tryExpr = expr)
   | SynExpr.TryFinally(tryExpr = expr)
   | SynExpr.Do(expr = expr)
   | SynExpr.Paren(expr = expr)
-  | SynExpr.Typed(expr = expr) -> objExprRanges acc expr
+  | SynExpr.Typed(expr = expr) ->
+    objExprRanges acc expr
   | SynExpr.LetOrUse(bindings = bindings; body = body) ->
     bindings
     |> List.fold (fun acc (SynBinding(expr = b)) -> objExprRanges acc b) acc
@@ -25,7 +27,8 @@ let rec objExprRanges acc = function
     let acc = objExprRanges acc iExpr
     let acc = objExprRanges acc tExpr
     if Option.isSome eExpr then objExprRanges acc eExpr.Value else acc
-  | _ -> acc
+  | _ ->
+    acc
 
 let private checkObjExprNewline src (objExprRanges: range list) =
   let findMultiline src acc lineIdx =

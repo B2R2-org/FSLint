@@ -95,7 +95,8 @@ let rec private checkTupleSpacing src path =
     checkTupleSpacing src rest
   | _ :: rest ->
     checkTupleSpacing src rest
-  | [] -> ()
+  | [] ->
+    ()
 
 and checkArray (src: ISourceText) = function
   | SynType.Array(elementType = SynType.LongIdent(longDotId = id)
@@ -108,7 +109,8 @@ and checkArray (src: ISourceText) = function
       reportWarn src gap "Remove whitespace in '[]'"
     else
       ()
-  | _ -> ()
+  | _ ->
+    ()
 
 and checkExprToLessSpacing src (typeName: SynType) (lessRange: option<Range>) =
   if typeName.Range.EndLine = lessRange.Value.StartLine
@@ -156,7 +158,8 @@ and checkTypeInternal src synType =
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
     List.iter (checkTypeInternal src) typeArgs
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkFieldWidth (src: ISourceText) field =
   let SynField(idOpt = idOpt; fieldType = fieldType) = field
@@ -182,7 +185,8 @@ let getFieldDeclaration (src: ISourceText) (field: SynField) =
       |> Array.filter (fun line -> not (line.TrimStart().StartsWith "///"))
       |> String.concat " "
       |> fun s -> s.Trim()
-  | None -> ""
+  | None ->
+    ""
 
 let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
   try
@@ -211,7 +215,8 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
           let after = str.Substring(starIndex + 1)
           let leftSpaces = before.Length - before.TrimEnd().Length
           let rightSpaces = after.Length - after.TrimStart().Length
-          if leftSpaces = 1 && rightSpaces = 1 then ()
+          if leftSpaces = 1 && rightSpaces = 1 then
+            ()
           elif leftSpaces > rightSpaces then
             Range.mkRange "" front.End
               (Position.mkPos front.StartLine (front.EndColumn + leftSpaces))
@@ -221,11 +226,13 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
               (Position.mkPos back.StartLine (back.StartColumn - rightSpaces))
               back.Start
             |> reportConsecutiveSpacing src
-        elif front.StartLine = back.StartLine && str.Contains " * " |> not
+        elif front.StartLine = back.StartLine &&
+          str.Contains " * " |> not
           && front.EndLine = back.StartLine
         then
           Range.mkRange "" front.End back.Start |> reportStarFormat src
-        elif front.StartLine <> back.StartLine && str.Contains "* " |> not
+        elif front.StartLine <> back.StartLine &&
+          str.Contains "* " |> not
           && front.EndLine = back.StartLine
         then
           Range.mkRange "" front.End back.Start |> reportStarFormat src
@@ -236,7 +243,8 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
             (Position.mkPos front.StartLine (front.EndColumn + 1))
           |> fun range -> reportWarn src range "Use ' *'"
         elif front.StartLine <> back.StartLine
-          && lastElemToDoubleCol <> " *" && lastElemToDoubleCol <> ""
+          && lastElemToDoubleCol <> " *" &&
+          lastElemToDoubleCol <> ""
         then
           let endIdx = str.TrimEnd().IndexOf '*' + front.EndColumn
           Range.mkRange "" front.End (Position.mkPos front.StartLine endIdx)
@@ -276,7 +284,8 @@ let private checkInlineSpacing src (frontCase, endCase) =
       Range.mkRange "" endRange.Start
         (Position.mkPos endRange.StartLine barRange.EndColumn)
       |> reportBarAfterSpacing src
-    else ()
+    else
+      ()
   | None, _ ->
     warn "Exception: '|' range does not exist"
   | _ ->
@@ -302,7 +311,8 @@ let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
   | _ when List.length cases > 1 &&
            cases.Head.Range.StartLine = (List.last cases).Range.StartLine ->
     cases |> List.pairwise |> List.iter (checkInlineSpacing src)
-  | _ -> ()
+  | _ ->
+    ()
 
 let private findAnonRecdOpeningRange (src: ISourceText) (range: range) =
   let line = src.GetLineString(range.StartLine - 1)
@@ -456,10 +466,12 @@ let rec checkTypeAbbrevWithAnnotation src = function
     then
       Range.mkRange "" argType.Range.End trivia.ArrowRange.Start
       |> reportArrowBeforeSpacing src
-    else ()
+    else
+      ()
     checkTypeInternal src argType
     checkTypeInternal src returnType
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkWithNullBarSpacing src (innerType: SynType) (barRange: range) =
   let findNullKey =
@@ -513,7 +525,8 @@ let checkPat src (pat: SynPat) = function
     checkTypeAbbrevWithAnnotation src innerType
   | SynType.Anon range ->
     checkColonSpace src pat.Range range
-  | typ -> warn $"TODO: [Type Annotation] filename: {typ.Range.FileName} {typ}"
+  | typ ->
+    warn $"TODO: [Type Annotation] filename: {typ.Range.FileName} {typ}"
 
 let rec checkParamTypeSpacing src = function
   | SynPat.LongIdent(argPats = SynArgPats.NamePatPairs(pats = pats)) ->
@@ -616,7 +629,8 @@ and checkAbstractSpacing src (id: Ident) (synType: SynType) (keyRange: range) =
     ()
   checkColonSpace src id.idRange synType.Range
   match extractColonPairs synType with
-  | [] -> ()
+  | [] ->
+    ()
   | pairs ->
     for nameRange, typeRange in pairs do checkColonSpace src nameRange typeRange
 

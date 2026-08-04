@@ -17,7 +17,8 @@ let private caseCheck (src: ISourceText) style identifier (range: range) =
     if Char.IsLower (identifier: string).[0] || identifier[0] = '_' then ()
     else reportWarn src range $"'{identifier}' should be {LowerCamelCase}."
   | PascalCase ->
-    if Char.IsUpper identifier[0] || identifier[0] = '_' then ()
+    if Char.IsUpper identifier[0] || identifier[0] = '_' then
+      ()
     else
       let identStartIdx =
         src.GetLineString(range.StartLine - 1).IndexOf identifier
@@ -34,8 +35,8 @@ let private underscoreCheck src (identifier: string) (range: range) =
   else reportWarn src range $"Remove underscore(s) in '{identifier}'"
 
 let check src style checkUnderscore (identifier: string) (range: range) =
-  if identifier.Contains " " || isKnownKeyWord identifier then ()
+  if identifier.Contains " " || isKnownKeyWord identifier then
+    ()
   else
     caseCheck src style identifier range
-    if checkUnderscore then underscoreCheck src identifier range
-    else ()
+    if checkUnderscore then underscoreCheck src identifier range else ()

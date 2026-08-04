@@ -47,7 +47,8 @@ module Diagnostics =
           LineContent = ""
           ColumnIndicator = "" }
       context.Errors <- error :: context.Errors
-    | None -> raise <| LintException message
+    | None ->
+      raise <| LintException message
 
   let reportWarn (src: ISourceText) (range: range) message =
     match currentLintContext.Value with

@@ -29,7 +29,8 @@ let extractComparisonOperator = function
     | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ]))
     | SynExpr.Ident(ident = id) -> Some id.idText
     | _ -> None
-  | _ -> None
+  | _ ->
+    None
 
 let isBlankLine (src: ISourceText) lineIdx =
   src.GetLineString(lineIdx - 1) |> String.IsNullOrWhiteSpace
@@ -62,7 +63,8 @@ let combineRangeWithComment startPos endPos combineToStartPos returnRange =
   | Some range ->
     if combineToStartPos then Range.unionRanges startPos range
     else Range.unionRanges range endPos
-  | None -> returnRange
+  | None ->
+    returnRange
 
 /// Counts lines occupied by comments between two ranges
 let countCommentLines (prev: range) next =

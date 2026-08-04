@@ -15,7 +15,8 @@ let private checkEmpty src (typeArgsRange: range) =
   then
     Range.mkRange "" typeArgsRange.Start typeArgsRange.End
     |> fun range -> reportWarn src range "Remove whitespace in null type args"
-  else ()
+  else
+    ()
 
 /// Checks if there is a space between 'expr' and '<type>' in an expression,
 /// e.g., detects 'expr <type>' instead of the correct 'expr<type>'.
@@ -100,10 +101,14 @@ let checkTypeAppParenSpacing src = function
           || typeRange.EndColumn <> parenRange.StartColumn then
           Range.mkRange "" typeRange.End parenRange.Start
           |> reportPascalCaseError src
-        else ()
-      else () (* This handle Type Reference convention *)
-    | _ -> ()
-  | _ -> ()
+        else
+          ()
+      else
+        () (* This handle Type Reference convention *)
+    | _ ->
+      ()
+  | _ ->
+    ()
 
 let checkLongIdentSpacing src typeArg =
   match typeArg with
@@ -119,7 +124,8 @@ let checkLongIdentSpacing src typeArg =
       else
         ()
     )
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkBracketRanges src lessRange greaterRange (innerRange: range) =
   match (lessRange: range option), (greaterRange: range option) with
@@ -153,7 +159,8 @@ let checkBarAlignment (src: ISourceText) (range: range) = function
         Range.mkRange "" barRange.End range.Start |> reportBarAfterSpacing src
     else
       ()
-  | None -> warn "Exception: '|' range does not exist"
+  | None ->
+    warn "Exception: '|' range does not exist"
 
 let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
   match cases with
@@ -164,7 +171,8 @@ let checkUnionType (src: ISourceText) (cases: SynUnionCase list) =
       let SynUnionCase(range = range; trivia = trivia) = case
       checkBarAlignment src range trivia.BarRange
     )
-  | _ -> ()
+  | _ ->
+    ()
 
 let check src (expr: SynExpr) typeArgs less greater typeArgsRange =
   checkFromExprToOpeningBracketSpacing src expr.Range typeArgsRange

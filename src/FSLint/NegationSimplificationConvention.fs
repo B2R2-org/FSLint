@@ -23,9 +23,12 @@ let private checkParenthesizedNegation (src: ISourceText) = function
       | Some(_, oriSymbol, oppSymbol) ->
         reportWarn src range
           $"Use '{oppSymbol}' instead of 'not ({oriSymbol})'"
-      | None -> ()
-    | None -> ()
-  | _ -> ()
+      | None ->
+        ()
+    | None ->
+      ()
+  | _ ->
+    ()
 
 let private checkPipelineNegation (src: ISourceText) = function
   | SynExpr.App(funcExpr = SynExpr.App(funcExpr = SynExpr.LongIdent(
@@ -45,9 +48,11 @@ let private checkPipelineNegation (src: ISourceText) = function
         | Some(_, oriSymbol, oppSymbol) ->
           reportWarn src range
             $"Use '{oppSymbol}' instead of '({oriSymbol}) |> not'"
-        | None -> ()
+        | None ->
+          ()
       )
-  | _ -> ()
+  | _ ->
+    ()
 
 let check (src: ISourceText) (expr: SynExpr) =
   checkParenthesizedNegation src expr

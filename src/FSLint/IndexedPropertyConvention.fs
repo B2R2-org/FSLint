@@ -9,7 +9,8 @@ let rec private collectBracketInfoInAppExpr = function
     if argExpr.IsArrayOrListComputed
     then argExpr :: collectBracketInfoInAppExpr funcExpr
     else collectBracketInfoInAppExpr argExpr
-  | _ -> []
+  | _ ->
+    []
 
 let checkBracketSpacing src (innerRange: range) (range: range) =
   if range.StartColumn + 1 <> innerRange.StartColumn then

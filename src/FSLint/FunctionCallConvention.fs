@@ -50,10 +50,11 @@ let private ensureMethodSpacing (src: ISourceText) flag funcExpr =
       ||> Range.mkRange ""
     if isPascalCase methodName && flag = ExprAtomicFlag.NonAtomic then
       let checkExn =
-        try src.GetSubTextFromRange spaceRange |> Some
+        try
+          src.GetSubTextFromRange spaceRange |> Some
         with
-          | :? ArgumentOutOfRangeException -> None
-          | _ -> Some ""
+        | :? ArgumentOutOfRangeException -> None
+        | _ -> Some ""
       if Option.isNone checkExn then ()
       else reportPascalCaseError src spaceRange
     elif isPascalCase methodName |> not && flag = ExprAtomicFlag.Atomic then

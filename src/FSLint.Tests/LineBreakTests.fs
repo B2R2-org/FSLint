@@ -501,6 +501,30 @@ type TestClass() =
         baz ()
 """
 
+  /// A barred handler hangs off the 'with' keyword, so it is the leading '|'
+  /// that has to agree with the broken 'try' body. The case bodies answer to
+  /// each other alone and may stay beside their arrows.
+  let goodTryWithBarredCaseTest =
+    """
+    let func () =
+      try
+        foo ()
+      with
+      | :? System.IO.IOException -> bar ()
+      | :? System.TimeoutException -> baz ()
+"""
+
+  /// The cases agree with each other; only the try/with pairing is off, the
+  /// 'try' body sitting inline while the bars break onto their own lines.
+  let badTryWithBarredCaseTest =
+    """
+    let func () =
+      try foo ()
+      with
+      | :? System.IO.IOException -> bar ()
+      | :? System.TimeoutException -> baz ()
+"""
+
   /// The handler body broken out below its arrow, matching the broken 'try'
   /// body. This is the canonical multi-line shape.
   let goodTryWithPatternOnKeywordLineTest =
@@ -944,6 +968,14 @@ type TestClass(lookup: Map<int,
   member _.``[LineBreak] Try With Clause Line Break Test``() =
     lint goodTryWithClauseTest
     lintAssert badTryWithClauseTest
+
+  [<TestMethod>]
+  member _.``[LineBreak] Try With Barred Case Line Break Test``() =
+    lint goodTryWithBarredCaseTest
+
+  [<TestMethod>]
+  member _.``[LineBreak] Try With Barred Case Line Break Test(2)``() =
+    lintAssert badTryWithBarredCaseTest
 
   [<TestMethod>]
   member _.``[LineBreak] Try Finally Line Break Test``() =

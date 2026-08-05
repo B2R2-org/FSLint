@@ -82,9 +82,7 @@ let bad = genericFn2 <int, string> 1 "x"
 
   let goodInfixOperatorInCondTest =
     """
-let f x =
-  if x.Y > 42 then x.X
-  else -x.X + 1
+let f x = if x.Y > 42 then x.X else -x.X + 1
 """
 
   [<TestMethod>]

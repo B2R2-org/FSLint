@@ -37,7 +37,7 @@ let private closedWidth (src: ISourceText) (span: range) =
 
 /// Returns true when the stretch is free to close up onto one line: it has to
 /// fit the line budget, and nothing may sit inside it that closing up would
-/// swallow — a comment, or a compiler directive whose own line cannot move.
+/// swallow: a comment, or a compiler directive whose own line cannot move.
 let private isClosable src (span: range) =
   closedWidth src span <= getCurrentMaxLineLength ()
   && (findCommentsBetween span.StartRange span.EndRange |> Option.isNone)
@@ -55,6 +55,25 @@ let private checkGapAgreement src ranges =
     |> Option.iter (fun (_, next) -> reportWarn src next Message)
   | [] ->
     ()
+
+/// Reports a construct spread over several lines though the whole of it would
+/// close up onto one inside the line budget. `span` is everything it occupies,
+/// and `joints` are the places a break could have landed; the first of them to
+/// have fallen past the opening line takes the report. Returns true when it
+/// reported, so that the caller can leave its finer checks alone: a construct
+/// that belongs on one line has nothing further to answer for.
+let checkClosesUp src (span: range) (joints: range list) =
+  if not isStrict || span.StartLine = span.EndLine then
+    false
+  elif not (isClosable src span) then
+    false
+  else
+    match joints |> List.tryFind (fun r -> r.StartLine > span.StartLine) with
+    | Some joint ->
+      reportNewLine src joint
+      true
+    | None ->
+      false
 
 /// Reports on a list laid out inside `span`, the whole stretch it occupies with
 /// its brackets. Fitting on one line settles it first: while the stretch would

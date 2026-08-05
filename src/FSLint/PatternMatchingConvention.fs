@@ -191,8 +191,7 @@ let rec private checkRecordInPattern src (idRange: range) = function
   | [ field: SynPat ] ->
     match field with
     | SynPat.Paren(pat = pat) ->
-      if pat.IsRecord then checkRecordInPattern src idRange [ pat ]
-      else ()
+      if pat.IsRecord then checkRecordInPattern src idRange [ pat ] else ()
     | _ ->
       match collectRecordEdgeRange [] field with
       | Some startRange, Some endRange, Some range ->
@@ -361,8 +360,7 @@ let checkUniformCaseBody src clauses =
 /// as well would leave the two checks pulling the same arrow opposite ways
 /// whenever the 'try' body is too long to come up but the handler is not.
 let checkUniformHandlerBody src (clauses: SynMatchClause list) =
-  if clauses.Length > 1 then checkUniformCaseBody src clauses
-  else ()
+  if clauses.Length > 1 then checkUniformCaseBody src clauses else ()
 
 let checkFormat src clauses =
   checkPatternSpacing src clauses

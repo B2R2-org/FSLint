@@ -98,12 +98,24 @@ let rec private hasBrokenCondition (ifExpr: SynExpr) elseExpr =
 /// Every branch of the chain must either stay inline or break onto its own
 /// line; mixing the two is reported. A condition broken across lines settles
 /// the chain on the broken layout outright.
-let private checkBranchLayout src ifExpr thenExpr elseExpr trivia =
+///
+/// Before any of that, the chain is held to the budget as a whole: one that
+/// would close up onto a single line has to be on a single line, so an 'elif'
+/// or 'else' left hanging below is reported however neatly its own body sits
+/// beside it. A branch body needing lines of its own puts that out of reach.
+let private checkBranchLayout src ifExpr thenExpr elseExpr range trivia =
   if (trivia: SynExprIfThenElseTrivia).IsElif then
     ()
   else
     let branches = collectBranches [] thenExpr elseExpr trivia |> List.rev
-    if hasBrokenCondition ifExpr elseExpr then
+    let fitsOnOneLine =
+      branches
+      |> List.forall (fun (_, body: range) -> body.StartLine = body.EndLine)
+    if fitsOnOneLine
+      && LineBreakConvention.checkClosesUp src range (List.map fst branches)
+    then
+      ()
+    elif hasBrokenCondition ifExpr elseExpr then
       LineBreakConvention.checkUniformlyBroken src branches
     else
       LineBreakConvention.checkUniformBreak src branches
@@ -117,7 +129,7 @@ let private checkConditionLayout src ifExpr =
 
 let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
   if isStrict then
-    checkBranchLayout src ifExpr thenExpr elseExpr trivia
+    checkBranchLayout src ifExpr thenExpr elseExpr range trivia
     checkConditionLayout src ifExpr
     match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
     | Some _ ->

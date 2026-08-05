@@ -8,22 +8,19 @@ type TryWithTests() =
   [<TestMethod>]
   member _.``[TryWith] Single case without bar - good``() =
     "let test () =\n" +
-    "  try riskyOp ()\n" +
-    "  with ex -> printfn \"error\"\n"
+    "  try riskyOp () with ex -> printfn \"error\"\n"
     |> lint
 
   [<TestMethod>]
   member _.``[TryWith] Single specific exception without bar - good``() =
     "let test () =\n" +
-    "  try riskyOp ()\n" +
-    "  with :? System.IO.IOException as ex -> printfn \"IO error\"\n"
+    "  try riskyOp () with :? System.IO.IOException as ex -> printfn \"IO\"\n"
     |> lint
 
   [<TestMethod>]
   member _.``[TryWith] Single wildcard without bar - good``() =
     "let test () =\n" +
-    "  try riskyOp ()\n" +
-    "  with _ -> printfn \"error\"\n"
+    "  try riskyOp () with _ -> printfn \"error\"\n"
     |> lint
 
   [<TestMethod>]
@@ -79,10 +76,10 @@ type TryWithTests() =
   member _.``[TryWith] Nested try-with - good``() =
     "let test () =\n" +
     "  try\n" +
-    "    try inner ()\n" +
-    "    with ex1 -> ()\n" +
+    "    try inner () with ex1 -> ()\n" +
     "  with ex2 ->\n" +
-    "    ()\n"
+    "    cleanup ()\n" +
+    "    report ()\n"
     |> lint
 
   [<TestMethod>]

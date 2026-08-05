@@ -15,30 +15,50 @@ open Diagnostics
 ///
 /// A '|' never joins the 'with' it hangs from, however much room the line has
 /// left, so a barred handler settles the whole group on the broken layout.
-let checkLayout src (tryExpr: SynExpr) clauses (trivia: SynExprTryWithTrivia) =
+///
+/// Before any of that, a bar-less 'try' is held to the budget as a whole: one
+/// that would close up onto a single line has to be on a single line, so a
+/// 'with' left hanging below is reported however neatly its own handler sits
+/// beside it. A body needing lines of its own puts that out of reach.
+let private closesUp src whole (bodies: range list) joints =
+  bodies |> List.forall (fun body -> body.StartLine = body.EndLine)
+  && LineBreakConvention.checkClosesUp src whole joints
+
+let checkLayout src (tryExpr: SynExpr) clauses range trivia =
   match clauses with
   | [] ->
     ()
   | SynMatchClause(resultExpr = handler; trivia = clauseTrivia) :: _ ->
     match clauseTrivia.BarRange with
     | Some barRange ->
-      [ trivia.TryKeyword, tryExpr.Range
+      [ (trivia: SynExprTryWithTrivia).TryKeyword, tryExpr.Range
         trivia.WithKeyword, barRange ]
       |> LineBreakConvention.checkUniformlyBroken src
     | None ->
       match clauseTrivia.ArrowRange with
       | Some arrowRange ->
-        [ trivia.TryKeyword, tryExpr.Range
-          arrowRange, (handler: SynExpr).Range ]
-        |> LineBreakConvention.checkUniformBreak src
+        let handler = (handler: SynExpr).Range
+        if closesUp src range [ tryExpr.Range; handler ]
+             [ tryExpr.Range; trivia.WithKeyword; handler ] then
+          ()
+        else
+          [ trivia.TryKeyword, tryExpr.Range
+            arrowRange, handler ]
+          |> LineBreakConvention.checkUniformBreak src
       | None ->
         ()
 
-/// 'try' and 'finally' pair up the same way 'try' and 'with' do.
-let checkFinallyLayout src (tryExpr: SynExpr) (finallyExpr: SynExpr) trivia =
-  [ (trivia: SynExprTryFinallyTrivia).TryKeyword, tryExpr.Range
-    trivia.FinallyKeyword, finallyExpr.Range ]
-  |> LineBreakConvention.checkUniformBreak src
+/// 'try' and 'finally' pair up the same way 'try' and 'with' do, the whole of
+/// them held to the budget first.
+let checkFinallyLayout src tryBody finallyBody whole trivia =
+  let keyword = (trivia: SynExprTryFinallyTrivia).FinallyKeyword
+  if closesUp src whole [ tryBody; finallyBody ]
+       [ tryBody; keyword; finallyBody ] then
+    ()
+  else
+    [ trivia.TryKeyword, tryBody
+      keyword, finallyBody ]
+    |> LineBreakConvention.checkUniformBreak src
 
 let check (src: ISourceText) (clauses: SynMatchClause list) =
   if isStrict && clauses.Length = 1 then

@@ -92,8 +92,7 @@ module Diagnostics =
   let reportWarns (errors: LintError list) (filePath: string) =
     lock outputLock (fun () ->
       let fileName =
-        if String.IsNullOrEmpty filePath then ""
-        else Path.GetFileName filePath
+        if String.IsNullOrEmpty filePath then "" else Path.GetFileName filePath
       for error in List.rev errors do
         if String.IsNullOrEmpty fileName then
           Console.Error.WriteLine(

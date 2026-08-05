@@ -302,9 +302,10 @@ type TestClass(lookup: Map<int, string,
     else printfn "good2"
 """
 
-  /// A condition that fits on one line does not oblige its branches either way:
-  /// they are judged on their own widths.
-  let goodInlineConditionInlineBranchTest =
+  /// A condition that fits on one line does not oblige its branches either way,
+  /// but the chain as a whole still has to close up while it can: with the
+  /// 'else' left below, this one is reported for the break, not the mixture.
+  let badInlineConditionInlineBranchTest =
     """
     if foo && bar && baz then printfn "good"
     else printfn "good2"
@@ -456,8 +457,10 @@ type TestClass() =
 
   /// 'try' and its handler form a group of their own. The handler is measured
   /// from its '->', the same anchor a `match` case uses, so where the 'with'
-  /// keyword sits does not enter into it.
-  let goodTryWithInlineTest =
+  /// keyword sits does not enter into it. But the whole of a bar-less 'try'
+  /// that would close up onto one line has to be on one line first, so both
+  /// shapes below are reported for the break rather than for the pairing.
+  let badTryWithInlineTest =
     """
     let func () =
       try foo ()
@@ -469,9 +472,7 @@ type TestClass() =
     let func () = try foo () with ex -> bar ()
 """
 
-  /// The 'with' keyword on a line of its own changes nothing: the handler body
-  /// still sits beside its arrow, matching the inline 'try' body.
-  let goodTryWithKeywordOwnLineTest =
+  let badTryWithKeywordOwnLineTest =
     """
     let func () =
       try foo ()
@@ -567,8 +568,14 @@ type TestClass() =
         printfn "a message far too long to be pulled back up beside its arrow"
 """
 
-  /// 'try' pairs with 'finally' exactly as it does with 'with'.
-  let goodTryFinallyInlineTest =
+  /// 'try' pairs with 'finally' exactly as it does with 'with', and closes up
+  /// onto one line on the same terms.
+  let goodTryFinallyOneLineTest =
+    """
+    let func () = try foo () finally bar ()
+"""
+
+  let badTryFinallyInlineTest =
     """
     let func () =
       try foo ()
@@ -800,10 +807,10 @@ type TestClass<'aLongTypeParameterName,
     """
     let func () =
       try
-        try inner ()
-        with e1 -> ()
+        try inner () with e1 -> ()
       with e2 ->
-        ()
+        cleanup ()
+        report ()
 """
 
   let badGuardedLambdaCaseTest =
@@ -1189,6 +1196,58 @@ type TestClass(aaa: int, bbb: int
                    AnExtremelyLongTypeNameLandingJustPastTheLastColumn>) = x
 """
 
+  /// The chain closes up onto one line while it fits, so the 'else' below is
+  /// reported even though its body sits neatly beside it.
+  let badElseOnOwnLineTest =
+    """
+    if ins.Flag then pushToStack bld (AST.undef rt "NULL")
+    else ()
+"""
+
+  /// One column too wide to close up, and the two-line shape is what is left.
+  let goodElseOnOwnLineTest =
+    """
+    if ins.Flag then pushToStack bld (AST.undef rt "NULL_POINTER_VALUE_HERE")
+    else ()
+"""
+
+  /// A branch body needing lines of its own puts the one-line shape out of
+  /// reach however short the chain reads.
+  let goodSequentialKeepsBranchesTest =
+    """
+    if foo then
+      printfn "good"
+      printfn "good2"
+    else
+      ()
+"""
+
+  /// A bar-less 'try' closes up on the same terms as an 'if'.
+  let badTryClosesUpTest =
+    """
+    let func () =
+      try riskyOp ()
+      with ex -> report ex
+"""
+
+  let goodTryTooWideToCloseTest =
+    """
+    let func () =
+      try riskyOp ()
+      with ex -> report ex "a rather long explanation of what went wrong"
+"""
+
+  /// A barred handler can never close up, whatever room the line has left.
+  let goodBarredHandlerNeverClosesTest =
+    """
+    let func () =
+      try
+        riskyOp ()
+      with
+      | :? System.IO.IOException -> report ()
+      | ex -> report ex
+"""
+
   /// A compiler directive between a keyword and its body cannot move, so the
   /// body cannot come up past it however much room the line has left, and the
   /// whole group settles on the broken layout.
@@ -1291,10 +1350,12 @@ type TestClass(aaa: int, bbb: int
   /// their own widths.
   [<TestMethod>]
   member _.``[LineBreak] Group Independence Test``() =
-    lint goodInlineConditionInlineBranchTest
+    lint goodBranchInlineTest
     lint goodInlineConditionBrokenBranchTest
     lintAssertMsg "Use consistent line breaks"
       badBrokenConditionInlineBranchTest
+    lintAssertMsg "Remove unnecessary line break"
+      badInlineConditionInlineBranchTest
 
   [<TestMethod>]
   member _.``[LineBreak] Case Line Break Test``() =
@@ -1362,9 +1423,9 @@ type TestClass(aaa: int, bbb: int
 
   [<TestMethod>]
   member _.``[LineBreak] Try With Line Break Test``() =
-    lint goodTryWithInlineTest
     lint goodTryWithOneLineTest
-    lint goodTryWithKeywordOwnLineTest
+    lintAssertMsg "Remove unnecessary line break" badTryWithInlineTest
+    lintAssertMsg "Remove unnecessary line break" badTryWithKeywordOwnLineTest
     lintAssert badTryWithTest
 
   [<TestMethod>]
@@ -1391,8 +1452,9 @@ type TestClass(aaa: int, bbb: int
 
   [<TestMethod>]
   member _.``[LineBreak] Try Finally Line Break Test``() =
-    lint goodTryFinallyInlineTest
+    lint goodTryFinallyOneLineTest
     lint goodTryFinallyBrokenTest
+    lintAssertMsg "Remove unnecessary line break" badTryFinallyInlineTest
     lintAssert badTryFinallyTest
 
   [<TestMethod>]
@@ -1495,6 +1557,22 @@ type TestClass(aaa: int, bbb: int
     lintErrors badTrailingBracketBreakTest
     |> List.filter (fun e -> e.Message = "Remove unnecessary line break")
     |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A construct that would close up onto one line has to be on one line, so
+  /// an 'else' left below is reported however neatly its body sits beside it.
+  [<TestMethod>]
+  member _.``[LineBreak] Chain Closes Up On One Line Test``() =
+    lint goodElseOnOwnLineTest
+    lint goodSequentialKeepsBranchesTest
+    lintAssertMsg "Remove unnecessary line break" badElseOnOwnLineTest
+
+  /// A 'try' is held to the same demand, and a barred handler is exempt from it
+  /// because its '|' can never join the 'with' above.
+  [<TestMethod>]
+  member _.``[LineBreak] Try Closes Up On One Line Test``() =
+    lint goodTryTooWideToCloseTest
+    lint goodBarredHandlerNeverClosesTest
+    lintAssertMsg "Remove unnecessary line break" badTryClosesUpTest
 
   /// A body reachable only through a compiler directive stays where it is.
   [<TestMethod>]

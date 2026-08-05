@@ -184,17 +184,19 @@ and checkExpression src = function
       checkExpression src expr
   | SynExpr.TryFinally(tryExpr = tryExpr
                        finallyExpr = finallyExpr
+                       range = range
                        trivia = tryFinallyTrivia) ->
-    TryWithConvention.checkFinallyLayout src tryExpr finallyExpr
-      tryFinallyTrivia
+    TryWithConvention.checkFinallyLayout src tryExpr.Range finallyExpr.Range
+      range tryFinallyTrivia
     checkExpression src tryExpr
     checkExpression src finallyExpr
   | SynExpr.TryWith(tryExpr = tryExpr
                     withCases = clauses
+                    range = range
                     trivia = tryWithTrivia) ->
     checkExpression src tryExpr
     TryWithConvention.check src clauses
-    TryWithConvention.checkLayout src tryExpr clauses tryWithTrivia
+    TryWithConvention.checkLayout src tryExpr clauses range tryWithTrivia
     PatternMatchingConvention.checkUniformHandlerBody src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
@@ -278,8 +280,7 @@ and checkExpression src = function
     RecordConvention.checkConstructor src copyInfo recordFields range
     for recordField in recordFields do
       let SynExprRecordField(expr = expr) = recordField
-      if expr.IsSome then checkExpression src expr.Value
-      else ()
+      if expr.IsSome then checkExpression src expr.Value else ()
   | SynExpr.Lazy(expr = expr) ->
     checkExpression src expr
   | SynExpr.InferredUpcast(expr = expr)
@@ -678,8 +679,7 @@ let tryOutputToBuffer (index: int) (path: string) editorConfig =
 /// Runs linting jobs in parallel for all given files
 let private runParallelByOrder editConfig opts (paths: string array) =
   let writeVerboseLine (message: string) =
-    if opts.Verbose then Console.WriteLine message
-    else ()
+    if opts.Verbose then Console.WriteLine message else ()
   paths
    |> Array.mapi (fun i p -> async { return tryOutputToBuffer i p editConfig })
   |> Async.Parallel
@@ -718,8 +718,7 @@ let linterForProjSln =
 [<EntryPoint>]
 let main args =
   System.Diagnostics.Trace.Listeners.Clear()
-  if args.Length < 1 then exitWithError "Usage: fslint <file|dir>"
-  else ()
+  if args.Length < 1 then exitWithError "Usage: fslint <file|dir>" else ()
   let rest, opts = OptParse.Parse(spec, "fslint", args, defaultOpts)
   let path = List.head rest
   let editorConfig =

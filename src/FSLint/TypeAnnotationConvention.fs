@@ -153,7 +153,8 @@ and checkTypeInternal src synType =
     checkCommaSpacing src typeArgs commaRanges
     typeArgs
     |> List.map (fun typeArg -> typeArg.Range)
-    |> LineBreakConvention.checkUniformPlacement src
+    |> LineBreakConvention.checkBracketedPlacement src
+      (Range.unionRanges lessRange.Value greaterRange.Value)
     checkExprToLessSpacing src typeName lessRange
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange

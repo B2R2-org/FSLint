@@ -195,7 +195,7 @@ and checkExpression src = function
     checkExpression src tryExpr
     TryWithConvention.check src clauses
     TryWithConvention.checkLayout src tryExpr clauses tryWithTrivia
-    PatternMatchingConvention.checkUniformCaseBody src clauses
+    PatternMatchingConvention.checkUniformHandlerBody src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.ArrayOrListComputed(isArray, expr, range) ->
     ArrayOrListConvention.check src isArray range expr
@@ -478,8 +478,7 @@ and checkBinding src case binding =
   let case = if hasAttr "Literal" attrs then PascalCase else case
   TypeAnnotation.checkFieldWidthByPat src pat
   checkPattern src case false trivia pat
-  if Option.isSome trivia.EqualsRange
-    && trivia.LeadingKeyword.IsNew |> not then
+  if Option.isSome trivia.EqualsRange && trivia.LeadingKeyword.IsNew |> not then
     DeclarationConvention.checkEqualSpacing src pat.Range
       trivia.EqualsRange.Value body.Range returnInfo
   else

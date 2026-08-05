@@ -169,7 +169,7 @@ let checkSynTypar src idRange (typeParams: SynTyparDecls) =
     checkBracketSpacingInTypar src decls constraints range
     decls
     |> List.map extractTypeNameRange
-    |> LineBreakConvention.checkUniformPlacement src
+    |> LineBreakConvention.checkBracketedPlacement src range
   | _ ->
     warn "[checkSynTypar] TODO"
 

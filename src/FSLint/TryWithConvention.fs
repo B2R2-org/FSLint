@@ -12,6 +12,9 @@ open Diagnostics
 /// with it; a bar-less `with pat -> body` fuses the keyword into the case, so
 /// the '->' is the only place a break can land there. Either way the arrows of
 /// the cases answer to each other alone, never to the 'try'.
+///
+/// A '|' never joins the 'with' it hangs from, however much room the line has
+/// left, so a barred handler settles the whole group on the broken layout.
 let checkLayout src (tryExpr: SynExpr) clauses (trivia: SynExprTryWithTrivia) =
   match clauses with
   | [] ->
@@ -21,7 +24,7 @@ let checkLayout src (tryExpr: SynExpr) clauses (trivia: SynExprTryWithTrivia) =
     | Some barRange ->
       [ trivia.TryKeyword, tryExpr.Range
         trivia.WithKeyword, barRange ]
-      |> LineBreakConvention.checkUniformBreak src
+      |> LineBreakConvention.checkUniformlyBroken src
     | None ->
       match clauseTrivia.ArrowRange with
       | Some arrowRange ->

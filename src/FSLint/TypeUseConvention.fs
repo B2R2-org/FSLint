@@ -57,10 +57,8 @@ let private checkCommaSeparator src (typeStr: string) typeRange =
     reportWarn src typeRange "Use single whitespace between type"
   else
     ()
-  if (Array.head parts).EndsWith " " then
-    reportCommaBeforeSpacing src typeRange
-  else
-    ()
+  if (Array.head parts).EndsWith " " then reportCommaBeforeSpacing src typeRange
+  else ()
 
 /// Checks whether the spacing between elements in the given type argument list
 /// is formatted correctly, distinguishing between ',' and '*' separators.

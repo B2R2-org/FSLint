@@ -11,39 +11,152 @@ let [<Literal>] private Message = "Use consistent line breaks"
 let private isBrokenGap (prev: range, next: range) =
   next.StartLine > prev.EndLine
 
-/// Reports when the separators of a list are broken across lines only some of
-/// the time. Every gap between neighbours must agree: either they all carry a
-/// line break or none of them does.
-let checkUniformPlacement src ranges =
+/// Joins two lines of a closed-up stretch. F# wants a space between most
+/// neighbours, but not where a bracket meets what it fences in, nor before a
+/// separator, so those junctions close up tight.
+let private joinTight (left: string) (right: string) =
+  let opensLeft = left.Length > 0 && "([<{".Contains left[left.Length - 1]
+  let closesRight = right.Length > 0 && ")]>},;".Contains right[0]
+  if opensLeft || closesRight then left + right else left + " " + right
+
+/// The width the stretch would take once every break inside it is closed up:
+/// its own line up to where it begins, then all of it through to the end of its
+/// last line, each break and the indentation behind it collapsed away. Whatever
+/// trails it there, a closing paren and an '=' say, lands on that line too and
+/// counts.
+let private closedWidth (src: ISourceText) (span: range) =
+  let lastLine = src.GetLineString(span.EndLine - 1)
+  let closed =
+    Position.mkPos span.EndLine (lastLine.TrimEnd().Length)
+    |> Range.mkRange "" span.Start
+    |> src.GetSubTextFromRange
+    |> fun text -> text.Split '\n'
+    |> Array.map (fun line -> line.Trim())
+    |> Array.reduce joinTight
+  span.StartColumn + closed.Length
+
+/// Returns true when the stretch is free to close up onto one line: it has to
+/// fit the line budget, and no comment may sit inside it, since closing up
+/// would swallow it.
+let private isClosable src (span: range) =
+  closedWidth src span <= getCurrentMaxLineLength ()
+  && (findCommentsBetween span.StartRange span.EndRange |> Option.isNone)
+
+/// Every gap between neighbours must agree: either they all carry a line break
+/// or none of them does.
+let private checkGapAgreement src ranges =
   let gaps = ranges |> List.pairwise
   match gaps with
-  | first :: _ when isStrict ->
+  | first :: _ ->
     let firstIsBroken = isBrokenGap first
     gaps
     |> List.tryFind (fun gap -> isBrokenGap gap <> firstIsBroken)
     |> Option.iter (fun (_, next) -> reportWarn src next Message)
+  | [] ->
+    ()
+
+/// Reports on a list laid out inside `span`, the whole stretch it occupies with
+/// its brackets. Fitting on one line settles it first: while the stretch would
+/// close up inside the line budget it has to stay closed up, and only once it
+/// would not does the weaker demand take over, that every gap between
+/// neighbours agree.
+///
+/// The brackets belong to the stretch because a break landing just inside one
+/// is a break in the list, and with a single element it is the only place a
+/// break can land at all.
+let checkBracketedPlacement src (span: range) ranges =
+  if not isStrict || List.isEmpty ranges then
+    ()
+  elif not (isClosable src span) then
+    checkGapAgreement src ranges
+  elif span.StartLine <> span.EndLine then
+    ranges
+    |> List.tryFind (fun (r: range) -> r.StartLine > span.StartLine)
+    |> Option.defaultValue (List.last ranges)
+    |> reportNewLine src
+  else
+    ()
+
+/// Reports on a list with no brackets of its own, such as a chain of '&&'
+/// operands or a curried parameter list. The gaps between elements are all
+/// there is to it, so a list of one has no layout to judge.
+let checkUniformPlacement src (ranges: range list) =
+  match ranges with
+  | _ :: _ :: _ when isStrict ->
+    let span = List.reduce Range.unionRanges ranges
+    if isClosable src span then
+      ranges
+      |> List.pairwise
+      |> List.tryFind isBrokenGap
+      |> Option.iter (fun (_, next) -> reportNewLine src next)
+    else
+      checkGapAgreement src ranges
   | _ ->
+    ()
+
+/// Returns true when the body was left on the line its keyword ends, rather
+/// than broken onto a line of its own.
+let private isInline (keyword: range, body: range) =
+  keyword.EndLine = body.StartLine
+
+/// The width the item would take once its body sits beside its keyword: the
+/// keyword's line up to the keyword, one space, then the body's line from where
+/// the body begins. Measuring the body by its line rather than by its own range
+/// keeps whatever trails it, a comment above all, inside the budget.
+let private joinedWidth (src: ISourceText) (keyword: range) (body: range) =
+  let bodyLine = src.GetLineString(body.StartLine - 1)
+  keyword.EndColumn + 1 + (bodyLine.TrimEnd().Length - body.StartColumn)
+
+/// Returns true when the body is free to sit beside its keyword. It has to fit
+/// the line budget, and one that already broke away has to be a single line
+/// with nothing but whitespace behind it: a body needing several lines of its
+/// own, a `let` or a sequence say, can never come back up, and neither can one
+/// hiding behind a comment that the join would swallow.
+let private isJoinable src ((keyword, body) as item) =
+  joinedWidth src keyword body <= getCurrentMaxLineLength ()
+  && (isInline item
+      || (body.StartLine = body.EndLine
+          && findCommentsBetween keyword body |> Option.isNone))
+
+/// The shared body of the two keyword-group checks. Fitting on one line comes
+/// first: when every body in the group could sit beside its keyword, every one
+/// of them has to, and only once at least one cannot does the group fall back
+/// to the weaker demand that all of them break away.
+let private checkGroup src joinable items =
+  if not isStrict || List.isEmpty items then
+    ()
+  elif joinable && items |> List.forall (isJoinable src) then
+    items
+    |> List.tryFind (isInline >> not)
+    |> Option.iter (fun (_, body) -> reportNewLine src body)
+  elif List.length items > 1 then
+    items
+    |> List.tryFind isInline
+    |> Option.iter (fun (_, body) -> reportWarn src body Message)
+  else
     ()
 
 /// Judges sibling bodies that hang off a keyword such as '->', 'then' or
 /// 'else'. Each item pairs that keyword's range with the body's range.
 let checkUniformBreak src (items: (range * range) list) =
-  let isInline (keyword: range, body: range) =
-    keyword.EndLine = body.StartLine
-  if isStrict && List.length items > 1 then
-    let firstIsInline = isInline (List.head items)
-    items
-    |> List.tryFind (fun item -> isInline item <> firstIsInline)
-    |> Option.iter (fun (_, body) -> reportWarn src body Message)
-  else
-    ()
+  checkGroup src true items
+
+/// Judges a group whose members can never share their keyword's line, such as
+/// the '|' of a barred handler sitting under its 'with'. Joining is off the
+/// table, so all that is left to ask is whether every one of them broke away.
+let checkUniformlyBroken src (items: (range * range) list) =
+  checkGroup src false items
 
 /// Checks a parameter list, covering both the tupled form `(a, b, c)` and the
-/// curried form `a b c`. A tupled list is measured by its elements, because the
-/// enclosing parentheses are a single pattern.
+/// curried form `a b c`. A tupled list is measured by its elements inside the
+/// parentheses that fence them in; a curried one has no fences of its own, its
+/// parameters standing side by side.
 let checkParameters src (pats: SynPat list) =
   match pats with
-  | [ SynPat.Paren(pat = SynPat.Tuple(elementPats = elements)) ] ->
-    elements |> List.map (fun pat -> pat.Range) |> checkUniformPlacement src
+  | [ SynPat.Paren(pat = SynPat.Tuple(elementPats = elements)
+                   range = fence) ] ->
+    elements
+    |> List.map (fun pat -> pat.Range)
+    |> checkBracketedPlacement src fence
   | _ ->
     pats |> List.map (fun pat -> pat.Range) |> checkUniformPlacement src

@@ -50,10 +50,8 @@ let rec private collectBranches acc (thenExpr: SynExpr) elseExpr trivia =
     collectBranches acc nextThen nextElse nextTrivia
   | Some elseBody ->
     match trivia.ElseKeyword with
-    | Some keyword ->
-      (keyword, (elseBody: SynExpr).Range) :: acc
-    | None ->
-      acc
+    | Some keyword -> (keyword, (elseBody: SynExpr).Range) :: acc
+    | None -> acc
   | None ->
     acc
 
@@ -80,15 +78,35 @@ let private flattenInfixChain expr =
       e :: acc
   if isBooleanConnective expr then loop [] expr else []
 
+/// True when any condition along the chain was broken across lines. A broken
+/// condition is one that would not close up inside the line budget, so the
+/// chain cannot be written on one line at all, whatever room is left beside the
+/// last of its operands. None of its branch bodies may sit beside a keyword
+/// either then: they all break with it.
+let rec private hasBrokenCondition (ifExpr: SynExpr) elseExpr =
+  if ifExpr.Range.StartLine <> ifExpr.Range.EndLine then
+    true
+  else
+    match elseExpr with
+    | Some(SynExpr.IfThenElse(ifExpr = nextIf
+                              elseExpr = nextElse
+                              trivia = nextTrivia)) when nextTrivia.IsElif ->
+      hasBrokenCondition nextIf nextElse
+    | _ ->
+      false
+
 /// Every branch of the chain must either stay inline or break onto its own
-/// line; mixing the two is reported.
-let private checkBranchLayout src thenExpr elseExpr trivia =
+/// line; mixing the two is reported. A condition broken across lines settles
+/// the chain on the broken layout outright.
+let private checkBranchLayout src ifExpr thenExpr elseExpr trivia =
   if (trivia: SynExprIfThenElseTrivia).IsElif then
     ()
   else
-    collectBranches [] thenExpr elseExpr trivia
-    |> List.rev
-    |> LineBreakConvention.checkUniformBreak src
+    let branches = collectBranches [] thenExpr elseExpr trivia |> List.rev
+    if hasBrokenCondition ifExpr elseExpr then
+      LineBreakConvention.checkUniformlyBroken src branches
+    else
+      LineBreakConvention.checkUniformBreak src branches
 
 /// Every operand of a boolean condition must either share one line or each sit
 /// on its own line.
@@ -99,7 +117,7 @@ let private checkConditionLayout src ifExpr =
 
 let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
   if isStrict then
-    checkBranchLayout src thenExpr elseExpr trivia
+    checkBranchLayout src ifExpr thenExpr elseExpr trivia
     checkConditionLayout src ifExpr
     match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
     | Some _ ->

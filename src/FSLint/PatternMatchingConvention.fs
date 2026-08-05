@@ -355,6 +355,15 @@ let checkUniformCaseBody src clauses =
     |> Option.map (fun arrow -> arrow, (expr: SynExpr).Range))
   |> LineBreakConvention.checkUniformBreak src
 
+/// The handler cases of a 'try' answer to each other exactly as a match's do,
+/// with one exception: a lone bar-less handler is no case list at all. Its '->'
+/// is the very anchor the try/with pairing is measured from, so judging it here
+/// as well would leave the two checks pulling the same arrow opposite ways
+/// whenever the 'try' body is too long to come up but the handler is not.
+let checkUniformHandlerBody src (clauses: SynMatchClause list) =
+  if clauses.Length > 1 then checkUniformCaseBody src clauses
+  else ()
+
 let checkFormat src clauses =
   checkPatternSpacing src clauses
   checkUniformCaseBody src clauses

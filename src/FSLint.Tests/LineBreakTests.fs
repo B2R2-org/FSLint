@@ -1123,6 +1123,94 @@ type TestClass(parameterNumberOneIsHere12: int,
   member _.Value = 1
 """
 
+  /// The body that will not fit is the one left inline this time. One such
+  /// settles the chain all the same, and the report lands on it. Its line is
+  /// over the budget too, so this one is read off the whole error list.
+  let badWideInlineBranchTest =
+    "\n    if foo then printfn " +
+    "\"this message is deliberately long enough to run past eighty\"\n" +
+    "    else\n" +
+    "      printfn \"bad2\"\n"
+
+  /// A lone case over the budget has no sibling to break away with, so its
+  /// width is left to the line rule and the group says nothing of its own.
+  let goodWideInlineSingleCaseTest =
+    "\n    match value with\n" +
+    "    | _ -> printfn " +
+    "\"this message is deliberately long enough to run past eighty!\"\n"
+
+  /// A '|' left beside its 'with' is reported, since a barred handler can only
+  /// ever hang below it.
+  let badBarBesideWithTest =
+    """
+    let func () =
+      try
+        foo ()
+      with | :? System.IO.IOException -> bar ()
+           | _ -> baz ()
+"""
+
+  /// A lone bar-less handler is no case list of its own: its '->' is the anchor
+  /// the try/with pairing is measured from. With the 'try' body too long to
+  /// come up, the handler breaks with it rather than being pulled up alone.
+  let goodLoneHandlerFollowsTryTest =
+    """
+    let func () =
+      try
+        foo ()
+        bar ()
+      with ex ->
+        baz ()
+"""
+
+  /// The stretch runs past its last element to the bracket that closes it, so a
+  /// break landing there is a break in the list. With nothing further down to
+  /// point at, the last element takes the report.
+  let badTrailingBracketBreakTest =
+    """
+type TestClass(aaa: int, bbb: int
+              ) =
+  member _.Aaa = aaa
+"""
+
+  /// Where a bracket meets what it fences in the closed-up form has no space
+  /// between them, and this argument lands on the eightieth column exactly. A
+  /// space wrongly counted at that junction would push it to the eighty-first
+  /// and let it off, so the pair below pins the junction as well as the budget.
+  let badBracketJunctionBoundaryTest =
+    """
+    let func (x: Option<
+                   AnExtremelyLongTypeNameLandingRightOnTheLastColumn>) = x
+"""
+
+  let goodBracketJunctionOverBoundaryTest =
+    """
+    let func (x: Option<
+                   AnExtremelyLongTypeNameLandingJustPastTheLastColumn>) = x
+"""
+
+  /// A closing bracket that opens a line joins tight when the list closes up,
+  /// so 'Map<int, string>' is measured at the width it would really have.
+  let badClosingBracketOwnLineTest =
+    """
+    let func (x: Map<int,
+                     string
+                     >) = x
+"""
+
+  /// The outer condition fits on one line but an 'elif' further along does not,
+  /// and that settles the layout of every branch in the chain.
+  let badElifBrokenConditionBranchTest =
+    """
+    if foo then printfn "bad"
+    elif isSomethingRatherLongHere &&
+         isAnotherRatherLongCondition &&
+         isYetAnotherLongCondition then
+      printfn "bad2"
+    else
+      printfn "bad3"
+"""
+
   /// However much room the line has left, a '|' never comes up to join the
   /// 'with' it hangs from, so a barred handler keeps the group broken.
   let goodBarredHandlerRoomTest =
@@ -1336,6 +1424,60 @@ type TestClass(parameterNumberOneIsHere12: int,
   member _.``[LineBreak] Single Bracketed Item Test``() =
     lint goodSingleWideTypeArgTest
     lintAssertMsg "Remove unnecessary line break" badSingleTypeArgTest
+
+  /// The over-wide body being the inline one settles the chain just as surely.
+  /// Its line breaks the budget as well, so the group's own report is picked
+  /// out of the full list rather than caught as the first thrown error.
+  [<TestMethod>]
+  member _.``[LineBreak] Wide Inline Body Test``() =
+    lintErrors badWideInlineBranchTest
+    |> List.filter (fun e -> e.Message = "Use consistent line breaks")
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A lone over-wide body has nothing to break away with, so the group adds
+  /// nothing to what the line rule already says.
+  [<TestMethod>]
+  member _.``[LineBreak] Wide Inline Single Case Test``() =
+    let errors = lintErrors goodWideInlineSingleCaseTest
+    errors
+    |> List.filter (fun e -> e.Message.Contains "exceeds")
+    |> fun tooWide -> Assert.AreEqual<int>(1, tooWide.Length)
+    errors
+    |> List.filter (fun e -> e.Message = "Use consistent line breaks")
+    |> fun breaks -> Assert.AreEqual<int>(0, breaks.Length)
+
+  [<TestMethod>]
+  member _.``[LineBreak] Bar Beside With Test``() =
+    lintAssertMsg "Use consistent line breaks" badBarBesideWithTest
+
+  /// The pairing owns a lone bar-less handler, so the case rule does not pull
+  /// its body up behind the pairing's back.
+  [<TestMethod>]
+  member _.``[LineBreak] Lone Handler Follows Try Test``() =
+    lint goodLoneHandlerFollowsTryTest
+
+  /// A break landing between the last element and its closing bracket is still
+  /// a break in the list.
+  [<TestMethod>]
+  member _.``[LineBreak] Trailing Bracket Break Test``() =
+    lintErrors badTrailingBracketBreakTest
+    |> List.filter (fun e -> e.Message = "Remove unnecessary line break")
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  [<TestMethod>]
+  member _.``[LineBreak] Closing Bracket On Own Line Test``() =
+    lintAssertMsg "Remove unnecessary line break" badClosingBracketOwnLineTest
+
+  /// The bracket junction is measured tight, to the column.
+  [<TestMethod>]
+  member _.``[LineBreak] Bracket Junction Boundary Test``() =
+    lint goodBracketJunctionOverBoundaryTest
+    lintAssertMsg "Remove unnecessary line break"
+      badBracketJunctionBoundaryTest
+
+  [<TestMethod>]
+  member _.``[LineBreak] Elif Broken Condition Branch Test``() =
+    lintAssertMsg "Use consistent line breaks" badElifBrokenConditionBranchTest
 
   [<TestMethod>]
   member _.``[LineBreak] Type Parameter Line Break Test(2)``() =

@@ -36,11 +36,12 @@ let private closedWidth (src: ISourceText) (span: range) =
   span.StartColumn + closed.Length
 
 /// Returns true when the stretch is free to close up onto one line: it has to
-/// fit the line budget, and no comment may sit inside it, since closing up
-/// would swallow it.
+/// fit the line budget, and nothing may sit inside it that closing up would
+/// swallow — a comment, or a compiler directive whose own line cannot move.
 let private isClosable src (span: range) =
   closedWidth src span <= getCurrentMaxLineLength ()
   && (findCommentsBetween span.StartRange span.EndRange |> Option.isNone)
+  && (findDirectivesBetween span.StartRange span.EndRange |> Option.isNone)
 
 /// Every gap between neighbours must agree: either they all carry a line break
 /// or none of them does.
@@ -110,13 +111,15 @@ let private joinedWidth (src: ISourceText) (keyword: range) (body: range) =
 /// Returns true when the body is free to sit beside its keyword. It has to fit
 /// the line budget, and one that already broke away has to be a single line
 /// with nothing but whitespace behind it: a body needing several lines of its
-/// own, a `let` or a sequence say, can never come back up, and neither can one
-/// hiding behind a comment that the join would swallow.
+/// own, a `let` or a sequence say, can never come back up. Neither can one
+/// standing behind a comment that the join would swallow, nor one reached only
+/// through a compiler directive, whose own line has to stay where it is.
 let private isJoinable src ((keyword, body) as item) =
   joinedWidth src keyword body <= getCurrentMaxLineLength ()
   && (isInline item
       || (body.StartLine = body.EndLine
-          && findCommentsBetween keyword body |> Option.isNone))
+          && findCommentsBetween keyword body |> Option.isNone
+          && findDirectivesBetween keyword body |> Option.isNone))
 
 /// The shared body of the two keyword-group checks. Fitting on one line comes
 /// first: when every body in the group could sit beside its keyword, every one

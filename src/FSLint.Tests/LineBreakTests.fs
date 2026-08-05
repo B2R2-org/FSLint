@@ -1189,6 +1189,38 @@ type TestClass(aaa: int, bbb: int
                    AnExtremelyLongTypeNameLandingJustPastTheLastColumn>) = x
 """
 
+  /// A compiler directive between a keyword and its body cannot move, so the
+  /// body cannot come up past it however much room the line has left, and the
+  /// whole group settles on the broken layout.
+  let goodDirectiveInGapTest =
+    """
+    let func x =
+      match x with
+      | 1 ->
+#if DEBUG
+        printfn "good"
+#else
+        printfn "good2"
+#endif
+      | _ ->
+        printfn "good3"
+"""
+
+  /// ... and with the group settled that way, the case left inline is the one
+  /// reported.
+  let badDirectiveInGapTest =
+    """
+    let func x =
+      match x with
+      | 1 ->
+#if DEBUG
+        printfn "bad"
+#else
+        printfn "bad2"
+#endif
+      | _ -> printfn "bad3"
+"""
+
   /// A closing bracket that opens a line joins tight when the list closes up,
   /// so 'Map<int, string>' is measured at the width it would really have.
   let badClosingBracketOwnLineTest =
@@ -1463,6 +1495,12 @@ type TestClass(aaa: int, bbb: int
     lintErrors badTrailingBracketBreakTest
     |> List.filter (fun e -> e.Message = "Remove unnecessary line break")
     |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A body reachable only through a compiler directive stays where it is.
+  [<TestMethod>]
+  member _.``[LineBreak] Directive In Gap Test``() =
+    lint goodDirectiveInGapTest
+    lintAssertMsg "Use consistent line breaks" badDirectiveInGapTest
 
   [<TestMethod>]
   member _.``[LineBreak] Closing Bracket On Own Line Test``() =

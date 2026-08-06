@@ -386,8 +386,7 @@ let changeToAliasOfLDM bin =
 
   /// A chain of two links has one gap, and one gap always agrees with itself.
   [<TestMethod>]
-  member _.``[IfThenElse] Two Link Chain Test``() =
-    lint goodTwoLinkWideTest
+  member _.``[IfThenElse] Two Link Chain Test``() = lint goodTwoLinkWideTest
 
   /// The links settle the shape before the bodies do, so a chain wrong on
   /// both counts is reported once, not twice.
@@ -424,8 +423,9 @@ let changeToAliasOfLDM bin =
       "  struct (Op.POP, OD.OprRegs)\n" +
       "  else\n" +
       "  struct (Op.LDM, OD.OprRnRegsA)\n"
-    try lintErrors source |> ignore with
-    | ex ->
+    try
+      lintErrors source |> ignore
+    with ex ->
       (* A lint report is a fine outcome; falling through to the catch-all
          'TODO' of the expression walker is not. *)
       StringAssert.DoesNotMatch(ex.Message, System.Text.RegularExpressions

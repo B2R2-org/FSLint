@@ -400,8 +400,7 @@ let fn (opcode: 'Op when 'Op: enum< int >) = opcode
     lintAssert badEmptyParenTest
 
   [<TestMethod>]
-  member _.``Type Annotation Extern Decl Test``() =
-    lint goodExternDeclTest
+  member _.``Type Annotation Extern Decl Test``() = lint goodExternDeclTest
 
   [<TestMethod>]
   member _.``Type Annotation Int Array Test``() =

@@ -159,6 +159,8 @@ and checkTypeInternal src synType =
     collectRangeOfFirstAndLastType typeArgs
     |> checkBracketRanges src lessRange greaterRange
     List.iter (checkTypeInternal src) typeArgs
+  | SynType.WithGlobalConstraints(typeName = constrained) ->
+    checkTypeInternal src constrained
   | _ ->
     ()
 
@@ -424,6 +426,8 @@ let extractColonPairs synType =
       loop usedType acc
     | SynType.WithNull(innerType = innerType) ->
       loop innerType acc
+    | SynType.WithGlobalConstraints(typeName = constrained) ->
+      loop constrained acc
     | synType ->
       warn $"[TypeAnnotation] Unhandled SynType case: {synType.GetType().Name}"
       acc
@@ -496,7 +500,12 @@ let checkWithNullBarSpacing src (innerType: SynType) (barRange: range) =
   else
     ()
 
-let checkPat src (pat: SynPat) = function
+/// A `when` clause inside an annotation wraps the type it constrains, so the
+/// wrapper is peeled off and the type underneath is judged as it would be on
+/// its own. The constraints themselves carry no rule of their own yet.
+let rec checkPat src (pat: SynPat) = function
+  | SynType.WithGlobalConstraints(typeName = constrained) ->
+    checkPat src pat constrained
   | SynType.LongIdent(SynLongIdent(ids, _, _)) when not (List.isEmpty ids) ->
     Range.unionRanges (List.head ids).idRange (List.last ids).idRange
     |> checkColonSpace src pat.Range

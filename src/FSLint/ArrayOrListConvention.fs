@@ -133,10 +133,8 @@ let checkEmpty src enclosureWidth (expr: SynExpr list) (range: range) =
 let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
   if isStrict &&
     src.GetLineString(range.StartLine - 1).TrimStart().StartsWith "let"
-  then
-    reportWarn src range "Move bracket to next line after binding"
-  else
-    ()
+  then reportWarn src range "Move bracket to next line after binding"
+  else ()
 
 /// Checks proper one element per line in multi-line list/array literals.
 let checkSingleElementPerLine src (elemRanges: Range list) =

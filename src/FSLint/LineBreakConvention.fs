@@ -44,17 +44,25 @@ let private isClosable src (span: range) =
   && (findDirectivesBetween span.StartRange span.EndRange |> Option.isNone)
 
 /// Every gap between neighbours must agree: either they all carry a line break
-/// or none of them does.
-let private checkGapAgreement src ranges =
+/// or none of them does. The first gap to break ranks with the rest takes the
+/// report. Returns true when it reported, so that the caller can leave its
+/// finer checks alone: a stretch already answering for its own shape has
+/// nothing further to say about the pieces inside it.
+let checkGapAgreement src ranges =
   let gaps = ranges |> List.pairwise
   match gaps with
   | first :: _ ->
     let firstIsBroken = isBrokenGap first
     gaps
     |> List.tryFind (fun gap -> isBrokenGap gap <> firstIsBroken)
-    |> Option.iter (fun (_, next) -> reportWarn src next Message)
+    |> function
+      | Some(_, next) ->
+        reportWarn src next Message
+        true
+      | None ->
+        false
   | [] ->
-    ()
+    false
 
 /// Reports a construct spread over several lines though the whole of it would
 /// close up onto one inside the line budget. `span` is everything it occupies,
@@ -88,7 +96,7 @@ let checkBracketedPlacement src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
   elif not (isClosable src span) then
-    checkGapAgreement src ranges
+    checkGapAgreement src ranges |> ignore
   elif span.StartLine <> span.EndLine then
     ranges
     |> List.tryFind (fun (r: range) -> r.StartLine > span.StartLine)
@@ -110,7 +118,7 @@ let checkUniformPlacement src (ranges: range list) =
       |> List.tryFind isBrokenGap
       |> Option.iter (fun (_, next) -> reportNewLine src next)
     else
-      checkGapAgreement src ranges
+      checkGapAgreement src ranges |> ignore
   | _ ->
     ()
 

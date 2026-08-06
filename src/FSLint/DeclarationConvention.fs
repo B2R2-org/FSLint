@@ -23,10 +23,8 @@ let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   if lastLineStr.TrimStart().StartsWith "[<"
     && lastLineStr.TrimStart().EndsWith ">]"
     && normalCase = 2
-  then
-    normalCase - 1
-  else
-    normalCase
+  then normalCase - 1
+  else normalCase
 
 let checkEqualSpacing src patRange equalRange bodyRange retInfo =
   let patRange =

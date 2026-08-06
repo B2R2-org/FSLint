@@ -63,14 +63,16 @@ type LineBreakTests() =
     if foo && bar && baz then printfn "good" else printfn "good2"
 """
 
+  /// A condition too long for its line breaks across several; the branches
+  /// below it answer to their own widths, not to the condition's.
   let goodConditionBrokenTest =
     """
     if isSomethingRatherLongHere &&
        isAnotherRatherLongCondition &&
        isYetAnotherLongCondition then
-      printfn "good"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "good2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// Short enough to close up onto one line, and so it has to.
@@ -90,9 +92,9 @@ type LineBreakTests() =
     if isSomethingRatherLongHere &&
        isAnotherRatherLongCondition ||
        isYetAnotherLongCondition then
-      printfn "good"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "good2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// Parentheses mark a nested group, so the parenthesised operand is judged on
@@ -101,9 +103,9 @@ type LineBreakTests() =
     """
     if (isSomethingRatherLongHere && isAnotherRatherLongCondition) ||
        isYetAnotherLongCondition then
-      printfn "good"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "good2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// Without parentheses the '&&' separator is un-broken while the '||' one is
@@ -113,18 +115,18 @@ type LineBreakTests() =
     """
     if isSomethingRatherLongHere && isAnotherRatherLongCondition ||
        isYetAnotherLongCondition then
-      printfn "bad"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "bad2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   let badConditionTest =
     """
     if isSomethingRatherLongHere && isAnotherRatherLongCondition &&
        isYetAnotherLongCondition then
-      printfn "bad"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "bad2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   let goodCaseInlineTest =
@@ -294,12 +296,28 @@ type TestClass(lookup: Map<int, string,
   /// inside the budget, so the 'if' cannot be written on one line at all and
   /// every branch body has to break with it. Leaving them beside their keywords
   /// is reported.
-  let badBrokenConditionInlineBranchTest =
+  /// Where the operands of a condition sit and where a body sits beside its
+  /// 'then' are separate questions. A condition too long for one line leaves
+  /// its branches free to answer as they would have anyway, and bodies that
+  /// fit beside their keywords belong beside them.
+  let goodBrokenConditionInlineBranchTest =
     """
     if isSomethingRatherLongHere &&
        isAnotherRatherLongCondition &&
        isYetAnotherLongCondition then printfn "good"
     else printfn "good2"
+"""
+
+  /// The same condition with branches that could have come up beside their
+  /// keywords but did not.
+  let badBrokenConditionBrokenBranchTest =
+    """
+    if isSomethingRatherLongHere &&
+       isAnotherRatherLongCondition &&
+       isYetAnotherLongCondition then
+      printfn "short"
+    else
+      printfn "short2"
 """
 
   /// A condition that fits on one line does not oblige its branches either way,
@@ -679,9 +697,9 @@ type Record =
     """
     if isSomethingRatherLongHere || isAnotherRatherLongCondition ||
        isYetAnotherLongCondition then
-      printfn "bad"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "bad2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// Each 'elif' link carries a condition group of its own, and a break in any
@@ -689,12 +707,12 @@ type Record =
   let badElifConditionTest =
     """
     if foo then
-      printfn "bad"
+      printfn "a message that is much too long to sit beside its keyword here"
     elif isSomethingRatherLongHere && isAnotherRatherLongCondition &&
          isYetAnotherLongCondition then
-      printfn "bad2"
+      printfn "another message far too long to sit beside its keyword as well"
     else
-      printfn "bad3"
+      printfn "a third message also too long to sit beside its keyword here"
 """
 
   /// Four operands with the disagreement in the middle.
@@ -703,9 +721,9 @@ type Record =
     if aLongConditionOne &&
        aLongConditionTwo && aLongConditionThree &&
        aLongConditionFour then
-      printfn "bad"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "bad2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// An operand may span lines of its own; the outer separators still have to
@@ -715,9 +733,9 @@ type Record =
     if someFunction (aaaaaaaaaa,
                      bbbbbbbbbb) && anotherRatherLongCondition &&
        aThirdRatherLongCondition then
-      printfn "bad"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "bad2"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// Three cases with the disagreement in the middle.
@@ -884,10 +902,6 @@ type TestClass(lookup: Map<AnExtremelyLongKeyTypeNameHere,
                            AnExtremelyLongExtraTypeName>) =
   member _.Lookup = lookup
 """
-
-  (* --------------------------------------------------------------------- *)
-  (* Fitting on one line comes before agreeing on a layout.                 *)
-  (* --------------------------------------------------------------------- *)
 
   /// Both branches would fit beside their keywords, so breaking them out is
   /// reported even though the two agree with each other perfectly well.
@@ -1297,9 +1311,9 @@ type TestClass(aaa: int, bbb: int
     elif isSomethingRatherLongHere &&
          isAnotherRatherLongCondition &&
          isYetAnotherLongCondition then
-      printfn "bad2"
+      printfn "a message that is much too long to sit beside its keyword here"
     else
-      printfn "bad3"
+      printfn "another message far too long to sit beside its keyword as well"
 """
 
   /// However much room the line has left, a '|' never comes up to join the
@@ -1346,14 +1360,15 @@ type TestClass(aaa: int, bbb: int
   member _.``[LineBreak] Condition Line Break Test(3)``() =
     lintAssertMsg "Use consistent line breaks" badConditionFirstBreakTest
 
-  /// A broken condition settles the branches; an unbroken one leaves them to
-  /// their own widths.
+  /// A condition's own layout settles nothing about its branches: broken or
+  /// not, each body answers to whether it fits beside its keyword.
   [<TestMethod>]
   member _.``[LineBreak] Group Independence Test``() =
     lint goodBranchInlineTest
     lint goodInlineConditionBrokenBranchTest
-    lintAssertMsg "Use consistent line breaks"
-      badBrokenConditionInlineBranchTest
+    lint goodBrokenConditionInlineBranchTest
+    lintAssertMsg "Remove unnecessary line break"
+      badBrokenConditionBrokenBranchTest
     lintAssertMsg "Remove unnecessary line break"
       badInlineConditionInlineBranchTest
 

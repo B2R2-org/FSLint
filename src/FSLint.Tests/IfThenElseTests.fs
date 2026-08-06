@@ -121,6 +121,163 @@ let fn v =
   if v = 0L then 1us elif v = 1L then  2us else 3us
 """
 
+  /// Neither spelling of a chain too wide to close up has anything to answer
+  /// for, and the two must answer alike.
+  let goodWideElifSpellingTest =
+    """
+let fn oldType newType =
+  if oldType < newType then true
+  elif oldType = newType then false
+  else castErr newType oldType
+"""
+
+  let goodWideElseIfSpellingTest =
+    """
+let fn oldType newType =
+  if oldType < newType then true
+  else if oldType = newType then false
+  else castErr newType oldType
+"""
+
+  /// A chain that does close up is still held to it, in either spelling.
+  let badNarrowElifSpellingTest =
+    """
+let fn v =
+  if v = 0 then 1
+  elif v = 1 then 2
+  else 3
+"""
+
+  let badNarrowElseIfSpellingTest =
+    """
+let fn v =
+  if v = 0 then 1
+  else if v = 1 then 2
+  else 3
+"""
+
+  let goodNarrowInlineElseIfTest =
+    """
+let fn v = if v = 0 then 1 else if v = 1 then 2 else 3
+"""
+
+  /// An 'else' handing its body a line of its own opens a nested expression
+  /// rather than carrying the chain on, and the whole of it still closes up.
+  let badNestedUnderElseTest =
+    """
+let fn v =
+  if v = 0 then 1
+  else
+    if v = 1 then 2 else 3
+"""
+
+  /// The head breaks away and the tail shares a line, in either spelling.
+  let badMixedLinksTailTest =
+    """
+let fn oldType newType =
+  if oldType < newType then true
+  else if oldType = newType then false else castErr newType oldType
+"""
+
+  let badMixedLinksTailElifTest =
+    """
+let fn oldType newType =
+  if oldType < newType then true
+  elif oldType = newType then false else castErr newType oldType
+"""
+
+  /// The same disagreement read the other way round.
+  let badMixedLinksHeadTest =
+    """
+let fn oldType newType =
+  if oldType < newType then true else if oldType = newType then false
+  else castErr newType oldType
+"""
+
+  /// Two links leave a single gap, which has nothing to disagree with.
+  let goodTwoLinkWideTest =
+    """
+let fn someLongName anotherLongName =
+  if someLongName < anotherLongName then someLongName
+  else castTypeError anotherLongName someLongName
+"""
+
+  /// A body broken onto its own line alongside links that disagree: the links
+  /// are the outer question and answer for it alone.
+  let badMixedLinksBrokenBodyTest =
+    """
+let fn oldType newType =
+  if oldType < newType then
+    true
+  elif oldType = newType then false else castErr newType oldType
+"""
+
+  /// The condition runs over three lines; the bodies still fit beside their
+  /// keywords, and so belong there.
+  let goodBrokenConditionInlineBodyTest =
+    """
+let changeToAliasOfLDM bin =
+  if (wbackW bin)
+    && (pickFour bin 16 = 0b1101u)
+    && (bitCount (extract bin 15 0) 15 > 1)
+  then struct (Op.POP, OD.OprRegs)
+  else struct (Op.LDM, OD.OprRnRegsA)
+"""
+
+  /// The same chain with bodies that could have sat beside their keywords but
+  /// were sent below instead.
+  let badBrokenConditionBelowBodyTest =
+    """
+let changeToAliasOfLDM bin =
+  if (wbackW bin)
+    && (pickFour bin 16 = 0b1101u)
+    && (bitCount (extract bin 15 0) 15 > 1)
+  then
+    struct (Op.POP, OD.OprRegs)
+  else
+    struct (Op.LDM, OD.OprRnRegsA)
+"""
+
+  /// One body too wide to sit beside its keyword settles the whole chain on
+  /// the broken layout, and the narrow one goes below with it.
+  let goodOneWideBodyBelowTest =
+    """
+let changeToAliasOfLDM bin =
+  if (wbackW bin)
+    && (pickFour bin 16 = 0b1101u)
+    && (bitCount (extract bin 15 0) 15 > 1)
+  then
+    struct (Op.LDM, OD.OprRnRegsWithRatherMoreBesidesThanCouldEverComeUpHereNow)
+  else
+    struct (Op.POP, OD.OprRegs)
+"""
+
+  /// The narrow one left beside its keyword while the wide one broke away.
+  let badOneWideBodyMixedTest =
+    """
+let changeToAliasOfLDM bin =
+  if (wbackW bin)
+    && (pickFour bin 16 = 0b1101u)
+    && (bitCount (extract bin 15 0) 15 > 1)
+  then
+    struct (Op.LDM, OD.OprRnRegsWithRatherMoreBesidesThanCouldEverComeUpHereNow)
+  else struct (Op.POP, OD.OprRegs)
+"""
+
+  /// A body too wide to come up settles the chain on the broken layout, and a
+  /// broken condition above it changes nothing about that.
+  let goodBrokenConditionWideBodyTest =
+    """
+let changeToAliasOfLDM bin =
+  if (wbackW bin)
+    && (pickFour bin 16 = 0b1101u)
+    && (bitCount (extract bin 15 0) 15 > 1)
+  then
+    struct (Op.POP, OD.OprRegsAndRatherMoreBesidesThatWillNotComeBackUpHereAt)
+  else
+    struct (Op.LDM, OD.OprRnRegsAndJustAsMuchAgainSoThatNeitherWillThisOneNow)
+"""
+
   [<TestMethod>]
   member _.``[IfThenElse] Else Expression not Exist Test``() =
     lint goodElseExprExistTest
@@ -175,3 +332,94 @@ let fn v =
   member _.``[IfThenElse] Inline Chain No Rule Conflict Test``() =
     lintErrors goodInlineElifChainTest
     |> fun errors -> Assert.AreEqual<int>(0, errors.Length)
+
+  /// A chain too wide to close up is left alone however its links are spelled.
+  [<TestMethod>]
+  member _.``[IfThenElse] Wide Chain Spelling Test``() =
+    lint goodWideElifSpellingTest
+    lint goodWideElseIfSpellingTest
+
+  /// One that does close up is held to it however its links are spelled.
+  [<TestMethod>]
+  member _.``[IfThenElse] Narrow Chain Spelling Test``() =
+    lintAssertMsg "Remove unnecessary line break" badNarrowElifSpellingTest
+    lintAssertMsg "Remove unnecessary line break" badNarrowElseIfSpellingTest
+    lint goodNarrowInlineElseIfTest
+
+  /// The two spellings must agree exactly, or the budget lands on one half of
+  /// an 'else if' chain and tears it in two.
+  [<TestMethod>]
+  member _.``[IfThenElse] Chain Spellings Agree Test``() =
+    let elifErrors = lintErrors goodWideElifSpellingTest |> List.length
+    let elseIfErrors = lintErrors goodWideElseIfSpellingTest |> List.length
+    Assert.AreEqual<int>(elifErrors, elseIfErrors)
+    Assert.AreEqual<int>(0, elseIfErrors)
+
+  /// An 'else' that hands its body a line of its own is a nested expression,
+  /// not a chain link, and the whole of it still closes up.
+  [<TestMethod>]
+  member _.``[IfThenElse] Nested Under Else Test``() =
+    lintAssertMsg "Remove unnecessary line break" badNestedUnderElseTest
+
+  /// Links that disagree are reported though the chain is too wide to close
+  /// up: closing up half of it is no more consistent than not closing it.
+  [<TestMethod>]
+  member _.``[IfThenElse] Mixed Links Test``() =
+    lintAssertMsg "Use consistent line breaks" badMixedLinksTailTest
+    lintAssertMsg "Use consistent line breaks" badMixedLinksTailElifTest
+    lintAssertMsg "Use consistent line breaks" badMixedLinksHeadTest
+
+  /// Both spellings must agree here too.
+  [<TestMethod>]
+  member _.``[IfThenElse] Mixed Links Spellings Agree Test``() =
+    let elseIf = lintErrors badMixedLinksTailTest |> List.length
+    let elifSpelling = lintErrors badMixedLinksTailElifTest |> List.length
+    Assert.AreEqual<int>(elifSpelling, elseIf)
+    Assert.AreEqual<int>(1, elseIf)
+
+  /// A chain of two links has one gap, and one gap always agrees with itself.
+  [<TestMethod>]
+  member _.``[IfThenElse] Two Link Chain Test``() =
+    lint goodTwoLinkWideTest
+
+  /// The links settle the shape before the bodies do, so a chain wrong on
+  /// both counts is reported once, not twice.
+  [<TestMethod>]
+  member _.``[IfThenElse] Mixed Links Single Report Test``() =
+    lintErrors badMixedLinksBrokenBodyTest
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A condition spread over several lines leaves the bodies to answer for
+  /// their own widths, exactly as an unbroken one would.
+  [<TestMethod>]
+  member _.``[IfThenElse] Broken Condition Body Test``() =
+    lint goodBrokenConditionInlineBodyTest
+    lint goodBrokenConditionWideBodyTest
+    lintAssertMsg "Remove unnecessary line break"
+      badBrokenConditionBelowBodyTest
+
+  /// One body that cannot come up takes the whole chain down with it, rather
+  /// than leaving its narrow sibling beside a keyword on its own.
+  [<TestMethod>]
+  member _.``[IfThenElse] One Wide Body Takes The Chain Down``() =
+    lint goodOneWideBodyBelowTest
+    lintAssertMsg "Use consistent line breaks" badOneWideBodyMixedTest
+
+  /// Input the parser could make nothing of reaches the rules as an error
+  /// node, and no rule may fall over on it.
+  [<TestMethod>]
+  member _.``[IfThenElse] Unparsable Chain Does Not Throw``() =
+    let source =
+      "let fn bin =\n" +
+      "  if (wbackW bin)\n" +
+      "    && (pickFour bin 16 = 0b1101u)\n" +
+      "  then\n" +
+      "  struct (Op.POP, OD.OprRegs)\n" +
+      "  else\n" +
+      "  struct (Op.LDM, OD.OprRnRegsA)\n"
+    try lintErrors source |> ignore with
+    | ex ->
+      (* A lint report is a fine outcome; falling through to the catch-all
+         'TODO' of the expression walker is not. *)
+      StringAssert.DoesNotMatch(ex.Message, System.Text.RegularExpressions
+                                              .Regex "checkExpression TODO")

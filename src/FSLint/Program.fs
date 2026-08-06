@@ -309,8 +309,11 @@ and checkExpression src = function
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _
   | SynExpr.DiscardAfterMissingQualificationAfterDot _
-  | SynExpr.FromParseError _ ->
-    () (* no need to check this *)
+  | SynExpr.FromParseError _
+  | SynExpr.ArbitraryAfterError _ ->
+    (* The parser could make nothing of this, so neither can any rule below
+       it. The syntax error itself is the report the file needs. *)
+    ()
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
 

@@ -1,6 +1,5 @@
 module B2R2.FSLint.IfThenElseConvention
 
-open System
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
@@ -127,29 +126,19 @@ let private checkConditionLayout src ifExpr =
   |> List.map (fun (operand: SynExpr) -> operand.Range)
   |> LineBreakConvention.checkUniformPlacement src
 
+/// An `elif` chain hands its `else` to the nested link that ends it, so every
+/// link above that one has an else expression without an `else` keyword of its
+/// own. Only a link holding neither is the one truly missing its else, and the
+/// absent expression says so on its own, whatever line the chain is laid on.
 let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
   if isStrict then
     checkBranchLayout src ifExpr thenExpr elseExpr range trivia
     checkConditionLayout src ifExpr
-    match (trivia: SynExprIfThenElseTrivia).ElseKeyword with
-    | Some _ ->
-      checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
+    match elseExpr with
+    | Some elseBody ->
+      checkKeywordSpacing src ifExpr thenExpr elseBody trivia
     | None ->
-      let line =
-        (src: ISourceText).GetLineString (thenExpr: SynExpr).Range.EndLine
-      if line.TrimStart().StartsWith "elif" && Option.isSome elseExpr then
-        checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
-      elif line.TrimStart().StartsWith "else" && Option.isSome elseExpr then
-        checkKeywordSpacing src ifExpr thenExpr elseExpr.Value trivia
-      elif line.TrimStart().StartsWith "(*"
-        || line.TrimStart().StartsWith "///" then
-        Range.mkRange "" thenExpr.Range.Start (range: range).End
-        |> (src: ISourceText).GetSubTextFromRange
-        |> fun thenToEndStr ->
-          if thenToEndStr.Contains "else " then ()
-          elif thenToEndStr.Contains("else" + Environment.NewLine) then ()
-          else reportWarn src trivia.IfToThenRange "Add else expression"
-      else
-        reportWarn src trivia.IfToThenRange "Add else expression"
+      reportWarn src (trivia: SynExprIfThenElseTrivia).IfToThenRange
+        "Add else expression"
   else
     ()

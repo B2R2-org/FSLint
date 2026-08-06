@@ -115,6 +115,33 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   else
     ()
 
+/// A binding whose body was broken below the '=' though the whole of it would
+/// close up onto one line inside the budget belongs on that one line.
+///
+/// Only a body already sitting on a single line can come up at all: one spread
+/// over lines of its own, a sequence or a match say, is not free to join the
+/// '=' however narrow its widest line reads. The header has to be on one line
+/// too, or what broke is the parameter list rather than the body, and that
+/// answers for itself elsewhere. A computation expression is held below the
+/// '=' by a rule of its own and is left to it.
+let checkBodyPlacement src (binding: SynBinding) =
+  let SynBinding(headPat = pat; expr = body; trivia = trivia) = binding
+  match body with
+  | SynExpr.ComputationExpr _
+  | SynExpr.App(argExpr = SynExpr.ComputationExpr _) ->
+    ()
+  | _ ->
+    match trivia.EqualsRange with
+    | Some equals when
+        (pat: SynPat).Range.StartLine = pat.Range.EndLine
+        && equals.StartLine = pat.Range.StartLine
+        && body.Range.StartLine = body.Range.EndLine ->
+      Range.unionRanges pat.Range body.Range
+      |> fun span -> LineBreakConvention.checkClosesUp src span [ body.Range ]
+      |> ignore
+    | _ ->
+      ()
+
 let checkSingleBlankLine (src: ISourceText) decls =
   if isStrict then
     decls

@@ -8,18 +8,21 @@ type TryWithTests() =
   [<TestMethod>]
   member _.``[TryWith] Single case without bar - good``() =
     "let test () =\n" +
+    "  printfn \"start\"\n" +
     "  try riskyOp () with ex -> printfn \"error\"\n"
     |> lint
 
   [<TestMethod>]
   member _.``[TryWith] Single specific exception without bar - good``() =
     "let test () =\n" +
+    "  printfn \"start\"\n" +
     "  try riskyOp () with :? System.IO.IOException as ex -> printfn \"IO\"\n"
     |> lint
 
   [<TestMethod>]
   member _.``[TryWith] Single wildcard without bar - good``() =
     "let test () =\n" +
+    "  printfn \"start\"\n" +
     "  try riskyOp () with _ -> printfn \"error\"\n"
     |> lint
 

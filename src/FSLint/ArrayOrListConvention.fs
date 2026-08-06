@@ -230,8 +230,7 @@ let checkMultiLine src range = function
     ()
 
 let check src isArray (fRange: Range) expr =
-  let elemRangeAdjusted, hasCommentInFront =
-    adjustRangeByComment fRange expr
+  let elemRangeAdjusted, hasCommentInFront = adjustRangeByComment fRange expr
   checkCommon src isArray fRange elemRangeAdjusted
   checkSymmetry src elemRangeAdjusted fRange hasCommentInFront
   if fRange.StartLine = fRange.EndLine then checkSingleLine src expr

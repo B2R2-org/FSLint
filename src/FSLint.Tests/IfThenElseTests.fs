@@ -59,12 +59,14 @@ type IfThenElseTests() =
   let goodInlineElifChainTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then 1us elif v = 1L then 2us else 3us
 """
 
   let goodInlineIfElseTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then 1us else 2us
 """
 
@@ -93,12 +95,14 @@ let fn v =
   let badInlineNoElseTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then printfn "zero"
 """
 
   let badInlineElifNoElseTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then printfn "zero" elif v = 1L then printfn "one"
 """
 
@@ -106,18 +110,21 @@ let fn v =
   let badInlineElseSpacingTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then 1us elif v = 1L then 2us else  3us
 """
 
   let badInlineElifSpacingTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then 1us elif  v = 1L then 2us else 3us
 """
 
   let badInlineThenSpacingTest =
     """
 let fn v =
+  printfn "checking"
   if v = 0L then 1us elif v = 1L then  2us else 3us
 """
 

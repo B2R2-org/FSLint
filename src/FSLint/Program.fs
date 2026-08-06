@@ -488,6 +488,7 @@ and checkBinding src case binding =
   else
     ()
   DeclarationConvention.checkComputationExprPlacement src binding
+  DeclarationConvention.checkBodyPlacement src binding
   TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat

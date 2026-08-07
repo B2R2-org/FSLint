@@ -62,8 +62,14 @@ type LspServer(rpc: JsonRpc) =
       setCurrentFile uri
       try
         match LineConvention.check sourceText content with
-        | Ok() -> parseFile sourceText uri |> Program.checkWithAST sourceText
-        | _ -> ()
+        | Ok() ->
+          setDirectiveLines (directiveLinesOf sourceText)
+          beginReadings ()
+          parseFile sourceText uri
+          |> List.iter (Program.checkWithAST sourceText)
+          reportAgreedJoins sourceText
+        | _ ->
+          ()
       with :? LintException as ex ->
         eprintfn "[LINT] LintException: %s" ex.Message
       setCurrentLintContext None
@@ -136,9 +142,8 @@ type LspServer(rpc: JsonRpc) =
         diagnosticsArray.Add(diagObj)
       rpc.NotifyWithParameterObjectAsync(
         "textDocument/publishDiagnostics",
-        JObject(
-          JProperty("uri", uri),
-          JProperty("diagnostics", diagnosticsArray)))
+        JObject(JProperty("uri", uri),
+                JProperty("diagnostics", diagnosticsArray)))
     with ex ->
       eprintfn "[LSP] ERROR publishing diagnostics: %s" ex.Message
       eprintfn "[LSP] STACK: %s" ex.StackTrace
@@ -155,7 +160,8 @@ type LspServer(rpc: JsonRpc) =
             eprintfn "[SCAN] ERROR: Directory does not exist: %s" root
           else
             let fsFiles =
-              Directory.EnumerateFiles(root, "*.fs",
+              Directory.EnumerateFiles(root,
+                                       "*.fs",
                                        SearchOption.AllDirectories)
               |> Seq.filter (fun path ->
                 not (path.Contains("node_modules") ||
@@ -307,11 +313,7 @@ type LspServer(rpc: JsonRpc) =
               JProperty("save", JObject(JProperty("includeText", true)))
             )
           ),
-          JProperty("workspace",
-            JObject(
-              JProperty("configuration", true)
-            )
-          )
+          JProperty("workspace", JObject(JProperty("configuration", true)))
         )
       ),
       JProperty("serverInfo",

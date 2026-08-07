@@ -100,6 +100,34 @@ let getProjOrSlnFiles (root: string) =
   |> Seq.sort
   |> Seq.toArray
 
+/// The symbols named by the `#if` and `#elif` directives of a file.
+let private conditionalSymbols (src: ISourceText) =
+  let namesOf (line: string) =
+    Regex.Matches(line, "[A-Za-z_][A-Za-z0-9_]*")
+    |> Seq.map (fun m -> m.Value)
+    |> Seq.filter (fun name -> name <> "if" && name <> "elif")
+    |> Seq.toList
+  [ 0 .. src.GetLineCount() - 1 ]
+  |> List.map (fun i -> src.GetLineString(i).TrimStart())
+  |> List.filter (fun line ->
+    line.StartsWith "#if " || line.StartsWith "#elif ")
+  |> List.collect namesOf
+  |> List.distinct
+
+/// The lines the conditional-compilation directives of the file sit on.
+let directiveLinesOf (src: ISourceText) =
+  [ 0 .. src.GetLineCount() - 1 ]
+  |> List.map (fun i -> i, src.GetLineString(i).TrimStart())
+  |> List.filter (fun (_, line) ->
+    line.StartsWith "#if" || line.StartsWith "#else"
+    || line.StartsWith "#elif" || line.StartsWith "#endif")
+  |> List.map (fun (i, _) -> i + 1)
+
+/// Parses the file as the compiler would see it, and again with every symbol
+/// its `#if` directives name defined. A branch left out of the first parse is
+/// absent from that tree altogether and no rule can reach it, so the second
+/// parse brings it in; between the two, both sides of a plain `#if`/`#else`
+/// are read. A file naming no symbols is parsed once.
 let parseFile src (path: string) =
   let checker = FSharpChecker.Create()
   let projOptions, _ =
@@ -107,6 +135,15 @@ let parseFile src (path: string) =
     |> Async.RunSynchronously
   let parsingOptions, _ =
     checker.GetParsingOptionsFromProjectOptions projOptions
-  checker.ParseFile(path, src, parsingOptions)
-  |> Async.RunSynchronously
-  |> fun r -> r.ParseTree
+  let parseWith (options: FSharpParsingOptions) =
+    checker.ParseFile(path, src, options)
+    |> Async.RunSynchronously
+    |> fun r -> r.ParseTree
+  match conditionalSymbols src with
+  | [] ->
+    [ parseWith parsingOptions ]
+  | symbols ->
+    let withSymbols =
+      { parsingOptions with
+          ConditionalDefines = symbols @ parsingOptions.ConditionalDefines }
+    [ parseWith parsingOptions; parseWith withSymbols ]

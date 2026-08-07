@@ -3,6 +3,14 @@ module B2R2.FSLint.TupleConvention
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
+/// Every element of a tuple must either share one line or each sit on a line
+/// of its own, as the operands of any other separator list do. One short
+/// enough to close up onto a single line has to be closed up first.
+let checkPlacement src (exprs: SynExpr list) =
+  exprs
+  |> List.map (fun (expr: SynExpr) -> expr.Range)
+  |> LineBreakConvention.checkUniformPlacement src
+
 let check (src: ISourceText) (exprs: SynExpr list) commaRanges =
   exprs
   |> List.pairwise

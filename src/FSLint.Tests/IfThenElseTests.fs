@@ -245,6 +245,55 @@ let changeToAliasOfLDM bin =
     struct (Op.LDM, OD.OprRnRegsA)
 """
 
+  /// Parentheses fence off a group of their own, judged on the same terms.
+  /// A group held on one line beside a broken outer chain is in order.
+  let goodParenGroupInlineTest =
+    """
+let fn () =
+  if isSomethingRatherLongHere
+    && (isAnotherLongCondition || isYetAnotherLongCondition) then
+    printfn "a message that is much too long to sit beside its keyword here"
+  else
+    printfn "another message far too long to sit beside its keyword as well"
+"""
+
+  /// The whole condition is one parenthesised group whose operands disagree.
+  let badWholeParenGroupTest =
+    """
+let fn () =
+  if (isSomethingRatherLongHere || isAnotherLongCondition
+      || isYetAnotherLongCondition || isTheFourthLongCondition
+      && isTheFifthLongCondition) then
+    printfn "a message that is much too long to sit beside its keyword here"
+  else
+    printfn "another message far too long to sit beside its keyword as well"
+"""
+
+  /// A nested group whose operands disagree, though the outer chain agrees.
+  let badNestedParenGroupTest =
+    """
+let fn () =
+  if isSomethingRatherLongHere
+    && (isAnotherLongCondition || isYetAnotherLongCondition
+        || isTheFourthLongCondition) then
+    printfn "a message that is much too long to sit beside its keyword here"
+  else
+    printfn "another message far too long to sit beside its keyword as well"
+"""
+
+  /// The same nested group with every one of its gaps broken.
+  let goodNestedParenGroupBrokenTest =
+    """
+let fn () =
+  if isSomethingRatherLongHere
+    && (isAnotherLongCondition ||
+        isYetAnotherLongCondition ||
+        isTheFourthLongCondition) then
+    printfn "a message that is much too long to sit beside its keyword here"
+  else
+    printfn "another message far too long to sit beside its keyword as well"
+"""
+
   /// One body too wide to sit beside its keyword settles the whole chain on
   /// the broken layout, and the narrow one goes below with it.
   let goodOneWideBodyBelowTest =
@@ -410,6 +459,15 @@ let changeToAliasOfLDM bin =
   member _.``[IfThenElse] One Wide Body Takes The Chain Down``() =
     lint goodOneWideBodyBelowTest
     lintAssertMsg "Use consistent line breaks" badOneWideBodyMixedTest
+
+  /// What stands inside parentheses is a group of its own and answers for
+  /// itself, whatever the chain around it does.
+  [<TestMethod>]
+  member _.``[IfThenElse] Paren Condition Group Test``() =
+    lint goodParenGroupInlineTest
+    lint goodNestedParenGroupBrokenTest
+    lintAssertMsg "Use consistent line breaks" badWholeParenGroupTest
+    lintAssertMsg "Use consistent line breaks" badNestedParenGroupTest
 
   /// Input the parser could make nothing of reaches the rules as an error
   /// node, and no rule may fall over on it.

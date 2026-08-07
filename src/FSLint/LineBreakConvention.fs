@@ -152,19 +152,47 @@ let private isJoinable src ((keyword, body) as item) =
 /// first: when every body in the group could sit beside its keyword, every one
 /// of them has to, and only once at least one cannot does the group fall back
 /// to the weaker demand that all of them break away.
+/// The group's own range, taken from the keyword opening it. That keyword
+/// stands in every build alike, so it names the group across the readings
+/// even where the bodies below it do not match.
+let private groupRange (items: (range * range) list) = items |> List.head |> fst
+
+/// True when a conditional directive stands inside the group, so that its
+/// members are not the same set in every build.
+let private spansDirective (items: (range * range) list) =
+  match items with
+  | (firstKeyword, _) :: _ ->
+    let last = items |> List.map (fun (_, body: range) -> body.EndLine)
+    straddlesDirective firstKeyword.StartLine (List.max last)
+  | [] ->
+    false
+
+/// Whether every body of a group could sit beside its keyword is a question
+/// with a different answer per build once a directive stands inside it, so a
+/// group reaching across one does not answer for the file on its own: its
+/// demand is held back until every build has been read, and raised only if
+/// every one of them made it. A build that can close up thus asks nothing of
+/// a build that cannot, while a group every build can close up is still
+/// closed up.
 let private checkGroup src joinable items =
   if not isStrict || List.isEmpty items then
     ()
-  elif joinable && items |> List.forall (isJoinable src) then
-    items
-    |> List.tryFind (isInline >> not)
-    |> Option.iter (fun (_, body) -> reportNewLine src body)
-  elif List.length items > 1 then
-    items
-    |> List.tryFind isInline
-    |> Option.iter (fun (_, body) -> reportWarn src body Message)
   else
-    ()
+    let canJoin = joinable && items |> List.forall (isJoinable src)
+    let straddles = spansDirective items
+    if straddles && not canJoin then blockJoin (groupRange items) else ()
+    if canJoin then
+      items
+      |> List.tryFind (isInline >> not)
+      |> Option.iter (fun (_, body) ->
+        if straddles then deferJoin (groupRange items) body
+        else reportNewLine src body)
+    elif List.length items > 1 then
+      items
+      |> List.tryFind isInline
+      |> Option.iter (fun (_, body) -> reportWarn src body Message)
+    else
+      ()
 
 /// Judges sibling bodies that hang off a keyword such as '->', 'then' or
 /// 'else'. Each item pairs that keyword's range with the body's range.

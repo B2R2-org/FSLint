@@ -14,10 +14,12 @@ type private Opts =
 
 let private spec =
   [ CmdOpt(descr = "Enforce strict linting rules.",
-           short = "-s", long = "--strict",
+           short = "-s",
+           long = "--strict",
            callback = fun opts _ -> { opts with Strict = true })
     CmdOpt(descr = "Enable verbose output.",
-           short = "-v", long = "--verbose",
+           short = "-v",
+           long = "--verbose",
            callback = fun opts _ -> { opts with Verbose = true }) ]
 
 let private defaultOpts = { Strict = false; Verbose = false }
@@ -179,6 +181,7 @@ and checkExpression src = function
     for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple(exprs = exprs; commaRanges = commaRanges) ->
     TupleConvention.check src exprs commaRanges
+    TupleConvention.checkPlacement src exprs
     for expr in exprs do
       FunctionCallConvention.checkMethodParenSpacing src expr
       checkExpression src expr
@@ -648,8 +651,13 @@ let linterForFsWithContext context =
           else
             checkBOM src (path |> File.ReadAllBytes)
           match LineConvention.check src txt with
-          | Ok() -> parseFile src path |> checkWithAST src
-          | _ -> ())
+          | Ok() ->
+            setDirectiveLines (directiveLinesOf src)
+            beginReadings ()
+            parseFile src path |> List.iter (checkWithAST src)
+            reportAgreedJoins src
+          | _ ->
+            ())
         setCurrentLintContext None }
 
 let linterForFs = linterForFsWithContext None

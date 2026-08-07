@@ -135,10 +135,22 @@ let private checkBranchLayout src ifExpr thenExpr elseExpr range trivia =
 
 /// Every operand of a boolean condition must either share one line or each sit
 /// on its own line.
-let private checkConditionLayout src ifExpr =
-  flattenInfixChain ifExpr
-  |> List.map (fun (operand: SynExpr) -> operand.Range)
-  |> LineBreakConvention.checkUniformPlacement src
+///
+/// Parentheses fence off a group of their own. To the chain outside them the
+/// whole parenthesised operand counts as one, however many lines it runs to,
+/// and what stands inside answers separately on the same terms. So a group
+/// held on one line beside a broken outer chain is in order, while operands
+/// disagreeing inside the parentheses are not, whatever the outer chain does.
+let rec private checkConditionLayout src expr =
+  match expr with
+  | SynExpr.Paren(expr = inner) ->
+    checkConditionLayout src inner
+  | _ ->
+    let operands = flattenInfixChain expr
+    operands
+    |> List.map (fun (operand: SynExpr) -> operand.Range)
+    |> LineBreakConvention.checkUniformPlacement src
+    for operand in operands do checkConditionLayout src operand
 
 /// An `elif` chain hands its `else` to the nested link that ends it, so every
 /// link above that one has an else expression without an `else` keyword of its

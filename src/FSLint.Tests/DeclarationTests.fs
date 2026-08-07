@@ -240,6 +240,129 @@ let processData input =
     "  x + 1\n"
     |> lintAssertMsg "Remove unnecessary line break"
 
+  /// A branch left out of the compiler's parse is absent from that tree and
+  /// no rule can reach it, so the file is read a second time with its '#if'
+  /// symbols defined. Both sides answer for themselves.
+  [<TestMethod>]
+  member _.``[Declaration] Inactive conditional branch is checked``() =
+    let source =
+      "#if LT_USE_SET_BUCKET\n" +
+      "let computeDom info v =\n" +
+      "  if info.IsEmpty then ()\n" +
+      "  else computeDomAux info v\n" +
+      "#else\n" +
+      "let computeDom info v =\n" +
+      "  if info.First = -1 then () else computeDomAux info v\n" +
+      "#endif\n"
+    lintErrors source
+    |> List.filter (fun e -> e.Range.StartLine = 4)
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A group reaching across a directive holds different members in each
+  /// build, so whether its bodies could all come up beside their keywords has
+  /// a different answer per build. Only the demand that they agree, which
+  /// every build can meet at once, is put to such a group; the demand that
+  /// they all come up would contradict the build whose body cannot.
+  [<TestMethod>]
+  member _.``[Declaration] Conditional group is asked one thing``() =
+    let clauses body =
+      "let unop op e =\n" +
+      "  match e with\n" +
+      body +
+      "#if ! HASHCONS\n" +
+      "  | _ ->\n" +
+      "    UnOp(op, e, null)\n" +
+      "#else\n" +
+      "  | _ ->\n" +
+      "    let hc = HashConsingInfo()\n" +
+      "    internExpr e hc (Expr.HashUnOp(op, e))\n" +
+      "#endif\n"
+    (* The clause beside its arrow disagrees with the one below, in the build
+       that spreads its body over lines of its own. *)
+    clauses "  | Num(n, _) -> ValueOptimizer.unop n op |> num\n"
+    |> lintAssertMsg "Use consistent line breaks"
+    (* Breaking it settles the matter, and no build asks for it back. *)
+    clauses "  | Num(n, _) ->\n    ValueOptimizer.unop n op |> num\n"
+    |> lint
+
+  /// A build that cannot close up excuses no build from doing so on its own
+  /// account: when every one of them could, every one of them has to.
+  [<TestMethod>]
+  member _.``[Declaration] Conditional group closes up when all can``() =
+    "let f op e =\n" +
+    "  match e with\n" +
+    "  | Num(n, _) ->\n" +
+    "    shortOne n op\n" +
+    "#if ! HASHCONS\n" +
+    "  | _ ->\n" +
+    "    shortTwo op e\n" +
+    "#else\n" +
+    "  | _ ->\n" +
+    "    shortThree op e\n" +
+    "#endif\n"
+    |> lintAssertMsg "Remove unnecessary line break"
+
+  /// Each build names the body standing out of place in it, so bringing one
+  /// of them up leaves the rest still asked for, and the walk down ends with
+  /// nothing left to ask.
+  [<TestMethod>]
+  member _.``[Declaration] Conditional group closes up in every build``() =
+    let clauses shared thumb other =
+      "let f op e =\n  match e with\n" + shared
+      + "#if ! HASHCONS\n" + thumb + "#else\n" + other + "#endif\n"
+    (* The bodies below both directives are named at once, one per build. *)
+    clauses "  | Num(n, _) -> shortOne n op\n"
+      "  | _ ->\n    shortTwo op e\n" "  | _ ->\n    shortThree op e\n"
+    |> lintErrors
+    |> List.filter (fun e -> e.Message = "Remove unnecessary line break")
+    |> fun errors -> Assert.AreEqual<int>(2, errors.Length)
+    (* Bringing one up leaves the other still asked for. *)
+    clauses "  | Num(n, _) -> shortOne n op\n"
+      "  | _ -> shortTwo op e\n" "  | _ ->\n    shortThree op e\n"
+    |> lintAssertMsg "Remove unnecessary line break"
+    (* With every body up, nothing is left to ask. *)
+    clauses "  | Num(n, _) -> shortOne n op\n"
+      "  | _ -> shortTwo op e\n" "  | _ -> shortThree op e\n"
+    |> lint
+
+  /// Code outside the directives is seen by both parses and reported once.
+  [<TestMethod>]
+  member _.``[Declaration] Conditional parse reports no duplicates``() =
+    let source =
+      "let outside v =\n" +
+      "  if v = 0 then 1\n" +
+      "  else 2\n" +
+      "\n" +
+      "#if SOME_SYMBOL\n" +
+      "let inA v = v + 1\n" +
+      "#else\n" +
+      "let inB v = v + 2\n" +
+      "#endif\n"
+    lintErrors source
+    |> List.filter (fun e -> e.Range.StartLine = 3)
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A body too wide to fit beside its keyword is never asked to come up, and
+  /// one already sitting there over the budget takes its whole group down.
+  [<TestMethod>]
+  member _.``[Declaration] Conditional group keeps to the budget``() =
+    let wide =
+      "aRatherLongCallThatRunsPastTheBudgetOnceItSitsBesideItsKeyword"
+      + "HereXX op e"
+    let chain first thumb =
+      "let f op e =\n  match e with\n" + first + "#if ! HASHCONS\n" + thumb
+      + "#else\n  | _ ->\n    shortThree op e\n#endif\n"
+    (* Broken, and bringing it up would overrun: nothing is asked of it. *)
+    chain "  | Num(n, _) ->\n    shortOne n op\n"
+      ("  | _ ->\n    " + wide + "\n")
+    |> lint
+    (* Sitting beside its keyword over the budget: the line answers for its
+       own width, and the group is told to come down besides. *)
+    chain "  | Num(n, _) -> shortOne n op\n" ("  | _ -> " + wide + "\n")
+    |> lintErrors
+    |> List.filter (fun e -> e.Message = "Use consistent line breaks")
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
   /// What broke is the header rather than the body, and the parameter list
   /// answers for that elsewhere.
   [<TestMethod>]

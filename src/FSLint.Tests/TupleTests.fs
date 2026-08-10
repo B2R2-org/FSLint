@@ -183,11 +183,11 @@ match bad with
   member _.``[Tuple] Element Placement Test``() =
     lint TuplePlacementSamples.goodStructTupleTest
     lint TuplePlacementSamples.goodPlainTupleTest
-    lintAssertMsg "Bind this to a let to fit the line"
+    lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badStructTupleTest
-    lintAssertMsg "Bind this to a let to fit the line"
+    lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badStructTupleBrokenTest
-    lintAssertMsg "Bind this to a let to fit the line"
+    lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badPlainTupleTest
 
   /// A parameter list is the other thing entirely: it breaks at every comma,

@@ -178,8 +178,7 @@ module CustomReports =
   let reportNewLine src range =
     reportWarn src range "Remove unnecessary line break"
 
-  let reportBindToLet src range =
-    reportWarn src range "Bind this to a let to fit the line"
+  let reportBindToLet src range = reportWarn src range "Bind to fit the line"
 
   /// Raises the held demands no build objected to, and drops the rest.
   let reportAgreedJoins src =

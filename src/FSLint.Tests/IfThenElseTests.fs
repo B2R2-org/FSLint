@@ -467,9 +467,9 @@ let changeToAliasOfLDM bin =
   [<TestMethod>]
   member _.``[IfThenElse] Paren Condition Group Test``() =
     lint goodParenGroupInlineTest
-    lintAssertMsg "Bind this to a let to fit the line" badWholeParenGroupTest
-    lintAssertMsg "Bind this to a let to fit the line" badNestedParenGroupTest
-    lintAssertMsg "Bind this to a let to fit the line"
+    lintAssertMsg "Bind to fit the line" badWholeParenGroupTest
+    lintAssertMsg "Bind to fit the line" badNestedParenGroupTest
+    lintAssertMsg "Bind to fit the line"
       badNestedParenGroupBrokenTest
 
   /// Input the parser could make nothing of reaches the rules as an error

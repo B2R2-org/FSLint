@@ -124,26 +124,25 @@ type LspServer(rpc: JsonRpc) =
         ()
       let diagnosticsArray = JArray()
       for diag in validDiagnostics do
+        let startPos =
+          JObject(JProperty("line", diag.Range.Start.Line),
+                  JProperty("character", diag.Range.Start.Character))
+        let endPos =
+          JObject(JProperty("line", diag.Range.End.Line),
+                  JProperty("character", diag.Range.End.Character))
+        let range =
+          JObject(JProperty("start", startPos), JProperty("end", endPos))
         let diagObj =
-          JObject(
-            JProperty("range",
-              JObject(
-                JProperty("start",
-                  JObject(
-                    JProperty("line", diag.Range.Start.Line),
-                    JProperty("character", diag.Range.Start.Character))),
-                JProperty("end",
-                  JObject(
-                    JProperty("line", diag.Range.End.Line),
-                    JProperty("character", diag.Range.End.Character))))),
-            JProperty("severity", diag.Severity),
-            JProperty("source", diag.Source),
-            JProperty("message", diag.Message))
+          JObject(JProperty("range", range),
+                  JProperty("severity", diag.Severity),
+                  JProperty("source", diag.Source),
+                  JProperty("message", diag.Message))
         diagnosticsArray.Add(diagObj)
-      rpc.NotifyWithParameterObjectAsync(
-        "textDocument/publishDiagnostics",
+      let payload =
         JObject(JProperty("uri", uri),
-                JProperty("diagnostics", diagnosticsArray)))
+                JProperty("diagnostics", diagnosticsArray))
+      rpc.NotifyWithParameterObjectAsync("textDocument/publishDiagnostics",
+                                         payload)
     with ex ->
       eprintfn "[LSP] ERROR publishing diagnostics: %s" ex.Message
       eprintfn "[LSP] STACK: %s" ex.StackTrace
@@ -303,26 +302,19 @@ type LspServer(rpc: JsonRpc) =
         ()
     else
       ()
-    JObject(
-      JProperty("capabilities",
-        JObject(
-          JProperty("textDocumentSync",
-            JObject(
-              JProperty("openClose", true),
+    let sync =
+      JObject(JProperty("openClose", true),
               JProperty("change", 0),
-              JProperty("save", JObject(JProperty("includeText", true)))
-            )
-          ),
-          JProperty("workspace", JObject(JProperty("configuration", true)))
-        )
-      ),
-      JProperty("serverInfo",
-        JObject(
-          JProperty("name", "FSLint Language Server"),
-          JProperty("version", "1.0.0")
-        )
-      )
-    )
+              JProperty("save", JObject(JProperty("includeText", true))))
+    let workspace = JObject(JProperty("configuration", true))
+    let capabilities =
+      JObject(JProperty("textDocumentSync", sync),
+              JProperty("workspace", workspace))
+    let serverInfo =
+      JObject(JProperty("name", "FSLint Language Server"),
+              JProperty("version", "1.0.0"))
+    JObject(JProperty("capabilities", capabilities),
+            JProperty("serverInfo", serverInfo))
 
   [<JsonRpcMethod("initialized")>]
   member _.Initialized(p: JToken) =

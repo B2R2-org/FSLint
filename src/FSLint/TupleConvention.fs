@@ -3,13 +3,48 @@ module B2R2.FSLint.TupleConvention
 open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 
+/// True when the whole of the tuple would stand on one line inside the line
+/// budget, so that spreading it is a choice rather than a necessity.
+let private tupleSpan (exprs: SynExpr list) =
+  exprs
+  |> List.map (fun (e: SynExpr) -> e.Range)
+  |> List.reduce Range.unionRanges
+
+let private fitsOneLine src exprs =
+  LineBreakConvention.closesUpWithin src (tupleSpan exprs)
+
+/// A tuple of data too wide for its line is not broken at its commas: a list
+/// of them reads as a table, and a row spilling over its neighbours loses the
+/// shape the table is read by. What it wants is a name, so that the row can
+/// stand on one line again. A parameter list is the other thing entirely and
+/// breaks at every comma, which is why the two are told apart first.
+let private checkWidth src (exprs: SynExpr list) isParameterList =
+  if isParameterList || fitsOneLine src exprs then
+    false
+  else
+    tupleSpan exprs |> reportBindToLet src
+    true
+
 /// Every element of a tuple must either share one line or each sit on a line
 /// of its own, as the operands of any other separator list do. One short
 /// enough to close up onto a single line has to be closed up first.
-let checkPlacement src (exprs: SynExpr list) =
-  exprs
-  |> List.map (fun (expr: SynExpr) -> expr.Range)
-  |> LineBreakConvention.checkUniformPlacement src
+let checkPlacement src (exprs: SynExpr list) isParameterList =
+  if checkWidth src exprs isParameterList then
+    ()
+  else
+    exprs
+    |> List.map (fun (expr: SynExpr) -> expr.Range)
+    |> LineBreakConvention.checkUniformPlacement src
+
+/// A tuple standing inside parentheses is judged along with them: the fence
+/// is part of the list, and opening it sends the whole to the block form.
+let checkFencedPlacement src (fence: range) exprs isParameterList =
+  if checkWidth src exprs isParameterList then
+    ()
+  else
+    exprs
+    |> List.map (fun (expr: SynExpr) -> expr.Range)
+    |> LineBreakConvention.checkOpenableFence src fence
 
 let check (src: ISourceText) (exprs: SynExpr list) commaRanges =
   exprs

@@ -34,6 +34,13 @@ module Diagnostics =
   /// Groups some build cannot close up, whatever the others manage.
   let blockedGroups = new AsyncLocal<ResizeArray<range>>()
 
+  /// The expressions standing as the argument of an application. A comma list
+  /// there is a parameter list, which nothing else in the tree tells apart
+  /// from a tuple of data, and the two are not laid out the same way: a
+  /// parameter list too wide for its line breaks at every comma, while a
+  /// tuple of data is asked to be named instead.
+  let applicationArgs = new AsyncLocal<ResizeArray<range>>()
+
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
@@ -44,6 +51,21 @@ module Diagnostics =
   let beginReadings () =
     deferredJoins.Value <- ResizeArray()
     blockedGroups.Value <- ResizeArray()
+    applicationArgs.Value <- ResizeArray()
+
+  let noteApplicationArg (range: range) = applicationArgs.Value.Add range
+
+  /// True when the stretch is an application's argument, and so a parameter
+  /// list rather than a tuple standing on its own.
+  let isApplicationArg (range: range) =
+    match box applicationArgs.Value with
+    | null ->
+      false
+    | _ ->
+      applicationArgs.Value
+      |> Seq.exists (fun (arg: range) ->
+        arg.StartLine = range.StartLine && arg.StartColumn = range.StartColumn
+        && arg.EndLine = range.EndLine && arg.EndColumn = range.EndColumn)
 
   let deferJoin (group: range) (body: range) =
     deferredJoins.Value.Add(group, body)
@@ -155,6 +177,9 @@ module CustomReports =
 
   let reportNewLine src range =
     reportWarn src range "Remove unnecessary line break"
+
+  let reportBindToLet src range =
+    reportWarn src range "Bind this to a let to fit the line"
 
   /// Raises the held demands no build objected to, and drops the rest.
   let reportAgreedJoins src =

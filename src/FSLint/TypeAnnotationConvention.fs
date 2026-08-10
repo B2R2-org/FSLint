@@ -485,17 +485,16 @@ let checkWithNullBarSpacing src (innerType: SynType) (barRange: range) =
   let gap =
     Range.mkRange "" barRange.End (Position.mkPos barRange.EndLine findNullKey)
   let barToFrontOfNullStr = gap |> src.GetSubTextFromRange
-  if innerType.Range.EndLine <> barRange.StartLine
-    && (barToFrontOfNullStr.StartsWith "null"
-    || barToFrontOfNullStr.StartsWith "  ") then
+  let nullFollowsBar =
+    barToFrontOfNullStr.StartsWith "null"
+    || barToFrontOfNullStr.StartsWith "  "
+  if innerType.Range.EndLine <> barRange.StartLine && nullFollowsBar then
     reportBarAfterSpacing src gap
   elif innerType.Range.EndLine = barRange.StartLine
     && innerType.Range.EndColumn + 1 <> barRange.StartColumn then
     Range.mkRange "" innerType.Range.End barRange.Start
     |> reportBarBeforeSpacing src
-  elif innerType.Range.EndLine = barRange.StartLine
-    && (barToFrontOfNullStr.StartsWith "null"
-    || barToFrontOfNullStr.StartsWith "  ") then
+  elif innerType.Range.EndLine = barRange.StartLine && nullFollowsBar then
     reportBarAfterSpacing src gap
   else
     ()

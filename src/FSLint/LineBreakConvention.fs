@@ -43,6 +43,10 @@ let private isClosable src (span: range) =
   && (findCommentsBetween span.StartRange span.EndRange |> Option.isNone)
   && (findDirectivesBetween span.StartRange span.EndRange |> Option.isNone)
 
+/// True when the stretch would stand on one line inside the line budget.
+let closesUpWithin src (span: range) =
+  closedWidth src span <= getCurrentMaxLineLength ()
+
 /// Every gap between neighbours must agree: either they all carry a line break
 /// or none of them does. The first gap to break ranks with the rest takes the
 /// report. Returns true when it reported, so that the caller can leave its
@@ -92,6 +96,7 @@ let checkClosesUp src (span: range) (joints: range list) =
 /// The brackets belong to the stretch because a break landing just inside one
 /// is a break in the list, and with a single element it is the only place a
 /// break can land at all.
+///
 let checkBracketedPlacement src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
@@ -104,6 +109,32 @@ let checkBracketedPlacement src (span: range) ranges =
     |> reportNewLine src
   else
     ()
+
+/// Reports on a list whose fence the author may open into a block. Sending
+/// the first element to a line below the one that opens the fence says the
+/// list is to be read that way, and a block is a layout in its own right: it
+/// is not asked to close up. What it is asked is that the closing bracket
+/// answer the opening one, standing below the last element as the first
+/// stands below the opening, and that the elements between them agree among
+/// themselves. Whether they take one line together or one line each is then
+/// the author's to choose.
+///
+/// A fence left shut is judged as any other bracketed list: it closes up
+/// while it can, and once it cannot its gaps have to agree.
+let checkOpenableFence src (span: range) ranges =
+  if not isStrict || List.isEmpty ranges then
+    ()
+  else
+    let first: range = List.head ranges
+    let last: range = List.last ranges
+    let openedUp = first.StartLine > span.StartLine
+    let closedDown = span.EndLine > last.EndLine
+    if openedUp <> closedDown then
+      Range.mkRange "" last.End span.End |> reportBracketSymmetry src
+    elif openedUp then
+      checkGapAgreement src ranges |> ignore
+    else
+      checkBracketedPlacement src span ranges
 
 /// Reports on a list with no brackets of its own, such as a chain of '&&'
 /// operands or a curried parameter list. The gaps between elements are all

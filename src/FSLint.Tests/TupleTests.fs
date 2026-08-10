@@ -2,12 +2,14 @@ namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
 
-/// The elements of a tuple are a separator list like any other: while the
-/// whole of it would close up onto one line it has to stay closed up, and
-/// once it would not, every gap between neighbours has to agree.
+/// A parameter list and a tuple of data are not laid out the same way. The
+/// first is a separator list like any other: while the whole of it would
+/// close up onto one line it stays closed up, and once it would not, every
+/// gap between neighbours has to agree. The second wants a name instead, so
+/// that whatever holds it keeps its shape.
 module TuplePlacementSamples =
 
-  /// A struct tuple whose first gap stays on the line and whose second breaks.
+  /// A struct tuple of data, spread because it does not fit.
   let badStructTupleTest =
     """
 let fn () =
@@ -15,12 +17,20 @@ let fn () =
           aThirdRatherLongOperandName)
 """
 
-  let goodStructTupleTest =
+  /// Breaking at every comma is no answer either: it still does not fit.
+  let badStructTupleBrokenTest =
     """
 let fn () =
   struct (someRatherLongOperandName,
           anotherRatherLongOperandName,
           aThirdRatherLongOperandName)
+"""
+
+  let goodStructTupleTest =
+    """
+let fn () =
+  printfn "anchor"
+  struct (shortOne, shortTwo, shortThree)
 """
 
   /// A plain tuple answers exactly as the struct one does.
@@ -34,9 +44,8 @@ let fn () =
   let goodPlainTupleTest =
     """
 let fn () =
-  (someRatherLongOperandName,
-   anotherRatherLongOperandName,
-   aThirdRatherLongOperandName)
+  printfn "anchor"
+  (shortOne, shortTwo, shortThree)
 """
 
   /// Named arguments are the same list, and mix the same way.
@@ -52,8 +61,8 @@ let fn () =
   let goodTwoElementTupleTest =
     """
 let fn () =
-  (someRatherLongOperandNameThatGoesOnAndOnAndOnForQuiteAWhileHere,
-   anotherRatherLongOperandNameThatAlsoGoesOnForQuiteAWhileYetHere)
+  someCall (someRatherLongArgumentNameThatGoesOnAndOnForQuiteAWhile,
+            anotherRatherLongArgumentNameThatAlsoGoesOnForAWhileYet)
 """
 
 [<TestClass>]
@@ -167,17 +176,22 @@ match bad with
     lintAssert badCommaSpacingInPatternTest
     lintAssert badCommaSpacingInPatternTest2
 
-  /// A tuple too wide to close up must break at every comma or none.
+  /// A tuple of data too wide for its line wants a name, not a break: a list
+  /// of such tuples reads as a table, and a row spread over its neighbours
+  /// loses the shape the table is read by.
   [<TestMethod>]
   member _.``[Tuple] Element Placement Test``() =
     lint TuplePlacementSamples.goodStructTupleTest
     lint TuplePlacementSamples.goodPlainTupleTest
-    lintAssertMsg "Use consistent line breaks"
+    lintAssertMsg "Bind this to a let to fit the line"
       TuplePlacementSamples.badStructTupleTest
-    lintAssertMsg "Use consistent line breaks"
+    lintAssertMsg "Bind this to a let to fit the line"
+      TuplePlacementSamples.badStructTupleBrokenTest
+    lintAssertMsg "Bind this to a let to fit the line"
       TuplePlacementSamples.badPlainTupleTest
 
-  /// Named arguments form the same list, and a two-element tuple has a single
+  /// A parameter list is the other thing entirely: it breaks at every comma,
+  /// so a mixture is what it answers for. A two-element tuple has a single
   /// gap that can never disagree with itself.
   [<TestMethod>]
   member _.``[Tuple] Element Placement Test(2)``() =

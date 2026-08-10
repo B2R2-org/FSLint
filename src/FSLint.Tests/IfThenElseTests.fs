@@ -281,8 +281,9 @@ let fn () =
     printfn "another message far too long to sit beside its keyword as well"
 """
 
-  /// The same nested group with every one of its gaps broken.
-  let goodNestedParenGroupBrokenTest =
+  /// Breaking at every one of its gaps is no answer either: the group still
+  /// does not keep to a line of its own, and still wants a name.
+  let badNestedParenGroupBrokenTest =
     """
 let fn () =
   if isSomethingRatherLongHere
@@ -460,14 +461,16 @@ let changeToAliasOfLDM bin =
     lint goodOneWideBodyBelowTest
     lintAssertMsg "Use consistent line breaks" badOneWideBodyMixedTest
 
-  /// What stands inside parentheses is a group of its own and answers for
-  /// itself, whatever the chain around it does.
+  /// A parenthesised group is held to a line of its own. The chain around it
+  /// may run down the page, breaking at every operator, but a group that
+  /// cannot keep to one line is asked for a name instead.
   [<TestMethod>]
   member _.``[IfThenElse] Paren Condition Group Test``() =
     lint goodParenGroupInlineTest
-    lint goodNestedParenGroupBrokenTest
-    lintAssertMsg "Use consistent line breaks" badWholeParenGroupTest
-    lintAssertMsg "Use consistent line breaks" badNestedParenGroupTest
+    lintAssertMsg "Bind this to a let to fit the line" badWholeParenGroupTest
+    lintAssertMsg "Bind this to a let to fit the line" badNestedParenGroupTest
+    lintAssertMsg "Bind this to a let to fit the line"
+      badNestedParenGroupBrokenTest
 
   /// Input the parser could make nothing of reaches the rules as an error
   /// node, and no rule may fall over on it.

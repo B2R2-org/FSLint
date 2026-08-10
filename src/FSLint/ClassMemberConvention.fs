@@ -13,20 +13,22 @@ let private getMemberCategory (memberDefn: SynMemberDefn) =
     MemberCategory.Constructor, range
   | SynMemberDefn.Member(binding, _) ->
     let SynBinding(headPat = pat; trivia = trivia) = binding
-    (match pat with
-     | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
-       match longDotId with
-       | SynLongIdent(id = [ id ]) when id.idText = "new" ->
-         MemberCategory.Constructor
-       | _ ->
-         match args with
-         | SynArgPats.Pats [] -> MemberCategory.Property
-         | _ -> MemberCategory.Method
-     | _ ->
-       MemberCategory.Method), trivia.LeadingKeyword.Range
+    let category =
+      match pat with
+      | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
+        match longDotId with
+        | SynLongIdent(id = [ id ]) when id.idText = "new" ->
+          MemberCategory.Constructor
+        | _ ->
+          match args with
+          | SynArgPats.Pats [] -> MemberCategory.Property
+          | _ -> MemberCategory.Method
+      | _ ->
+        MemberCategory.Method
+    category, trivia.LeadingKeyword.Range
   | SynMemberDefn.GetSetMember(range = range; trivia = trivia) ->
-    MemberCategory.Property,
-    Range.mkRange "" range.Start trivia.WithKeyword.Start
+    let keyword = Range.mkRange "" range.Start trivia.WithKeyword.Start
+    MemberCategory.Property, keyword
   | SynMemberDefn.AutoProperty(trivia = trivia) ->
     MemberCategory.Property, trivia.LeadingKeyword.Range
   | SynMemberDefn.AbstractSlot(range = range) ->

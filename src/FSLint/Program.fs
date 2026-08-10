@@ -118,6 +118,14 @@ and checkExpression src = function
     RecordConvention.checkAnonymousRecord src info fields range trivia
     if Option.isSome info then info.Value |> fst |> checkExpression src else ()
     fields |> List.iter (fun (_, _, expr) -> checkExpression src expr)
+  | SynExpr.Paren(expr = SynExpr.Tuple(exprs = exprs; commaRanges = commas)
+                  range = parenRange) as expr ->
+    (* A tuple fenced in by parentheses is judged with them, since a break
+       landing just inside one is a break in the list. Without them it has
+       only the gaps between its elements to answer for, so the two are not
+       both put to it. *)
+    ParenConvention.checkExpr src expr
+    checkTuple src (Some parenRange) exprs commas
   | SynExpr.Paren(expr = innerExpr) as expr ->
     ParenConvention.checkExpr src expr
     checkExpression src innerExpr
@@ -180,11 +188,7 @@ and checkExpression src = function
     PatternMatchingConvention.checkUniformCaseBody src clauses
     for clause in clauses do checkMatchClause src clause
   | SynExpr.Tuple(exprs = exprs; commaRanges = commaRanges) ->
-    TupleConvention.check src exprs commaRanges
-    TupleConvention.checkPlacement src exprs
-    for expr in exprs do
-      FunctionCallConvention.checkMethodParenSpacing src expr
-      checkExpression src expr
+    checkTuple src None exprs commaRanges
   | SynExpr.TryFinally(tryExpr = tryExpr
                        finallyExpr = finallyExpr
                        range = range
@@ -223,6 +227,7 @@ and checkExpression src = function
       TypeUseConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix funcExpr argExpr
+      noteApplicationArg argExpr.Range
       checkExpression src funcExpr
       checkExpression src argExpr
   | SynExpr.Sequential(expr1 = expr1; expr2 = expr2) ->
@@ -319,6 +324,20 @@ and checkExpression src = function
     ()
   | expr ->
     failwith $"{nameof checkExpression} TODO: {expr}"
+
+/// A tuple, with the parentheses fencing it in when it has any. The fence
+/// belongs to the list it holds, so a fenced tuple is judged once, with it.
+and checkTuple src fence exprs commaRanges =
+  TupleConvention.check src exprs commaRanges
+  match fence with
+  | Some range ->
+    isApplicationArg range
+    |> TupleConvention.checkFencedPlacement src range exprs
+  | None ->
+    TupleConvention.checkPlacement src exprs false
+  for expr in exprs do
+    FunctionCallConvention.checkMethodParenSpacing src expr
+    checkExpression src expr
 
 and checkIdOpt src case = function
   | Some(id: Ident) ->

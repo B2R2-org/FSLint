@@ -141,10 +141,24 @@ let private checkBranchLayout src ifExpr thenExpr elseExpr range trivia =
 /// and what stands inside answers separately on the same terms. So a group
 /// held on one line beside a broken outer chain is in order, while operands
 /// disagreeing inside the parentheses are not, whatever the outer chain does.
+/// A condition too wide for its line is not broken across several either: a
+/// test spread over a paragraph stops reading as a test. What it wants is a
+/// name, so that the `if` can say what it asks in one line again.
+/// A condition too long for one line breaks at every one of its operators,
+/// and the chain reads down the page well enough for that.
+///
+/// A parenthesised group is another matter. It is not a parameter list, and
+/// once it needs a line break of its own the reader has to hold an unnamed
+/// sub-condition in mind across it. What it wants then is a name: bound to a
+/// let, it goes back to standing on one line inside the chain. So a group is
+/// held to its own line, and asked for a name once it cannot keep to it.
 let rec private checkConditionLayout src expr =
   match expr with
-  | SynExpr.Paren(expr = inner) ->
-    checkConditionLayout src inner
+  | SynExpr.Paren(expr = inner; range = fence) ->
+    if LineBreakConvention.closesUpWithin src fence then
+      checkConditionLayout src inner
+    else
+      reportBindToLet src fence
   | _ ->
     let operands = flattenInfixChain expr
     operands

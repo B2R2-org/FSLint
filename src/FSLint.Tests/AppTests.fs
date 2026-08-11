@@ -173,3 +173,49 @@ let f x = if x.Y > 42 then x.X else -x.X + 1
   [<TestMethod>]
   member _.``[UnaryOp] DEBUG - without space``() =
     try "let negate x = -x\n" |> lint with _ -> ()
+  /// A bit pattern built with '|||' reads as a row of fields, so its operands
+  /// fill each line as far as it goes rather than standing one to a line. All
+  /// that is asked is that a break be called for: an operand sent below while
+  /// there was room beside its neighbour broke the row for nothing.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Fill Test``() =
+    (* The last operand does not fit above: 58 + 1 + 23 is past the budget. *)
+    "let f p u w value =\n" +
+    "  let imm =\n" +
+    "    (1u <<< 11) ||| (p <<< 10) ||| (u <<< 9) ||| (w <<< 8)\n" +
+    "    ||| unsignedImm 8 value\n" +
+    "  imm\n"
+    |> lint
+    (* Here it does: the row was broken for nothing. *)
+    "let f rt imm =\n" +
+    "  wideWord (head rn)\n" +
+    "           ((coreReg rt <<< 12) ||| (0xfu <<< 8)\n" +
+    "             ||| offset (defaultArg imm 0L))\n"
+    |> lintAssertMsg "Remove unnecessary line break"
+
+  /// The budget decides, and it decides to the column: joined, the row below
+  /// lands on the eightieth exactly and so had room, while one character more
+  /// puts it past and the break was called for.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Fill Boundary Test``() =
+    let row tail =
+      "let f p u w value =\n" +
+      "  let imm =\n" +
+      "    (1u <<< 11) ||| (p <<< 10) ||| (u <<< 9) ||| (w <<< 8)\n" +
+      "    ||| unsignedImm 8 " + tail + "\n" +
+      "  imm\n"
+    (* 58 + 1 + 21 lands on the budget: there was room. *)
+    row "abc" |> lintAssertMsg "Remove unnecessary line break"
+    (* 58 + 1 + 22 is one past it: the break was called for. *)
+    row "abcd" |> lint
+
+  /// One operand to a line, where several would have fitted together.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Fill Test(2)``() =
+    "let f p u value =\n" +
+    "  let imm =\n" +
+    "    (1u <<< 11)\n" +
+    "    ||| (p <<< 10)\n" +
+    "    ||| unsignedImm 8 value\n" +
+    "  imm\n"
+    |> lintAssertMsg "Remove unnecessary line break"

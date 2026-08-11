@@ -197,3 +197,42 @@ and traverseParen src isInfix = function
     traverseParen src isInfix body
   | _ ->
     ()
+/// The name a bitwise operator compiles to, when the expression applies one
+/// infix. These are the operators that build a value out of fields, and a
+/// chain of them is read across the line rather than down the page.
+let private bitwiseOperator = function
+  | SynExpr.App(funcExpr =
+                  SynExpr.App(isInfix = true
+                              funcExpr =
+                                SynExpr.LongIdent(
+                                  longDotId = SynLongIdent(id = [ op ])))) ->
+    match op.idText with
+    | "op_BitwiseOr" | "op_BitwiseAnd" | "op_ExclusiveOr" -> Some op.idText
+    | _ -> None
+  | _ ->
+    None
+
+/// Flattens a chain of one and the same bitwise operator into its operands.
+/// Mixing two of them nests by precedence rather than chaining, so only the
+/// one on top is followed.
+let private flattenBitwiseChain expr =
+  let name = bitwiseOperator expr
+  let rec loop acc e =
+    match e with
+    | SynExpr.App(funcExpr = SynExpr.App(isInfix = true; argExpr = lhs)
+                  argExpr = rhs) when bitwiseOperator e = name ->
+      loop (rhs :: acc) lhs
+    | _ ->
+      e :: acc
+  if Option.isSome name then loop [] expr else []
+
+/// A chain of bitwise operators fills its lines: an operand may sit beside its
+/// neighbour or below it, so long as going below was called for.
+let checkBitwiseChain src expr =
+  match flattenBitwiseChain expr with
+  | _ :: _ :: _ as operands ->
+    operands
+    |> List.map (fun (operand: SynExpr) -> operand.Range)
+    |> LineBreakConvention.checkFilledChain src
+  | _ ->
+    ()

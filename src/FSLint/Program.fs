@@ -229,6 +229,7 @@ and checkExpression src = function
       TypeUseConvention.checkTypeAppParenSpacing src expr
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix funcExpr argExpr
+      AppConvention.checkBitwiseChain src expr
       noteApplicationArg argExpr.Range
       checkExpression src funcExpr
       checkExpression src argExpr

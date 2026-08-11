@@ -197,9 +197,10 @@ and traverseParen src isInfix = function
     traverseParen src isInfix body
   | _ ->
     ()
+
 /// The name a bitwise operator compiles to, when the expression applies one
-/// infix. These are the operators that build a value out of fields, and a
-/// chain of them is read across the line rather than down the page.
+/// infix. These are the operators that build one value out of several, and a
+/// chain of them is a separator list like any other.
 let private bitwiseOperator = function
   | SynExpr.App(funcExpr =
                   SynExpr.App(isInfix = true
@@ -226,13 +227,28 @@ let private flattenBitwiseChain expr =
       e :: acc
   if Option.isSome name then loop [] expr else []
 
-/// A chain of bitwise operators fills its lines: an operand may sit beside its
-/// neighbour or below it, so long as going below was called for.
-let checkBitwiseChain src expr =
+/// Notes every proper prefix of the chain, so that none of them is judged
+/// again on its own. A chain nests to the left, and its prefixes are the
+/// left-hand sides down the spine.
+let rec private noteChainPrefixes name (expr: SynExpr) =
+  match expr with
+  | SynExpr.App(funcExpr = SynExpr.App(isInfix = true; argExpr = lhs)) when
+      bitwiseOperator expr = name ->
+    noteCoveredChain lhs.Range
+    noteChainPrefixes name lhs
+  | _ ->
+    ()
+
+/// A bitwise chain that would stand on one line has to stand on it. Once it
+/// would not, it is left alone: a value built out of bits may be meant as a
+/// row of fields, packed across the line, or as a set of flags, one to a
+/// line, and nothing in the syntax tells the two apart.
+let checkBitwiseChain src (expr: SynExpr) =
   match flattenBitwiseChain expr with
-  | _ :: _ :: _ as operands ->
+  | _ :: _ :: _ as operands when not (isCoveredChain expr.Range) ->
+    noteChainPrefixes (bitwiseOperator expr) expr
     operands
     |> List.map (fun (operand: SynExpr) -> operand.Range)
-    |> LineBreakConvention.checkFilledChain src
+    |> LineBreakConvention.checkClosesUpOnly src
   | _ ->
     ()

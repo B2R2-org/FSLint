@@ -41,6 +41,13 @@ module Diagnostics =
   /// tuple of data is asked to be named instead.
   let applicationArgs = new AsyncLocal<ResizeArray<range>>()
 
+  /// Sub-chains already answered for by a longer chain above them. An operator
+  /// chain nests to the left, so every prefix of it is an expression in its
+  /// own right and would otherwise be judged again on its own; a short prefix
+  /// of a long chain looks as though it could close up when the chain holding
+  /// it cannot.
+  let coveredChains = new AsyncLocal<ResizeArray<range>>()
+
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
@@ -52,8 +59,21 @@ module Diagnostics =
     deferredJoins.Value <- ResizeArray()
     blockedGroups.Value <- ResizeArray()
     applicationArgs.Value <- ResizeArray()
+    coveredChains.Value <- ResizeArray()
 
   let noteApplicationArg (range: range) = applicationArgs.Value.Add range
+
+  let noteCoveredChain (range: range) = coveredChains.Value.Add range
+
+  let isCoveredChain (range: range) =
+    match box coveredChains.Value with
+    | null ->
+      false
+    | _ ->
+      coveredChains.Value
+      |> Seq.exists (fun (seen: range) ->
+        seen.StartLine = range.StartLine && seen.StartColumn = range.StartColumn
+        && seen.EndLine = range.EndLine && seen.EndColumn = range.EndColumn)
 
   /// True when the stretch is an application's argument, and so a parameter
   /// list rather than a tuple standing on its own.

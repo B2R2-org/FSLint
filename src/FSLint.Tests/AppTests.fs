@@ -173,49 +173,42 @@ let f x = if x.Y > 42 then x.X else -x.X + 1
   [<TestMethod>]
   member _.``[UnaryOp] DEBUG - without space``() =
     try "let negate x = -x\n" |> lint with _ -> ()
-  /// A bit pattern built with '|||' reads as a row of fields, so its operands
-  /// fill each line as far as it goes rather than standing one to a line. All
-  /// that is asked is that a break be called for: an operand sent below while
-  /// there was room beside its neighbour broke the row for nothing.
+
+  /// A chain of bitwise operators is a separator list like the operands of a
+  /// condition: while the whole of it would close up onto one line it stays
+  /// closed up, and once it would not, every gap between its operands has to
+  /// agree. A chain nests to the left, so its prefixes must not be judged
+  /// again on their own: a short prefix of a long chain looks as though it
+  /// could close up when the chain holding it cannot.
   [<TestMethod>]
-  member _.``[App] Bitwise Chain Fill Test``() =
-    (* The last operand does not fit above: 58 + 1 + 23 is past the budget. *)
+  member _.``[App] Bitwise Chain Placement Test``() =
+    "let numberFormat =\n" +
+    "  NumberLiteralOptions.AllowBinary\n" +
+    "  ||| NumberLiteralOptions.AllowOctal\n" +
+    "  ||| NumberLiteralOptions.AllowHexadecimal\n" +
+    "  ||| NumberLiteralOptions.AllowMinusSign\n" +
+    "  ||| NumberLiteralOptions.AllowPlusSign\n"
+    |> lint
+
+  /// Too wide for one line, and packed rather than spread. Where a chain that
+  /// will not fit is broken is the author's to choose, so nothing is asked.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Placement Test(2)``() =
     "let f p u w value =\n" +
     "  let imm =\n" +
     "    (1u <<< 11) ||| (p <<< 10) ||| (u <<< 9) ||| (w <<< 8)\n" +
     "    ||| unsignedImm 8 value\n" +
     "  imm\n"
     |> lint
-    (* Here it does: the row was broken for nothing. *)
-    "let f rt imm =\n" +
-    "  wideWord (head rn)\n" +
-    "           ((coreReg rt <<< 12) ||| (0xfu <<< 8)\n" +
-    "             ||| offset (defaultArg imm 0L))\n"
-    |> lintAssertMsg "Remove unnecessary line break"
 
-  /// The budget decides, and it decides to the column: joined, the row below
-  /// lands on the eightieth exactly and so had room, while one character more
-  /// puts it past and the break was called for.
+  /// A chain short enough to close up has to be closed up, however evenly it
+  /// was spread.
   [<TestMethod>]
-  member _.``[App] Bitwise Chain Fill Boundary Test``() =
-    let row tail =
-      "let f p u w value =\n" +
-      "  let imm =\n" +
-      "    (1u <<< 11) ||| (p <<< 10) ||| (u <<< 9) ||| (w <<< 8)\n" +
-      "    ||| unsignedImm 8 " + tail + "\n" +
-      "  imm\n"
-    (* 58 + 1 + 21 lands on the budget: there was room. *)
-    row "abc" |> lintAssertMsg "Remove unnecessary line break"
-    (* 58 + 1 + 22 is one past it: the break was called for. *)
-    row "abcd" |> lint
-
-  /// One operand to a line, where several would have fitted together.
-  [<TestMethod>]
-  member _.``[App] Bitwise Chain Fill Test(2)``() =
-    "let f p u value =\n" +
+  member _.``[App] Bitwise Chain Placement Test(3)``() =
+    "let f p u =\n" +
     "  let imm =\n" +
     "    (1u <<< 11)\n" +
     "    ||| (p <<< 10)\n" +
-    "    ||| unsignedImm 8 value\n" +
+    "    ||| (u <<< 9)\n" +
     "  imm\n"
     |> lintAssertMsg "Remove unnecessary line break"

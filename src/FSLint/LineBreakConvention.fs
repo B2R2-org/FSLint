@@ -47,28 +47,6 @@ let private isClosable src (span: range) =
 let closesUpWithin src (span: range) =
   closedWidth src span <= getCurrentMaxLineLength ()
 
-/// Reports a break inside a chain that packs its operands across lines rather
-/// than standing each on one of its own. A bit pattern built with '|||' reads
-/// as a row of fields, and one field to a line hides the pattern rather than
-/// showing it, so the operands are let to fill each line as far as it goes.
-/// What is asked of them is only that a break be needed: an operand sent
-/// below while there was room for it beside its neighbour broke the row for
-/// nothing.
-let checkFilledChain (src: ISourceText) (ranges: range list) =
-  if not isStrict then
-    ()
-  else
-    let budget = getCurrentMaxLineLength ()
-    ranges
-    |> List.pairwise
-    |> List.filter (fun (prev: range, next: range) ->
-      next.StartLine > prev.EndLine)
-    |> List.tryFind (fun (prev, next) ->
-      let above = src.GetLineString(prev.EndLine - 1).TrimEnd()
-      let below = src.GetLineString(next.StartLine - 1).Trim()
-      above.Length + 1 + below.Length <= budget)
-    |> Option.iter (fun (_, next) -> reportNewLine src next)
-
 /// Every gap between neighbours must agree: either they all carry a line break
 /// or none of them does. The first gap to break ranks with the rest takes the
 /// report. Returns true when it reported, so that the caller can leave its
@@ -118,7 +96,6 @@ let checkClosesUp src (span: range) (joints: range list) =
 /// The brackets belong to the stretch because a break landing just inside one
 /// is a break in the list, and with a single element it is the only place a
 /// break can land at all.
-///
 let checkBracketedPlacement src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
@@ -172,6 +149,25 @@ let checkUniformPlacement src (ranges: range list) =
       |> Option.iter (fun (_, next) -> reportNewLine src next)
     else
       checkGapAgreement src ranges |> ignore
+  | _ ->
+    ()
+
+/// Reports a list spread over lines though the whole of it would close up
+/// onto one, and asks nothing of it once it would not. Where a list too wide
+/// for its line is broken is left to whoever wrote it: a value built out of
+/// bits may be read as a row of fields or as a set of flags, and the two want
+/// opposite layouts with nothing in the syntax to tell them apart.
+let checkClosesUpOnly src (ranges: range list) =
+  match ranges with
+  | _ :: _ :: _ when isStrict ->
+    let span = List.reduce Range.unionRanges ranges
+    if isClosable src span then
+      ranges
+      |> List.pairwise
+      |> List.tryFind isBrokenGap
+      |> Option.iter (fun (_, next) -> reportNewLine src next)
+    else
+      ()
   | _ ->
     ()
 

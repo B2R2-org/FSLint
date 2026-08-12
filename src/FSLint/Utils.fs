@@ -139,7 +139,7 @@ let parseFile src (path: string) =
     checker.ParseFile(path, src, options)
     |> Async.RunSynchronously
     |> fun r -> r.ParseTree
-  match conditionalSymbols src with
+  match (if isStrict then conditionalSymbols src else []) with
   | [] ->
     [ parseWith parsingOptions ]
   | symbols ->

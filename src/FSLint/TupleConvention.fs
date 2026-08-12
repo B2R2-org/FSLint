@@ -19,7 +19,7 @@ let private fitsOneLine src exprs =
 /// stand on one line again. A parameter list is the other thing entirely and
 /// breaks at every comma, which is why the two are told apart first.
 let private checkWidth src (exprs: SynExpr list) isParameterList =
-  if isParameterList || fitsOneLine src exprs then
+  if not isStrict || isParameterList || fitsOneLine src exprs then
     false
   else
     tupleSpan exprs |> reportBindToLet src

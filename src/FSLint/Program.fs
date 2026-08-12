@@ -455,14 +455,18 @@ and checkTypeDefn src defn =
                        typeParams = typeParams
                        range = range
                        attributes = attrs) = info
-  let name = (List.last lid).idText
   if Option.isSome typeParams then
     ClassDefinition.checkSynTypar src range typeParams.Value
   else
     ()
   ClassDefinition.checkAttributesLineSpacing src attrs trivia
-  if hasAttr "Measure" attrs then ()
-  else IdentifierConvention.check src PascalCase true name range
+  (* A parse recovered from a broken declaration can leave the name out
+     altogether, and there is then no identifier to hold to the convention. *)
+  match List.tryLast lid with
+  | Some last when not (hasAttr "Measure" attrs) ->
+    IdentifierConvention.check src PascalCase true last.idText range
+  | _ ->
+    ()
   if Option.isSome implicitConstructor then
     ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
     match implicitConstructor with

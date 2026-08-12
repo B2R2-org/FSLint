@@ -200,6 +200,20 @@ module CustomReports =
 
   let reportBindToLet src range = reportWarn src range "Bind to fit the line"
 
+  /// A list spread down the page whose members do not share one column.
+  let reportColumnAgreement src range =
+    reportWarn src range "Use consistent indentation"
+
+  /// A `when` clause still sharing the line its type parameters stand on.
+  /// Sending it down takes the constraints below it along, so it is the only
+  /// thing said of such a list.
+  let reportWhenPlacement src range =
+    reportWarn src range "Move 'when' to the next line"
+
+  /// An `and` that does not stand in the column its `when` opened.
+  let reportAndAlignment src range =
+    reportWarn src range "Align 'and' with 'when'"
+
   /// Raises the held demands no build objected to, and drops the rest.
   let reportAgreedJoins src =
     match box deferredJoins.Value with

@@ -159,6 +159,63 @@ let checkBracketSpacingInTypar src decls constraints (range: range) =
   else
     ()
 
+/// The `when` or `and` standing ahead of a constraint on its line: where the
+/// keyword sits, and whether it opens that line. Neither keyword is part of
+/// the constraint the tree gives back, so the line ahead of it is read.
+let private precedingKeyword (src: ISourceText) (range: range) =
+  let line = src.GetLineString(range.StartLine - 1)
+  let before = line.Substring(0, range.StartColumn).TrimEnd()
+  let name =
+    if before.EndsWith "when" then "when"
+    elif before.EndsWith "and" then "and"
+    else ""
+  if name = "" then
+    None
+  else
+    let column = before.Length - name.Length
+    let keyword =
+      Range.mkRange "" (Position.mkPos range.StartLine column)
+        (Position.mkPos range.StartLine before.Length)
+    Some(keyword, column, before.TrimStart() = name)
+
+/// The constraints of a type parameter list are a separator list like any
+/// other: `when` opens it and `and` divides it. Either the whole list keeps to
+/// the line the parameters are on, or `when` starts a line of its own and each
+/// constraint takes one after it, every `and` standing in the column `when`
+/// opened.
+///
+/// A `when` still up on the parameter line is the only thing said of such a
+/// list. Sending it down takes the constraints below it along, and what the
+/// `and`s under it are doing cannot be judged until it lands.
+///
+/// Where that column falls is not asked. `when` and `and` are the one pair of
+/// separators in the language of unequal length, so a column can hold the
+/// keywords or the constraints but not both, and it is the keywords that are
+/// held; how far in they sit is left to the author.
+let checkTyparConstraints src (constraints: SynTypeConstraint list) range =
+  if not isStrict || constraints.IsEmpty then
+    ()
+  elif (range: range).StartLine = range.EndLine then
+    ()
+  else
+    match constraints with
+    | head :: rest ->
+      match precedingKeyword src head.Range with
+      | None ->
+        reportWhenPlacement src head.Range
+      | Some(keyword, _, false) ->
+        reportWhenPlacement src keyword
+      | Some(_, column, true) ->
+        rest
+        |> List.iter (fun constr ->
+          match precedingKeyword src constr.Range with
+          | Some(_, found, true) when found = column -> ()
+          | Some(keyword, _, _) -> reportAndAlignment src keyword
+          | None -> reportAndAlignment src constr.Range
+        )
+    | [] ->
+      ()
+
 let checkSynTypar src idRange (typeParams: SynTyparDecls) =
   match typeParams with
   | SynTyparDecls.PostfixList(decls = decls
@@ -167,9 +224,16 @@ let checkSynTypar src idRange (typeParams: SynTyparDecls) =
     checkNameBracketSpacing src idRange range
     checkBracketElementSpacingInTypar src decls
     checkBracketSpacingInTypar src decls constraints range
-    decls
-    |> List.map extractTypeNameRange
-    |> LineBreakConvention.checkBracketedPlacement src range
+    checkTyparConstraints src constraints range
+    let declRanges = decls |> List.map extractTypeNameRange
+    (* The parameters are measured by their own width, not by the fence they
+       share with the constraints. A constraint list too wide for the line says
+       nothing about whether the parameters ahead of it fit on one, and reading
+       the two together would leave them broken with nothing gained. *)
+    let declSpan =
+      if constraints.IsEmpty then range
+      else Range.mkRange "" range.Start (List.last declRanges).End
+    LineBreakConvention.checkBracketedPlacement src declSpan declRanges
   | _ ->
     warn "[checkSynTypar] TODO"
 

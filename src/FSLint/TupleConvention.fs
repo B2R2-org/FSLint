@@ -13,13 +13,25 @@ let private tupleSpan (exprs: SynExpr list) =
 let private fitsOneLine src exprs =
   LineBreakConvention.closesUpWithin src (tupleSpan exprs)
 
+/// True when the tuple has been spread over more than one line, and so has
+/// made a choice of layout that it can be held to.
+let private isSpread exprs =
+  let span = tupleSpan exprs
+  span.StartLine <> span.EndLine
+
 /// A tuple of data too wide for its line is not broken at its commas: a list
 /// of them reads as a table, and a row spilling over its neighbours loses the
 /// shape the table is read by. What it wants is a name, so that the row can
 /// stand on one line again. A parameter list is the other thing entirely and
 /// breaks at every comma, which is why the two are told apart first.
+///
+/// Only a tuple already spread is asked this. One still standing on a single
+/// line has chosen no layout to answer for: what is wrong with it is the
+/// length of the line, and the line budget says that by itself.
 let private checkWidth src (exprs: SynExpr list) isParameterList =
-  if not isStrict || isParameterList || fitsOneLine src exprs then
+  if not isStrict || isParameterList then
+    false
+  elif not (isSpread exprs) || fitsOneLine src exprs then
     false
   else
     tupleSpan exprs |> reportBindToLet src

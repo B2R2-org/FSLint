@@ -57,6 +57,55 @@ let fn () =
                   thirdNamedArgument = aThirdValue, fourth = more)
 """
 
+  /// A row of a table is a tuple of data like any other, and answers the
+  /// same way: the list holding it reads by the shape of its rows, and one
+  /// spilling over its neighbours loses that shape.
+  let badTableRowTest =
+    """
+let rows =
+  [ "the first rather long field of this particular row of the table okay", 1,
+    0UL
+    "second row", 2, 1UL ]
+"""
+
+  /// Breaking the row at every comma is no answer: its commas then look like
+  /// the separators of the list, and the rows can no longer be told apart.
+  let badTableRowBrokenTest =
+    """
+let rows =
+  [ "the first rather long field of this particular row of the table okay",
+    1,
+    0UL
+    "second row", 2, 1UL ]
+"""
+
+  /// A row that does fit on one line is left alone.
+  let goodTableRowTest =
+    """
+let rows =
+  [ "first row", 1, 0UL
+    "second row", 2, 1UL ]
+"""
+
+  /// The same tuple left on one line, where it runs past the line budget.
+  /// Only the budget itself has anything to say about that.
+  ///
+  /// The sample is joined rather than quoted whole: the line it carries has to
+  /// run past the budget to be worth testing, and written out here it would run
+  /// past it in this file too.
+  let badSingleLineTupleTest =
+    "\nlet private formOf (probe: uint32) =\n  probe &&& 0x7Fu, "
+    + "(probe >>> 12) &&& 0x7u, probe >>> 25, (probe >>> 20) &&& 0x1Fu\n"
+
+  /// A tuple a function hands back has nowhere obvious to put a name, and is
+  /// asked for one all the same: the caller reads it by its shape too.
+  let badReturnTupleTest =
+    """
+let private formOf (probe: uint32) =
+  probe &&& 0x7Fu, (probe >>> 12) &&& 0x7u, probe >>> 25,
+  (probe >>> 20) &&& 0x1Fu
+"""
+
   /// Two elements leave a single gap, which has nothing to disagree with.
   let goodTwoElementTupleTest =
     """
@@ -189,6 +238,28 @@ match bad with
       TuplePlacementSamples.badStructTupleBrokenTest
     lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badPlainTupleTest
+
+  /// Where the tuple stands makes no difference to any of this. A row of a
+  /// table and a tuple handed back by a function are both tuples of data, and
+  /// both want a name once they no longer fit.
+  [<TestMethod>]
+  member _.``[Tuple] Element Placement Test(3)``() =
+    lint TuplePlacementSamples.goodTableRowTest
+    lintAssertMsg "Bind to fit the line" TuplePlacementSamples.badTableRowTest
+    lintAssertMsg "Bind to fit the line"
+      TuplePlacementSamples.badTableRowBrokenTest
+    lintAssertMsg "Bind to fit the line"
+      TuplePlacementSamples.badReturnTupleTest
+
+  /// A tuple still standing on one line has chosen no layout to answer for.
+  /// What is wrong with it is the length of the line, and asking for a name
+  /// on top of that says the same thing twice.
+  [<TestMethod>]
+  member _.``[Tuple] SingleLine Width Test``() =
+    lintErrors TuplePlacementSamples.badSingleLineTupleTest
+    |> fun errors ->
+      Assert.AreEqual<int>(1, errors.Length)
+      StringAssert.Contains(errors.Head.Message, "exceeds 80 characters")
 
   /// A parameter list is the other thing entirely: it breaks at every comma,
   /// so a mixture is what it answers for. A two-element tuple has a single

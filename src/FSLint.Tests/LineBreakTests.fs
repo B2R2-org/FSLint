@@ -780,12 +780,105 @@ type TestClass(aaa: int) =
   member _.Aaa = aaa
 """
 
-  /// A constraint rides along on the last type parameter without upsetting the
-  /// separators.
+  /// A list spread down the page is read by the column its lines begin in.
+  let goodColumnArgumentTest =
+    """
+let fn () =
+  someFunctionName (aVeryLongArgumentNameHereOk,
+                    bVeryLongArgumentNameHereOk,
+                    cVeryLongArgumentNameHereOk)
+"""
+
+  let badColumnArgumentTest =
+    """
+let fn () =
+  someFunctionName (aVeryLongArgumentNameHereOk,
+                    bVeryLongArgumentNameHereOk,
+                      cVeryLongArgumentNameHereOk)
+"""
+
+  /// A leading separator answers on the same terms: what shares the column is
+  /// the '&&' that opens each line, not the operand behind it.
+  let goodColumnConditionTest =
+    """
+let fn a b =
+  if aVeryLongConditionOperandName = a
+    && bVeryLongConditionOperandName = b
+    && cVeryLongConditionOperandName = a then 1
+  else 2
+"""
+
+  let badColumnConditionTest =
+    """
+let fn a b =
+  if aVeryLongConditionOperandName = a
+    && bVeryLongConditionOperandName = b
+      && cVeryLongConditionOperandName = a then 1
+  else 2
+"""
+
+  /// The first operand shares its line with the `if` that opened the chain, so
+  /// its column was settled by the `if` and the lines below answer to each
+  /// other rather than to it.
+  let goodColumnOpenerTest =
+    """
+let fn a b =
+  aVeryLongConditionOperandName = a
+  && bVeryLongConditionOperandName = b
+  && cVeryLongConditionOperandName = a
+"""
+
+  /// A chain of branches hands over the keywords opening its links, and `then`
+  /// sitting mid-line beside `else` at the head of one shares no column.
+  let goodColumnBranchTest =
+    """
+let fn combineToStartPos startPos endPos range =
+  if combineToStartPos then Range.unionRanges startPos range
+  else Range.unionRanges range endPos
+"""
+
+  /// Type parameters that genuinely will not fit stand in one column.
+  let goodColumnTypeParamTest =
+    """
+type Aligned<'aVeryLongTypeParameterName,
+             'bVeryLongTypeParameterName,
+             'cVeryLongTypeParamName>() =
+  member _.Value = 1
+"""
+
+  let badColumnTypeParamTest =
+    """
+type Stair<'aVeryLongTypeParameterName,
+              'bVeryLongTypeParameterName,
+                 'cVeryLongTypeParamName>() =
+  member _.Value = 1
+"""
+
+  /// The parameters are measured by their own width. A constraint list too
+  /// wide for the line says nothing about whether the parameters ahead of it
+  /// fit on one, so they stay where they are and only the constraints break.
   let goodConstrainedTypeParamTest =
+    """
+type TestClass<'aLongTypeParameterName, 'bLongTypeParamName
+  when 'bLongTypeParamName: comparison>() =
+  member _.Value = 1
+"""
+
+  /// The constraint riding along on the last parameter instead.
+  let badConstrainedTypeParamTest =
     """
 type TestClass<'aLongTypeParameterName,
                'bLongTypeParamName when 'bLongTypeParamName: comparison>() =
+  member _.Value = 1
+"""
+
+  /// Parameters broken though they fit, leaving them indented past the
+  /// constraints that follow them.
+  let badBackwardsTypeParamTest =
+    """
+type TestClass<'aLongTypeParameterName,
+               'bLongTypeParamName
+  when 'bLongTypeParamName: comparison>() =
   member _.Value = 1
 """
 
@@ -1613,6 +1706,8 @@ type TestClass(aaa: int, bbb: int
   [<TestMethod>]
   member _.``[LineBreak] Type Parameter Line Break Test(2)``() =
     lint goodConstrainedTypeParamTest
+    lintAssertMsg "Move 'when' to the next line" badConstrainedTypeParamTest
+    lintAssertMsg "Remove unnecessary line break" badBackwardsTypeParamTest
 
   [<TestMethod>]
   member _.``[LineBreak] Try With Clause Line Break Test(2)``() =
@@ -1720,3 +1815,26 @@ type TestClass(aaa: int, bbb: int
     lint goodListBoundaryTest
     lint goodListOverBoundaryTest
     lintAssertMsg "Remove unnecessary line break" badListBoundaryTest
+
+  /// Every line a list spread down the page runs to begins in one column,
+  /// whether the separator that divides it trails its members or leads them.
+  [<TestMethod>]
+  member _.``[LineBreak] Column Agreement Test``() =
+    lint goodColumnArgumentTest
+    lint goodColumnConditionTest
+    lintAssertMsg "Use consistent indentation" badColumnArgumentTest
+    lintAssertMsg "Use consistent indentation" badColumnConditionTest
+
+  /// The column is asked of the lines the list runs to, not of a member that
+  /// shares its line with whatever opened the list, nor of the keywords a
+  /// chain of branches hands over in place of members.
+  [<TestMethod>]
+  member _.``[LineBreak] Column Agreement Exemption Test``() =
+    lint goodColumnOpenerTest
+    lint goodColumnBranchTest
+
+  /// Type parameters too many for one line answer the same way.
+  [<TestMethod>]
+  member _.``[LineBreak] Type Parameter Column Test``() =
+    lint goodColumnTypeParamTest
+    lintAssertMsg "Use consistent indentation" badColumnTypeParamTest

@@ -5,6 +5,57 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 [<TestClass>]
 type ClassDefinitionTests() =
 
+  /// The constraints of a type parameter list are a separator list: `when`
+  /// opens it and `and` divides it. Short enough, it keeps to one line.
+  let goodInlineConstraintTest =
+    """
+type Small<'V, 'A when 'V: equality> = Small of 'V * 'A
+"""
+
+  /// Too long for one line, `when` opens a line of its own and each
+  /// constraint takes one after it, the keywords standing in one column two
+  /// spaces in from the declaration.
+  let goodBrokenConstraintTest =
+    """
+type Good<'V, 'A
+  when 'V :> IMonoid<'V>
+  and 'V: (new: unit -> 'V)
+  and 'A :> IMeasured<'V>> =
+  | GoodCase of 'V
+"""
+
+  /// `when` left on the line the parameters are on, with the constraints
+  /// chasing its column. The keywords no longer agree, and neither do the
+  /// breaks: the first constraint shares a line while the rest do not.
+  let badRaggedConstraintTest =
+    """
+type Ragged<'V, 'A when 'V :> IMonoid<'V>
+                    and 'V: (new: unit -> 'V)
+                    and 'A :> IMeasured<'V>> =
+  | RaggedCase of 'V
+"""
+
+  /// How far in the keywords sit is left to the author, so long as they sit
+  /// together.
+  let goodDeeperConstraintTest =
+    """
+type Deeper<'V, 'A
+      when 'V :> IMonoid<'V>
+      and 'V: (new: unit -> 'V)
+      and 'A :> IMeasured<'V>> =
+  | DeeperCase of 'V
+"""
+
+  /// `when` opens its line, but an `and` under it wanders off the column.
+  let badStrayConstraintTest =
+    """
+type Stray<'V, 'A
+  when 'V :> IMonoid<'V>
+  and 'V: (new: unit -> 'V)
+      and 'A :> IMeasured<'V>> =
+  | StrayCase of 'V
+"""
+
   let goodImplicitCtorTest =
     """
 type TestClass(param1: string, param2: int) =
@@ -129,3 +180,28 @@ type ComplexClass (initialValue: int) =
   member _.``[ClassDefinition] Complex Class Definition Spacing Test``() =
     lint goodMixedCaseTest
     lintAssert badMixedCaseTest
+
+  /// A constraint list that fits stays on its line; one that does not opens
+  /// at `when`.
+  [<TestMethod>]
+  member _.``[ClassDefinition] Typar Constraint Placement Test``() =
+    lint goodInlineConstraintTest
+    lint goodBrokenConstraintTest
+    lintAssertMsg "Move 'when' to the next line" badRaggedConstraintTest
+
+  /// A `when` still up on the parameter line is the only thing said of such a
+  /// list: sending it down takes the constraints below it along, so what the
+  /// `and`s under it are doing cannot be judged until it lands.
+  [<TestMethod>]
+  member _.``[ClassDefinition] Typar Constraint Priority Test``() =
+    lintErrors badRaggedConstraintTest
+    |> fun errors ->
+      Assert.AreEqual<int>(1, errors.Length)
+      StringAssert.Contains(errors.Head.Message, "Move 'when' to the next line")
+
+  /// Once `when` opens its line, every `and` stands in the column it opened.
+  /// How far in that column falls is left to the author.
+  [<TestMethod>]
+  member _.``[ClassDefinition] Typar Constraint Alignment Test``() =
+    lint goodDeeperConstraintTest
+    lintAssertMsg "Align 'and' with 'when'" badStrayConstraintTest

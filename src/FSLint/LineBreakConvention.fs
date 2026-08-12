@@ -4,7 +4,9 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Syntax
 open Diagnostics
 
-let [<Literal>] private Message = "Use consistent line breaks"
+/// What a separator list is told when its members do not agree on their
+/// breaks. Shared so that a list checked elsewhere answers by the same name.
+let [<Literal>] Message = "Use consistent line breaks"
 
 /// Returns true when the gap between two neighbouring items holds a line
 /// break, i.e. the separator that joins them was broken across lines.
@@ -47,6 +49,41 @@ let private isClosable src (span: range) =
 let closesUpWithin src (span: range) =
   closedWidth src span <= getCurrentMaxLineLength ()
 
+/// The column the line a range begins on starts in. For a list divided by a
+/// leading separator that is the separator rather than the member behind it,
+/// so both kinds of list answer on the same terms.
+let private lineIndent (src: ISourceText) (r: range) =
+  let line = src.GetLineString(r.StartLine - 1)
+  line.Length - line.TrimStart().Length
+
+/// Every line a list spread down the page runs to begins in the one column.
+/// That column is what makes the members read as a list at all; wandering left
+/// and right they read as unrelated lines that happen to follow one another.
+/// The first line to leave the column takes the report.
+///
+/// A first member sharing its line with whatever opened the list is left out
+/// of this. Its column was settled by the opener, an `if` or an opening
+/// bracket, and the lines below answer to each other rather than to it.
+let private checkColumnAgreement src ranges =
+  let opensItsLine (r: range) = lineIndent src r = r.StartColumn
+  let members =
+    match ranges with
+    | head :: tail when not (opensItsLine head) -> tail
+    | _ -> ranges
+  match members with
+  | first :: rest ->
+    let column = lineIndent src first
+    rest
+    |> List.tryFind (fun r -> lineIndent src r <> column)
+    |> function
+      | Some stray ->
+        reportColumnAgreement src stray
+        true
+      | None ->
+        false
+  | [] ->
+    false
+
 /// Every gap between neighbours must agree: either they all carry a line break
 /// or none of them does. The first gap to break ranks with the rest takes the
 /// report. Returns true when it reported, so that the caller can leave its
@@ -67,6 +104,18 @@ let checkGapAgreement src ranges =
         false
   | [] ->
     false
+
+/// The gaps of a list of members, then the column its members stand in. Only
+/// a list whose ranges are the members themselves is asked the second: a chain
+/// of branches hands over the keywords that open its links, and `then` sitting
+/// mid-line beside `else` at the head of one has no column to share.
+let checkMemberPlacement src ranges =
+  if checkGapAgreement src ranges then
+    true
+  else
+    match ranges |> List.pairwise with
+    | first :: _ when isBrokenGap first -> checkColumnAgreement src ranges
+    | _ -> false
 
 /// Reports a construct spread over several lines though the whole of it would
 /// close up onto one inside the line budget. `span` is everything it occupies,
@@ -100,7 +149,7 @@ let checkBracketedPlacement src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
   elif not (isClosable src span) then
-    checkGapAgreement src ranges |> ignore
+    checkMemberPlacement src ranges |> ignore
   elif span.StartLine <> span.EndLine then
     ranges
     |> List.tryFind (fun (r: range) -> r.StartLine > span.StartLine)
@@ -131,7 +180,7 @@ let checkOpenableFence src (span: range) ranges =
     if openedUp <> closedDown then
       Range.mkRange "" last.End span.End |> reportBracketSymmetry src
     elif openedUp then
-      checkGapAgreement src ranges |> ignore
+      checkMemberPlacement src ranges |> ignore
     else
       checkBracketedPlacement src span ranges
 
@@ -148,7 +197,7 @@ let checkUniformPlacement src (ranges: range list) =
       |> List.tryFind isBrokenGap
       |> Option.iter (fun (_, next) -> reportNewLine src next)
     else
-      checkGapAgreement src ranges |> ignore
+      checkMemberPlacement src ranges |> ignore
   | _ ->
     ()
 

@@ -48,6 +48,101 @@ let fn () =
   (shortOne, shortTwo, shortThree)
 """
 
+  /// What a match is taken on is not a tuple of data. Its commas pair the
+  /// things being tested rather than build a value, so there is no tuple
+  /// there to be given a name however the pairing is laid out.
+  let goodMatchScrutineeTest =
+    """
+let fn doc startIndex endIndexExclusive =
+  match LinearDocument.tryGetItem doc startIndex,
+        LinearDocument.tryGetItem doc (endIndexExclusive - 1) with
+  | Some startItem, Some endItem -> Some(startItem, endItem)
+  | _ -> None
+"""
+
+  /// An element running to lines of its own, a record here, widens the tuple
+  /// without any comma having been broken. That spread is the record's doing,
+  /// and what follows it still sits beside it, so the tuple has nothing to
+  /// answer for.
+  let goodBlockElementTest =
+    """
+let fn rootPane themeMode customThemes =
+  { LoadedBinary = None
+    LoadingBinaryPath = None
+    RootPane = rootPane
+    FocusedPaneID = Some rootPane.ID
+    CustomThemes = customThemes
+    ThemeMode = themeMode
+    Theme = Theme.resolve themeMode customThemes
+    StatusBarState = EmptyStatus }, Elmish.Cmd.none
+"""
+
+  /// Being no tuple of data does not free the pairing from its commas. Three
+  /// operands whose gaps disagree answer for that as any separator list does.
+  let badScrutineeGapsTest =
+    """
+let fn doc a b c =
+  match LinearDocument.tryGetItem doc a, LinearDocument.tryGetItem doc b,
+        LinearDocument.tryGetItem doc c with
+  | Some x, Some y, Some z -> Some(x, y, z)
+  | _ -> None
+"""
+
+  /// One short enough to close up has to be closed up, too.
+  let badScrutineeClosesUpTest =
+    """
+let fn x y =
+  match x,
+        y with
+  | Some a, Some b -> Some(a, b)
+  | _ -> None
+"""
+
+  /// A tuple holding a block can never be one line, so a name is no answer to
+  /// it. What is asked is that the neighbour come up beside the comma, and it
+  /// fits: 49 columns of pipeline, then 16 more.
+  let badBlockNeighbourTest =
+    """
+let fn nextModel paneID arbiter =
+  { nextModel with FocusedPaneID = Some paneID }
+  |> syncOffsetSnapshotWithActiveTab arbiter,
+  Elmish.Cmd.none
+"""
+
+  /// The same tuple with the neighbour already up beside the comma.
+  let goodBlockNeighbourTest =
+    """
+let fn nextModel paneID arbiter =
+  { nextModel with FocusedPaneID = Some paneID }
+  |> syncOffsetSnapshotWithActiveTab arbiter, Elmish.Cmd.none
+"""
+
+  /// A block whose neighbour will not fit beside the comma even so: there a
+  /// name is the only way left.
+  let badBlockOverBudgetTest =
+    """
+let fn nextModel paneID arbiter =
+  { nextModel with FocusedPaneID = Some paneID }
+  |> syncOffsetSnapshotWithSomeRatherLongFunctionName arbiter model,
+  anotherRatherLongNeighbourExpression arbiter model paneID
+"""
+
+  /// A neighbour that is itself a block has nowhere to be brought up to:
+  /// pulling its opening beside the comma would strand the rest of it below.
+  /// A name is the only way left.
+  let badBlockNeighbourBlockTest =
+    """
+let fn lnumA idA clnumA lnumB idB clnumB =
+  { LineNo = lnumA
+    LineID = idA
+    ChangedLineNumbers = clnumA
+    Len = Array.length lnumA },
+  { LineNo = lnumB
+    LineID = idB
+    ChangedLineNumbers = clnumB
+    Len = Array.length lnumB }
+"""
+
   /// Named arguments are the same list, and mix the same way.
   let badNamedArgumentTest =
     """
@@ -269,3 +364,37 @@ match bad with
     lintAssertMsg "Use consistent line breaks"
       TuplePlacementSamples.badNamedArgumentTest
     lint TuplePlacementSamples.goodTwoElementTupleTest
+
+  /// A tuple answers for its own commas and for nothing else. Neither a match
+  /// taken on a pairing nor a tuple widened by a block inside it has broken a
+  /// comma, and neither is asked for a name.
+  [<TestMethod>]
+  member _.``[Tuple] Bind Exemption Test``() =
+    lint TuplePlacementSamples.goodMatchScrutineeTest
+    lint TuplePlacementSamples.goodBlockElementTest
+    lintAssertMsg "Bind to fit the line"
+      TuplePlacementSamples.badPlainTupleTest
+
+  /// The exemption reaches only the demand for a name. A pairing is still a
+  /// comma list, and answers for its commas like any other: its gaps have to
+  /// agree, and one that would close up onto a line has to be closed up.
+  [<TestMethod>]
+  member _.``[Tuple] Scrutinee Comma Test``() =
+    lintAssertMsg "Use consistent line breaks"
+      TuplePlacementSamples.badScrutineeGapsTest
+    lintAssertMsg "Remove unnecessary line break"
+      TuplePlacementSamples.badScrutineeClosesUpTest
+
+  /// A tuple that could be one line is held to that: it closes up or it is
+  /// named. One holding a block never can be, so each neighbour is asked only
+  /// to come up beside the comma before it, and named only where even that
+  /// will not fit.
+  [<TestMethod>]
+  member _.``[Tuple] Block Neighbour Test``() =
+    lint TuplePlacementSamples.goodBlockNeighbourTest
+    lintAssertMsg "Remove unnecessary line break"
+      TuplePlacementSamples.badBlockNeighbourTest
+    lintAssertMsg "Bind to fit the line"
+      TuplePlacementSamples.badBlockOverBudgetTest
+    lintAssertMsg "Bind to fit the line"
+      TuplePlacementSamples.badBlockNeighbourBlockTest

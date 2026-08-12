@@ -179,9 +179,11 @@ and checkExpression src = function
     then checkExpression src (Option.get elseExpr)
     else ()
   | SynExpr.MatchBang(expr = expr; clauses = clauses) ->
+    noteMatchScrutinee expr.Range
     checkExpression src expr
     PatternMatchingConvention.checkFormat src clauses
   | SynExpr.Match(expr = expr; clauses = clauses; trivia = trivia) ->
+    noteMatchScrutinee expr.Range
     checkExpression src expr
     PatternMatchingConvention.checkBarIsSameColWithMatch src clauses trivia
     PatternMatchingConvention.checkFormat src clauses
@@ -338,10 +340,11 @@ and checkTuple src fence tupleRange exprs commaRanges =
   TupleConvention.check src exprs commaRanges
   match fence with
   | Some range ->
-    isApplicationArg range
+    (isApplicationArg range || isMatchScrutinee range)
     |> TupleConvention.checkFencedPlacement src range exprs
   | None ->
-    isApplicationArg tupleRange |> TupleConvention.checkPlacement src exprs
+    (isApplicationArg tupleRange || isMatchScrutinee tupleRange)
+    |> TupleConvention.checkPlacement src exprs
   for expr in exprs do
     FunctionCallConvention.checkMethodParenSpacing src expr
     checkExpression src expr

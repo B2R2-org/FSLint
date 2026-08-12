@@ -2,6 +2,37 @@ namespace B2R2.FSLint.Tests
 
 open Microsoft.VisualStudio.TestTools.UnitTesting
 
+/// A `then` carrying a bare `if` is the one chain that cannot be closed up:
+/// brought onto one line the inner `else` takes the one meant for the outer,
+/// and F# refuses to read the result at all.
+module BareInnerIfSamples =
+
+  let goodBareInnerIfTest =
+    """
+let fn x i xs =
+  if x.Min = i.Min then
+    if x.Max = i.Max then true else xs
+  else
+    false
+"""
+
+  let badBareInnerIfTest =
+    """
+let fn x i xs =
+  if x.Min = i.Min then
+    if x.Max = i.Max then true else xs
+  else false
+"""
+
+  /// Parenthesised, the inner `if` is an operand and the chain closes up.
+  let badParenInnerIfTest =
+    """
+let fn x i xs =
+  if x.Min = i.Min then
+    (if x.Max = i.Max then true else xs)
+  else false
+"""
+
 [<TestClass>]
 type IfThenElseTests() =
 
@@ -491,3 +522,20 @@ let changeToAliasOfLDM bin =
          'TODO' of the expression walker is not. *)
       StringAssert.DoesNotMatch(ex.Message, System.Text.RegularExpressions
                                               .Regex "checkExpression TODO")
+
+  /// A chain whose `then` carries a bare `if` can never be closed up: brought
+  /// onto one line the inner `else` takes the one meant for the outer, and F#
+  /// refuses to read the result at all. So the chain is not asked to close up;
+  /// what it is asked is that its bodies agree.
+  [<TestMethod>]
+  member _.``[IfThenElse] Bare Inner If Test``() =
+    lint BareInnerIfSamples.goodBareInnerIfTest
+    lintAssertMsg "Use consistent line breaks"
+      BareInnerIfSamples.badBareInnerIfTest
+
+  /// Parenthesised, the inner `if` is an operand like any other and the chain
+  /// closes up as it would have.
+  [<TestMethod>]
+  member _.``[IfThenElse] Paren Inner If Test``() =
+    lintAssertMsg "Remove unnecessary line break"
+      BareInnerIfSamples.badParenInnerIfTest

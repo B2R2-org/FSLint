@@ -41,6 +41,11 @@ module Diagnostics =
   /// tuple of data is asked to be named instead.
   let applicationArgs = new AsyncLocal<ResizeArray<range>>()
 
+  /// The expressions a match is taken on. A comma list there pairs the things
+  /// being tested rather than building a value, so it is never asked for a
+  /// name; what it answers for is only that its gaps agree.
+  let matchScrutinees = new AsyncLocal<ResizeArray<range>>()
+
   /// Sub-chains already answered for by a longer chain above them. An operator
   /// chain nests to the left, so every prefix of it is an expression in its
   /// own right and would otherwise be judged again on its own; a short prefix
@@ -59,33 +64,36 @@ module Diagnostics =
     deferredJoins.Value <- ResizeArray()
     blockedGroups.Value <- ResizeArray()
     applicationArgs.Value <- ResizeArray()
+    matchScrutinees.Value <- ResizeArray()
     coveredChains.Value <- ResizeArray()
 
-  let noteApplicationArg (range: range) = applicationArgs.Value.Add range
-
-  let noteCoveredChain (range: range) = coveredChains.Value.Add range
-
-  let isCoveredChain (range: range) =
-    match box coveredChains.Value with
+  /// True when the store holds the very stretch given.
+  let private holds (store: AsyncLocal<ResizeArray<range>>) (range: range) =
+    match box store.Value with
     | null ->
       false
     | _ ->
-      coveredChains.Value
+      store.Value
       |> Seq.exists (fun (seen: range) ->
         seen.StartLine = range.StartLine && seen.StartColumn = range.StartColumn
         && seen.EndLine = range.EndLine && seen.EndColumn = range.EndColumn)
 
+  let noteApplicationArg (range: range) = applicationArgs.Value.Add range
+
+  let noteMatchScrutinee (range: range) = matchScrutinees.Value.Add range
+
+  let noteCoveredChain (range: range) = coveredChains.Value.Add range
+
+  let isCoveredChain range = holds coveredChains range
+
   /// True when the stretch is an application's argument, and so a parameter
   /// list rather than a tuple standing on its own.
-  let isApplicationArg (range: range) =
-    match box applicationArgs.Value with
-    | null ->
-      false
-    | _ ->
-      applicationArgs.Value
-      |> Seq.exists (fun (arg: range) ->
-        arg.StartLine = range.StartLine && arg.StartColumn = range.StartColumn
-        && arg.EndLine = range.EndLine && arg.EndColumn = range.EndColumn)
+  let isApplicationArg range = holds applicationArgs range
+
+  /// True when the stretch is what a match is taken on. Its commas pair the
+  /// things being tested rather than build a value, so there is no tuple there
+  /// to be given a name.
+  let isMatchScrutinee range = holds matchScrutinees range
 
   let deferJoin (group: range) (body: range) =
     deferredJoins.Value.Add(group, body)

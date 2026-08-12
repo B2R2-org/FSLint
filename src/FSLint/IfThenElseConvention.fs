@@ -97,6 +97,26 @@ let private flattenInfixChain expr =
       e :: acc
   if isBooleanConnective expr then loop [] expr else []
 
+/// True when a link of the chain carries another `if` as its body, bare of
+/// parentheses. Such a chain can never be closed up: brought onto one line,
+/// the inner `if` takes the `else` meant for the outer one and F# refuses to
+/// read the result at all. Parenthesised, the inner `if` is an operand like
+/// any other and the chain closes up as it would have.
+let rec private carriesBareIf (thenExpr: SynExpr) elseExpr trivia =
+  let elseKeyword = (trivia: SynExprIfThenElseTrivia).ElseKeyword
+  match thenExpr with
+  | SynExpr.IfThenElse _ ->
+    true
+  | _ ->
+    match elseExpr with
+    | Some(SynExpr.IfThenElse(thenExpr = nextThen
+                              elseExpr = nextElse
+                              trivia = nextTrivia)) when
+        continuesChain elseKeyword nextTrivia ->
+      carriesBareIf nextThen nextElse nextTrivia
+    | _ ->
+      false
+
 /// The chain is judged from the outside in, and the first question to settle
 /// silences the rest.
 ///
@@ -123,15 +143,18 @@ let private checkBranchLayout src ifExpr thenExpr elseExpr range trivia =
   else
     let branches = collectBranches [] thenExpr elseExpr trivia |> List.rev
     let links = List.map fst branches
+    let bare = carriesBareIf thenExpr elseExpr trivia
     let fitsOnOneLine =
       branches
       |> List.forall (fun (_, body: range) -> body.StartLine = body.EndLine)
-    if fitsOnOneLine && LineBreakConvention.checkClosesUp src range links then
-      ()
-    elif LineBreakConvention.checkGapAgreement src links then
-      ()
-    else
-      LineBreakConvention.checkUniformBreak src branches
+    let closesUp =
+      not bare
+      && fitsOnOneLine
+      && LineBreakConvention.checkClosesUp src range links
+    if closesUp then ()
+    elif LineBreakConvention.checkGapAgreement src links then ()
+    elif bare then LineBreakConvention.checkUniformlyBroken src branches
+    else LineBreakConvention.checkUniformBreak src branches
 
 /// Every operand of a boolean condition must either share one line or each sit
 /// on its own line.

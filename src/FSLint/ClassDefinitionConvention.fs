@@ -103,8 +103,14 @@ let checkAttributesLineSpacing src (attribute: SynAttributes) trivia =
     match (trivia: SynTypeDefnTrivia).LeadingKeyword with
     | SynTypeDefnLeadingKeyword.StaticType(typeRange = range)
     | SynTypeDefnLeadingKeyword.Type range ->
+      (* A directive standing between the attribute and its type holds the two
+         apart, and its own line cannot be taken away to close the gap. The
+         attribute is as near its type as it is allowed to be. *)
+      let heldApart =
+        findDirectivesBetween lastAttr.Value.Range range |> Option.isSome
       if lastAttr.Value.Range.EndLine + 1 <> range.StartLine
-        && lastAttr.Value.Range.StartLine <> range.StartLine then
+        && lastAttr.Value.Range.StartLine <> range.StartLine
+        && not heldApart then
         Range.mkRange "" (Position.mkPos (range.StartLine - 1) 0) range.Start
         |> reportNewLine src
       else

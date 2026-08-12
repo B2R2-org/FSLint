@@ -56,6 +56,26 @@ type Stray<'V, 'A
   | StrayCase of 'V
 """
 
+  /// A directive standing between an attribute and its type holds the two
+  /// apart, and its own line cannot be taken away to close the gap.
+  let goodDirectiveAttributeTest =
+    """
+#if HASHCONS
+[<CustomEquality; NoComparison>]
+#endif
+type Stmt =
+  | Nop
+"""
+
+  /// A blank line is another matter: the attribute belongs above its type.
+  let badBlankAttributeTest =
+    """
+[<CustomEquality; NoComparison>]
+
+type Other =
+  | Nop
+"""
+
   let goodImplicitCtorTest =
     """
 type TestClass(param1: string, param2: int) =
@@ -205,3 +225,10 @@ type ComplexClass (initialValue: int) =
   member _.``[ClassDefinition] Typar Constraint Alignment Test``() =
     lint goodDeeperConstraintTest
     lintAssertMsg "Align 'and' with 'when'" badStrayConstraintTest
+
+  /// The attribute belongs on the line above its type, unless a directive
+  /// stands between them: that line cannot be taken away.
+  [<TestMethod>]
+  member _.``[ClassDefinition] Attribute Directive Spacing Test``() =
+    lint goodDirectiveAttributeTest
+    lintAssertMsg "Remove unnecessary line break" badBlankAttributeTest

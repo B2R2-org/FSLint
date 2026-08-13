@@ -361,7 +361,8 @@ let processData input =
     chain "  | Num(n, _) -> shortOne n op\n" ("  | _ -> " + wide + "\n")
     |> lintErrors
     |> List.filter (fun e -> e.Message = "Use consistent line breaks")
-    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+    (* Both clauses are named: each is a place the author has to break. *)
+    |> fun errors -> Assert.AreEqual<int>(2, errors.Length)
 
   /// What broke is the header rather than the body, and the parameter list
   /// answers for that elsewhere.

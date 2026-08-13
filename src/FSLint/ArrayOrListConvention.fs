@@ -14,6 +14,15 @@ let rec private collectElemAndOptionalSeparatorRanges acc = function
   | expr ->
     expr.Range :: acc |> List.rev
 
+/// The elements of a literal, without the separators between them. A literal
+/// written over several lines holds its elements in a chain of sequential
+/// expressions, one link per element.
+let rec private collectElementRanges = function
+  | SynExpr.Sequential(expr1 = expr1; expr2 = expr2) ->
+    (expr1: SynExpr).Range :: collectElementRanges expr2
+  | expr ->
+    [ (expr: SynExpr).Range ]
+
 /// Checks proper spacing after semicolons between list/array elements.
 /// Ensures exactly one space after each semicolon (e.g., "1; 2; 3").
 let checkElementSpacing src (elemAndSepRanges: Range list) =
@@ -136,16 +145,18 @@ let checkOpeningBracketIsInlineWithLet (src: ISourceText) (range: range) =
   then reportWarn src range "Move bracket to next line after binding"
   else ()
 
-/// Checks proper one element per line in multi-line list/array literals.
+/// Every element of a literal spread down the page begins a line of its own.
+/// Where several share a line it is the ones after the first that have to come
+/// down, and it is those the report names: the first is already where it
+/// belongs, and naming it would send the reader to the wrong element.
 let checkSingleElementPerLine src (elemRanges: Range list) =
   if isStrict then
     elemRanges
-    |> List.groupBy (fun range -> range.StartLine)
+    |> List.groupBy (fun (range: range) -> range.StartLine)
     |> List.iter (fun (_, ranges) ->
-      if ranges.Length > 1 then
-        ranges |> List.iter (reportSingleElementPerLineError src)
-      else
-        ()
+      ranges
+      |> List.skip 1
+      |> List.iter (reportSingleElementPerLineError src)
     )
   else
     ()
@@ -224,8 +235,7 @@ let rec checkSingleLine src = function
 let checkMultiLine src range = function
   | SynExpr.Sequential _ as expr ->
     checkOpeningBracketIsInlineWithLet src range
-    collectElemAndOptionalSeparatorRanges [] expr
-    |> checkSingleElementPerLine src
+    collectElementRanges expr |> checkSingleElementPerLine src
   | _ ->
     ()
 

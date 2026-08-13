@@ -59,7 +59,8 @@ let private lineIndent (src: ISourceText) (r: range) =
 /// Every line a list spread down the page runs to begins in the one column.
 /// That column is what makes the members read as a list at all; wandering left
 /// and right they read as unrelated lines that happen to follow one another.
-/// The first line to leave the column takes the report.
+/// Every line that leaves the column is named: each is a separate place the
+/// author has to move.
 ///
 /// A first member sharing its line with whatever opened the list is left out
 /// of this. Its column was settled by the opener, an `if` or an opening
@@ -73,37 +74,32 @@ let private checkColumnAgreement src ranges =
   match members with
   | first :: rest ->
     let column = lineIndent src first
-    rest
-    |> List.tryFind (fun r -> lineIndent src r <> column)
-    |> function
-      | Some stray ->
-        reportColumnAgreement src stray
-        true
-      | None ->
-        false
+    let strays = rest |> List.filter (fun r -> lineIndent src r <> column)
+    strays |> List.iter (reportColumnAgreement src)
+    not (List.isEmpty strays)
   | [] ->
     false
 
 /// Every gap between neighbours must agree: either they all carry a line break
-/// or none of them does. The first gap to break ranks with the rest takes the
-/// report. Returns true when it reported, so that the caller can leave its
-/// finer checks alone: a stretch already answering for its own shape has
-/// nothing further to say about the pieces inside it.
+/// or none of them does. Returns true when it reported, so that the caller can
+/// leave its finer checks alone: a stretch already answering for its own shape
+/// has nothing further to say about the pieces inside it.
+///
+/// This is asked only of a list that cannot close up onto one line, so a list
+/// spread down the page at all belongs down the page entire. It is therefore
+/// the neighbour still sitting beside its predecessor that has to move, and
+/// every one of them is named: the reader fixing the list wants to see each
+/// place it is asked to break, not the first alone.
+///
+/// A list with no break in it at all is not mixed and is left to the line
+/// budget, which is the only thing wrong with it.
 let checkGapAgreement src ranges =
-  let gaps = ranges |> List.pairwise
-  match gaps with
-  | first :: _ ->
-    let firstIsBroken = isBrokenGap first
-    gaps
-    |> List.tryFind (fun gap -> isBrokenGap gap <> firstIsBroken)
-    |> function
-      | Some(_, next) ->
-        reportWarn src next Message
-        true
-      | None ->
-        false
-  | [] ->
+  let broken, closed = ranges |> List.pairwise |> List.partition isBrokenGap
+  if List.isEmpty broken || List.isEmpty closed then
     false
+  else
+    closed |> List.iter (fun (_, next) -> reportWarn src next Message)
+    true
 
 /// The gaps of a list of members, then the column its members stand in. Only
 /// a list whose ranges are the members themselves is asked the second: a chain
@@ -287,8 +283,8 @@ let private checkGroup src joinable items =
         else reportNewLine src body)
     elif List.length items > 1 then
       items
-      |> List.tryFind isInline
-      |> Option.iter (fun (_, body) -> reportWarn src body Message)
+      |> List.filter isInline
+      |> List.iter (fun (_, body) -> reportWarn src body Message)
     else
       ()
 

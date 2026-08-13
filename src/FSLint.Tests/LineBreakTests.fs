@@ -854,6 +854,42 @@ type Stair<'aVeryLongTypeParameterName,
   member _.Value = 1
 """
 
+  /// A curried parameter list spread down the page belongs down the page
+  /// entire. What has to move is the parameter still sitting beside its
+  /// predecessor, and it is that one the report names.
+  let badOneStrayParameterTest =
+    """
+let private createDominance fwG (bwG: Lazy<IDiGraphAccessible<_, _>>)
+                            fwInfo
+                            (fwDT: Lazy<DominatorTree<_, _>>)
+                            (bwInfo: Lazy<CPDomInfo<_>>)
+                            (dfp: IDominanceFrontierProvider<_, _>) =
+  ()
+"""
+
+  /// Two of them sitting beside their predecessors, and both are named: the
+  /// reader wants to see every place the list is asked to break.
+  let badTwoStrayParametersTest =
+    """
+let private createDominance fwG (bwG: Lazy<IDiGraphAccessible<_, _>>)
+                            fwInfo (fwDT: Lazy<DominatorTree<_, _>>)
+                            (bwInfo: Lazy<CPDomInfo<_>>)
+                            (dfp: IDominanceFrontierProvider<_, _>) =
+  ()
+"""
+
+  /// One parameter to a line throughout.
+  let goodEveryParameterOnItsLineTest =
+    """
+let private createDominance fwG
+                            (bwG: Lazy<IDiGraphAccessible<_, _>>)
+                            fwInfo
+                            (fwDT: Lazy<DominatorTree<_, _>>)
+                            (bwInfo: Lazy<CPDomInfo<_>>)
+                            (dfp: IDominanceFrontierProvider<_, _>) =
+  ()
+"""
+
   /// The parameters are measured by their own width. A constraint list too
   /// wide for the line says nothing about whether the parameters ahead of it
   /// fit on one, so they stay where they are and only the constraints break.
@@ -1838,3 +1874,19 @@ type TestClass(aaa: int, bbb: int
   member _.``[LineBreak] Type Parameter Column Test``() =
     lint goodColumnTypeParamTest
     lintAssertMsg "Use consistent indentation" badColumnTypeParamTest
+
+  /// A list too wide to close up belongs down the page entire, so it is the
+  /// neighbour still beside its predecessor that has to move. Every one of
+  /// them is named, and the report sits on the parameter itself.
+  [<TestMethod>]
+  member _.``[LineBreak] Stray Parameter Test``() =
+    lint goodEveryParameterOnItsLineTest
+    lintErrors badOneStrayParameterTest
+    |> fun errors ->
+      Assert.AreEqual<int>(1, errors.Length)
+      Assert.AreEqual<int>(32, errors.Head.Range.StartColumn)
+    lintErrors badTwoStrayParametersTest
+    |> fun errors ->
+      Assert.AreEqual<int>(2, errors.Length)
+      Assert.AreEqual<int>(2, errors.Head.Range.StartLine)
+      Assert.AreEqual<int>(3, errors[1].Range.StartLine)

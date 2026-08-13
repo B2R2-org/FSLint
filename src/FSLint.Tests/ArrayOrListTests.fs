@@ -4,6 +4,20 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 
 /// In ArrayOrListConvention, tests unrelated to array/list differences use only
 /// lists for clarity, as not all cases require checking both types.
+/// An annotation fences nothing off: an element wearing one is read on the
+/// same terms as any other, rather than falling past the checks entirely.
+module AnnotatedElementSamples =
+
+  let goodAnnotatedElementTest =
+    """
+let a = [ (expr: SynExpr).Range ]
+"""
+
+  let badAnnotatedElementTest =
+    """
+let b = [ (expr: SynExpr).Range ;(other: SynExpr).Range ]
+"""
+
 [<TestClass>]
 type ArrayOrListTests() =
 
@@ -326,3 +340,17 @@ let bad = [
   member _.``[ArrayOrList] TypeApp Outside List Test``() =
     lint goodTypeAppOutsideTest
     lintAssert badTypeAppOutsideTest
+
+  /// An element behind a type annotation is still an element, and the spacing
+  /// beside it is still read.
+  ///
+  /// What this cannot pin is the other half of the case: without the `Typed`
+  /// arm the walk falls into the TODO it keeps for shapes it does not know,
+  /// and that note goes to the error stream, raising nothing. The test host
+  /// holds that stream itself, so the note never reaches a test. Running the
+  /// linter over `src/` and reading the output is what catches that.
+  [<TestMethod>]
+  member _.``[ArrayOrList] Annotated Element Test``() =
+    lint AnnotatedElementSamples.goodAnnotatedElementTest
+    lintAssertMsg "Remove whitespace before ';'"
+      AnnotatedElementSamples.badAnnotatedElementTest

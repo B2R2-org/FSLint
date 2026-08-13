@@ -208,10 +208,6 @@ module CustomReports =
 
   let reportBindToLet src range = reportWarn src range "Bind to fit the line"
 
-  /// A list spread down the page whose members do not share one column.
-  let reportColumnAgreement src range =
-    reportWarn src range "Use consistent indentation"
-
   /// A `when` clause still sharing the line its type parameters stand on.
   /// Sending it down takes the constraints below it along, so it is the only
   /// thing said of such a list.

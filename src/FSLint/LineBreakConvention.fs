@@ -49,37 +49,6 @@ let private isClosable src (span: range) =
 let closesUpWithin src (span: range) =
   closedWidth src span <= getCurrentMaxLineLength ()
 
-/// The column the line a range begins on starts in. For a list divided by a
-/// leading separator that is the separator rather than the member behind it,
-/// so both kinds of list answer on the same terms.
-let private lineIndent (src: ISourceText) (r: range) =
-  let line = src.GetLineString(r.StartLine - 1)
-  line.Length - line.TrimStart().Length
-
-/// Every line a list spread down the page runs to begins in the one column.
-/// That column is what makes the members read as a list at all; wandering left
-/// and right they read as unrelated lines that happen to follow one another.
-/// Every line that leaves the column is named: each is a separate place the
-/// author has to move.
-///
-/// A first member sharing its line with whatever opened the list is left out
-/// of this. Its column was settled by the opener, an `if` or an opening
-/// bracket, and the lines below answer to each other rather than to it.
-let private checkColumnAgreement src ranges =
-  let opensItsLine (r: range) = lineIndent src r = r.StartColumn
-  let members =
-    match ranges with
-    | head :: tail when not (opensItsLine head) -> tail
-    | _ -> ranges
-  match members with
-  | first :: rest ->
-    let column = lineIndent src first
-    let strays = rest |> List.filter (fun r -> lineIndent src r <> column)
-    strays |> List.iter (reportColumnAgreement src)
-    not (List.isEmpty strays)
-  | [] ->
-    false
-
 /// Every gap between neighbours must agree: either they all carry a line break
 /// or none of them does. Returns true when it reported, so that the caller can
 /// leave its finer checks alone: a stretch already answering for its own shape
@@ -93,41 +62,90 @@ let private checkColumnAgreement src ranges =
 ///
 /// A list with no break in it at all is not mixed and is left to the line
 /// budget, which is the only thing wrong with it.
+///
+/// Nor is one that keeps several members on the line it opens and hangs the
+/// rest under the last of them: that reads as a column and is a layout in its
+/// own right, whatever the gaps say.
+let private standsInAColumn (ranges: range list) =
+  match ranges with
+  | first :: _ ->
+    let opening = (first: range).StartLine
+    let above = ranges |> List.filter (fun r -> r.StartLine = opening)
+    let below = ranges |> List.filter (fun r -> r.StartLine > opening)
+    match below with
+    | [] ->
+      false
+    | _ ->
+      let column = (List.last above).StartColumn
+      below |> List.forall (fun r -> r.StartColumn = column)
+  | [] ->
+    false
+
+/// The stretches a broken list still holds together, one range each. Members
+/// joined by an unbroken comma are one stretch however many they are, and the
+/// whole of it takes a single report: a run to be pulled apart is one thing to
+/// do, not one thing for every member of it.
+///
+/// The range covers what has to move and no more: the member opening a run is
+/// already where it belongs and is left out of it. Runs that do not touch stay
+/// separate, each naming its own place.
+let private unbrokenStretches (ranges: range list) =
+  let rec loop acc current = function
+    | gap :: rest ->
+      if isBrokenGap gap then
+        loop (Option.toList current @ acc) None rest
+      else
+        let grown =
+          match current with
+          | Some held -> Range.unionRanges held (snd gap)
+          | None -> snd gap
+        loop acc (Some grown) rest
+    | [] ->
+      Option.toList current @ acc
+  ranges |> List.pairwise |> loop [] None |> List.rev
+
 let checkGapAgreement src ranges =
   let broken, closed = ranges |> List.pairwise |> List.partition isBrokenGap
   if List.isEmpty broken || List.isEmpty closed then
     false
+  elif standsInAColumn ranges then
+    false
   else
-    closed |> List.iter (fun (_, next) -> reportWarn src next Message)
+    unbrokenStretches ranges |> List.iter (fun r -> reportWarn src r Message)
     true
 
-/// The gaps of a list of members, then the column its members stand in. Only
-/// a list whose ranges are the members themselves is asked the second: a chain
-/// of branches hands over the keywords that open its links, and `then` sitting
-/// mid-line beside `else` at the head of one has no column to share.
-let checkMemberPlacement src ranges =
-  if checkGapAgreement src ranges then
-    true
-  else
-    match ranges |> List.pairwise with
-    | first :: _ when isBrokenGap first -> checkColumnAgreement src ranges
-    | _ -> false
+/// Where what has to come up begins: the first line below the one a construct
+/// opens on, at the column its content starts in.
+let private firstLineBelow (src: ISourceText) (span: range) =
+  let content line =
+    let text = src.GetLineString(line - 1)
+    if text.Trim() = "" then None
+    else Some(Position.mkPos line (text.Length - text.TrimStart().Length))
+  [ span.StartLine + 1 .. span.EndLine ] |> List.tryPick content
 
 /// Reports a construct spread over several lines though the whole of it would
-/// close up onto one inside the line budget. `span` is everything it occupies,
-/// and `joints` are the places a break could have landed; the first of them to
-/// have fallen past the opening line takes the report. Returns true when it
-/// reported, so that the caller can leave its finer checks alone: a construct
-/// that belongs on one line has nothing further to answer for.
-let checkClosesUp src (span: range) (joints: range list) =
+/// close up onto one inside the line budget. `span` is everything it occupies.
+///
+/// Everything standing below the line the construct opens on has to come up,
+/// and it comes up together: closing a construct is one thing to do, not one
+/// thing for every break inside it. So a single report is raised covering the
+/// whole of what has to move, from where the first line below the opening
+/// begins through to the end of the construct. Naming the breaks one at a time
+/// would send the reader to a keyword with a body beside it that is just as
+/// much in the wrong place, and leave the rest to be found a round later.
+///
+/// Returns true when it reported, so that the caller can leave its finer checks
+/// alone: a construct that belongs on one line has nothing further to answer
+/// for.
+let checkClosesUp src (span: range) =
   if not isStrict || span.StartLine = span.EndLine then
     false
   elif not (isClosable src span) then
     false
   else
-    match joints |> List.tryFind (fun r -> r.StartLine > span.StartLine) with
-    | Some joint ->
-      reportNewLine src joint
+    match firstLineBelow src span with
+    | Some start ->
+      Range.mkRange "" start span.End |> reportNewLine src
       true
     | None ->
       false
@@ -145,7 +163,7 @@ let checkBracketedPlacement src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
   elif not (isClosable src span) then
-    checkMemberPlacement src ranges |> ignore
+    checkGapAgreement src ranges |> ignore
   elif span.StartLine <> span.EndLine then
     ranges
     |> List.tryFind (fun (r: range) -> r.StartLine > span.StartLine)
@@ -176,7 +194,7 @@ let checkOpenableFence src (span: range) ranges =
     if openedUp <> closedDown then
       Range.mkRange "" last.End span.End |> reportBracketSymmetry src
     elif openedUp then
-      checkMemberPlacement src ranges |> ignore
+      checkGapAgreement src ranges |> ignore
     else
       checkBracketedPlacement src span ranges
 
@@ -193,7 +211,7 @@ let checkUniformPlacement src (ranges: range list) =
       |> List.tryFind isBrokenGap
       |> Option.iter (fun (_, next) -> reportNewLine src next)
     else
-      checkMemberPlacement src ranges |> ignore
+      checkGapAgreement src ranges |> ignore
   | _ ->
     ()
 
@@ -209,8 +227,8 @@ let checkClosesUpOnly src (ranges: range list) =
     if isClosable src span then
       ranges
       |> List.pairwise
-      |> List.tryFind isBrokenGap
-      |> Option.iter (fun (_, next) -> reportNewLine src next)
+      |> List.filter isBrokenGap
+      |> List.iter (fun (_, next) -> reportNewLine src next)
     else
       ()
   | _ ->
@@ -281,7 +299,11 @@ let private checkGroup src joinable items =
       |> Option.iter (fun (_, body) ->
         if straddles then deferJoin (groupRange items) body
         else reportNewLine src body)
-    elif List.length items > 1 then
+    elif List.length items > 1 && not (items |> List.forall isInline) then
+      (* Mixed, so the ones still beside their keyword have to come down. A
+         group every body of which is inline is not mixed, whatever its width:
+         what is wrong with it is the length of a line, and the budget says so
+         by itself. Break that line and the group answers here next. *)
       items
       |> List.filter isInline
       |> List.iter (fun (_, body) -> reportWarn src body Message)

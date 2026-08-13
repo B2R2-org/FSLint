@@ -199,6 +199,17 @@ let fn v =
 let fn v = if v = 0 then 1 else if v = 1 then 2 else 3
 """
 
+  /// A chain that closes up names the whole of what has to come up, not the
+  /// last break alone: the body below its 'then' is as much in the wrong place
+  /// as the 'else' hanging under it.
+  let badClosableChainRangeTest =
+    """
+let fn count srcA srcB =
+  if count < 64 then
+      (srcB + srcA)
+    else (srcB - srcA)
+"""
+
   /// An 'else' handing its body a line of its own opens a nested expression
   /// rather than carrying the chain on, and the whole of it still closes up.
   let badNestedUnderElseTest =
@@ -433,6 +444,20 @@ let changeToAliasOfLDM bin =
     lintAssertMsg "Remove unnecessary line break" badNarrowElifSpellingTest
     lintAssertMsg "Remove unnecessary line break" badNarrowElseIfSpellingTest
     lint goodNarrowInlineElseIfTest
+
+  /// Closing a chain up is one thing to do, so it takes one report, and the
+  /// report covers everything standing below the line the chain opens on.
+  [<TestMethod>]
+  member _.``[IfThenElse] Closable Chain Range Test``() =
+    lintErrors badClosableChainRangeTest
+    |> fun errors ->
+      Assert.AreEqual<int>(1, errors.Length)
+      let range = errors.Head.Range
+      (* from the body under 'then' through the end of the else body *)
+      Assert.AreEqual<int>(4, range.StartLine)
+      Assert.AreEqual<int>(6, range.StartColumn)
+      Assert.AreEqual<int>(5, range.EndLine)
+      Assert.AreEqual<int>(22, range.EndColumn)
 
   /// The two spellings must agree exactly, or the budget lands on one half of
   /// an 'else if' chain and tears it in two.

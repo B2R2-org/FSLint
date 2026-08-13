@@ -212,8 +212,9 @@ let rec private checkRecordInPattern src (idRange: range) = function
 
 and private checkLongIdentPatternCase src typarDecls argPats = function
   | [ qualifier; method: Ident ]
-    when isPascalCase method.idText &&
-         qualifier.idText <> "_" && qualifier.idText <> "this" ->
+    when isPascalCase method.idText
+         && qualifier.idText <> "_"
+         && qualifier.idText <> "this" ->
     checkFuncSpacing src typarDecls method.idRange argPats
   | [ id ] when isPascalCase id.idText && not argPats.Patterns.IsEmpty ->
     if argPats.Patterns.Head.IsRecord then
@@ -225,8 +226,9 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
     else
       ()
   | [ id ]
-    when id.idText = "new" && argPats.Patterns.Head.IsParen &&
-         id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
+    when id.idText = "new"
+         && argPats.Patterns.Head.IsParen
+         && id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argPats.Patterns.Head.Range.Start
     |> reportPascalCaseError src
   | _ ->
@@ -413,3 +415,34 @@ and private checkArrayOrList src isArray elementPats (range: range) =
     else
       ()
     elementPats |> List.iter (checkBody src)
+
+/// A comma list in a pattern is laid out as one in an expression is: its gaps
+/// either all carry a line break or none of them does. What a pattern is never
+/// asked is a name, since there is nowhere in a pattern to put one; the gaps
+/// are all of it.
+///
+/// The walk reaches down through whatever fences a pattern nests behind, since
+/// a list buried inside a constructor is a list still.
+let rec checkCommaLayout src (pat: SynPat) =
+  match pat with
+  | SynPat.Tuple(elementPats = pats) ->
+    pats
+    |> List.map (fun (p: SynPat) -> p.Range)
+    |> LineBreakConvention.checkUniformPlacement src
+    for p in pats do checkCommaLayout src p
+  | SynPat.Paren(pat = inner)
+  | SynPat.Typed(pat = inner)
+  | SynPat.Attrib(pat = inner) ->
+    checkCommaLayout src inner
+  | SynPat.As(lhsPat = lhs; rhsPat = rhs)
+  | SynPat.Or(lhsPat = lhs; rhsPat = rhs)
+  | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
+    checkCommaLayout src lhs
+    checkCommaLayout src rhs
+  | SynPat.LongIdent(argPats = SynArgPats.Pats args) ->
+    for arg in args do checkCommaLayout src arg
+  | SynPat.Ands(pats = pats)
+  | SynPat.ArrayOrList(elementPats = pats) ->
+    for p in pats do checkCommaLayout src p
+  | _ ->
+    ()

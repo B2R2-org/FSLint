@@ -878,6 +878,37 @@ let private createDominance fwG (bwG: Lazy<IDiGraphAccessible<_, _>>)
   ()
 """
 
+  /// Four members crowd one line and the fifth is below: pulling that run
+  /// apart is one thing to do, so it takes one report covering the whole run
+  /// rather than one report per member.
+  let badOneCrowdedRunTest =
+    """
+let fn x =
+  match x with
+  | (DB, zk, zv, RBNode(NB, xk, xv, RBNode(B, wk, wv, a, b),
+     RBNode(B, yk, yv, c, d)), e) ->
+    aRatherLongFunctionNameHere zk zv |> anotherRatherLongFunctionNameHere
+  | _ ->
+    aRatherLongFunctionNameHere one two |> anotherRatherLongFunctionNameHere
+"""
+
+  /// Several parameters may keep to the line the list opens on, so long as
+  /// what follows stands under the last of them: that reads as a column and
+  /// is a layout in its own right, whatever the gaps say.
+  let goodColumnedParametersTest =
+    """
+let joinDefs dstInSP (m1: SensitiveReachingDefs<_>)
+                     (m2: SensitiveReachingDefs<_>) = ()
+"""
+
+  /// Standing under no column at all is another matter.
+  let badRaggedParametersTest =
+    """
+let ragged fwG (bwG: Lazy<IDiGraphAccessible<_, _>>)
+      fwInfo
+            (fwDT: Lazy<DominatorTree<_, _>>) = ()
+"""
+
   /// One parameter to a line throughout.
   let goodEveryParameterOnItsLineTest =
     """
@@ -1852,28 +1883,19 @@ type TestClass(aaa: int, bbb: int
     lint goodListOverBoundaryTest
     lintAssertMsg "Remove unnecessary line break" badListBoundaryTest
 
-  /// Every line a list spread down the page runs to begins in one column,
-  /// whether the separator that divides it trails its members or leads them.
+  /// Where the members of a broken list stand is left to the author. A list
+  /// whose every comma is broken has answered for itself, however ragged the
+  /// columns it lands in.
   [<TestMethod>]
-  member _.``[LineBreak] Column Agreement Test``() =
+  member _.``[LineBreak] Column Left To The Author Test``() =
     lint goodColumnArgumentTest
     lint goodColumnConditionTest
-    lintAssertMsg "Use consistent indentation" badColumnArgumentTest
-    lintAssertMsg "Use consistent indentation" badColumnConditionTest
-
-  /// The column is asked of the lines the list runs to, not of a member that
-  /// shares its line with whatever opened the list, nor of the keywords a
-  /// chain of branches hands over in place of members.
-  [<TestMethod>]
-  member _.``[LineBreak] Column Agreement Exemption Test``() =
     lint goodColumnOpenerTest
     lint goodColumnBranchTest
-
-  /// Type parameters too many for one line answer the same way.
-  [<TestMethod>]
-  member _.``[LineBreak] Type Parameter Column Test``() =
     lint goodColumnTypeParamTest
-    lintAssertMsg "Use consistent indentation" badColumnTypeParamTest
+    lint badColumnArgumentTest
+    lint badColumnConditionTest
+    lint badColumnTypeParamTest
 
   /// A list too wide to close up belongs down the page entire, so it is the
   /// neighbour still beside its predecessor that has to move. Every one of
@@ -1884,9 +1906,35 @@ type TestClass(aaa: int, bbb: int
     lintErrors badOneStrayParameterTest
     |> fun errors ->
       Assert.AreEqual<int>(1, errors.Length)
+      (* `bwG` is what has to move; `fwG` is already where it belongs *)
       Assert.AreEqual<int>(32, errors.Head.Range.StartColumn)
     lintErrors badTwoStrayParametersTest
     |> fun errors ->
       Assert.AreEqual<int>(2, errors.Length)
       Assert.AreEqual<int>(2, errors.Head.Range.StartLine)
       Assert.AreEqual<int>(3, errors[1].Range.StartLine)
+
+  /// A list that hangs what follows under the last parameter of its opening
+  /// line reads as a column, and the gaps have nothing to say about it. One
+  /// hanging them under nothing in particular still answers.
+  [<TestMethod>]
+  member _.``[LineBreak] Columned Parameter Test``() =
+    lint goodColumnedParametersTest
+    lintAssertMsg "Use consistent line breaks" badRaggedParametersTest
+
+  /// Members sharing a line are one stretch, however many of them there are,
+  /// and the whole of it takes a single report. Stretches that do not touch
+  /// stay separate, each naming its own place.
+  [<TestMethod>]
+  member _.``[LineBreak] Crowded Run Test``() =
+    lintErrors badOneCrowdedRunTest
+    |> List.filter (fun e -> e.Message = "Use consistent line breaks")
+    |> fun errors ->
+      Assert.AreEqual<int>(1, errors.Length)
+      (* the range covers what has to move: `xk` through the last member
+         still joined to it, leaving `NB` where it already belongs *)
+      Assert.AreEqual<int>(28, errors.Head.Range.StartColumn)
+      Assert.AreEqual<int>(59, errors.Head.Range.EndColumn)
+    lintErrors badTwoStrayParametersTest
+    |> List.filter (fun e -> e.Message = "Use consistent line breaks")
+    |> fun errors -> Assert.AreEqual<int>(2, errors.Length)

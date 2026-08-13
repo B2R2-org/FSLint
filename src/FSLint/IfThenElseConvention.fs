@@ -87,12 +87,18 @@ let private isBooleanConnective = function
 
 /// Flattens a chain of '&&' and '||' into its operands, so that `a && b || c`
 /// yields `[ a; b; c ]`.
+///
+/// Both sides are walked, not the left alone. `&&` binds tighter than `||`, so
+/// `a && b || c && d` is a `||` holding two `&&` pairs, and following only the
+/// left spine would leave `c && d` standing as one operand with its own `&&`
+/// hidden inside it. The reader sees four things separated by operators, and
+/// the chain has to be read the same way.
 let private flattenInfixChain expr =
   let rec loop acc e =
     match e with
     | SynExpr.App(funcExpr = SynExpr.App(isInfix = true; argExpr = lhs)
                   argExpr = rhs) when isBooleanConnective e ->
-      loop (rhs :: acc) lhs
+      loop (loop acc rhs) lhs
     | _ ->
       e :: acc
   if isBooleanConnective expr then loop [] expr else []
@@ -150,7 +156,7 @@ let private checkBranchLayout src ifExpr thenExpr elseExpr range trivia =
     let closesUp =
       not bare
       && fitsOnOneLine
-      && LineBreakConvention.checkClosesUp src range links
+      && LineBreakConvention.checkClosesUp src range
     if closesUp then ()
     elif LineBreakConvention.checkGapAgreement src links then ()
     elif bare then LineBreakConvention.checkUniformlyBroken src branches
@@ -188,6 +194,25 @@ let rec private checkConditionLayout src expr =
     |> List.map (fun (operand: SynExpr) -> operand.Range)
     |> LineBreakConvention.checkUniformPlacement src
     for operand in operands do checkConditionLayout src operand
+
+/// Every operand of a `when` guard must either share one line or each sit on
+/// one of its own, as the operands of an `if` condition do.
+///
+/// What is not asked of a guard is the name an `if` condition is asked for once
+/// a parenthesised group runs past its line. There is nowhere in a match clause
+/// to put that name: a `let` cannot stand ahead of the guard, and the group
+/// commonly reads the very value the pattern bound, so lifting it out of the
+/// match is closed off too. A guard answers for its gaps and for nothing else.
+let rec checkGuardLayout src expr =
+  match expr with
+  | SynExpr.Paren(expr = inner) ->
+    checkGuardLayout src inner
+  | _ ->
+    let operands = flattenInfixChain expr
+    operands
+    |> List.map (fun (operand: SynExpr) -> operand.Range)
+    |> LineBreakConvention.checkUniformPlacement src
+    for operand in operands do checkGuardLayout src operand
 
 /// An `elif` chain hands its `else` to the nested link that ends it, so every
 /// link above that one has an else expression without an `else` keyword of its

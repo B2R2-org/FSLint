@@ -20,9 +20,9 @@ open Diagnostics
 /// that would close up onto a single line has to be on a single line, so a
 /// 'with' left hanging below is reported however neatly its own handler sits
 /// beside it. A body needing lines of its own puts that out of reach.
-let private closesUp src whole (bodies: range list) joints =
+let private closesUp src whole (bodies: range list) =
   bodies |> List.forall (fun body -> body.StartLine = body.EndLine)
-  && LineBreakConvention.checkClosesUp src whole joints
+  && LineBreakConvention.checkClosesUp src whole
 
 let checkLayout src (tryExpr: SynExpr) clauses range trivia =
   match clauses with
@@ -38,8 +38,7 @@ let checkLayout src (tryExpr: SynExpr) clauses range trivia =
       match clauseTrivia.ArrowRange with
       | Some arrowRange ->
         let handler = (handler: SynExpr).Range
-        if closesUp src range [ tryExpr.Range; handler ]
-             [ tryExpr.Range; trivia.WithKeyword; handler ] then
+        if closesUp src range [ tryExpr.Range; handler ] then
           ()
         else
           [ trivia.TryKeyword, tryExpr.Range
@@ -52,8 +51,7 @@ let checkLayout src (tryExpr: SynExpr) clauses range trivia =
 /// them held to the budget first.
 let checkFinallyLayout src tryBody finallyBody whole trivia =
   let keyword = (trivia: SynExprTryFinallyTrivia).FinallyKeyword
-  if closesUp src whole [ tryBody; finallyBody ]
-       [ tryBody; keyword; finallyBody ] then
+  if closesUp src whole [ tryBody; finallyBody ] then
     ()
   else
     [ trivia.TryKeyword, tryBody

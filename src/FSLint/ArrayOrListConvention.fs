@@ -215,6 +215,10 @@ let rec checkSingleLine src = function
     checkSingleLine src argExpr
   | SynExpr.TypeApp(expr = expr) ->
     checkSingleLine src expr
+  | SynExpr.Typed(expr = expr) ->
+    (* An annotation fences nothing off: what stands inside it is an element
+       like any other and is read on the same terms. *)
+    checkSingleLine src expr
   | SynExpr.YieldOrReturn _
   | SynExpr.YieldOrReturnFrom _
   | SynExpr.Upcast _

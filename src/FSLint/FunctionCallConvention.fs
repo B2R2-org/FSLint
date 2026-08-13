@@ -124,9 +124,9 @@ let checkDotGet src expr id flag =
       ()
 
 let checkNewKeywordSpacing src = function
-  | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ])),
-    (argExpr: SynExpr)
-    when id.idText = "new" && argExpr.IsParen
+  | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ])), (argExpr: SynExpr)
+    when id.idText = "new"
+    && argExpr.IsParen
     && id.idRange.EndColumn <> argExpr.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argExpr.Range.Start
     |> reportPascalCaseError src
@@ -148,7 +148,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
     | SynExpr.TypeApp(expr = expr; range = typeRange) ->
       checkTypeApp src expr typeRange argExpr
     | SynExpr.LongIdent(isOptional = false; longDotId = SynLongIdent(id = id))
-      when id.Length <> 1 && argExpr.IsParen
+      when id.Length <> 1
+      && argExpr.IsParen
       && argExpr.Range.StartLine = (List.last id).idRange.StartLine ->
       checkIdent src (List.last id) argExpr
     | SynExpr.Ident ident when argExpr.IsParen ->

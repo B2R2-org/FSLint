@@ -137,7 +137,7 @@ let checkBodyPlacement src (binding: SynBinding) =
         && equals.StartLine = pat.Range.StartLine
         && body.Range.StartLine = body.Range.EndLine ->
       Range.unionRanges pat.Range body.Range
-      |> fun span -> LineBreakConvention.checkClosesUp src span [ body.Range ]
+      |> LineBreakConvention.checkClosesUp src
       |> ignore
     | _ ->
       ()

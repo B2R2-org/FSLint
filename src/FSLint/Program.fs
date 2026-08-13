@@ -38,8 +38,11 @@ let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
   | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
     checkPattern src case true trivia lhs
     checkPattern src case true trivia rhs
-  | SynPat.LongIdent(lid, extraId, typarDecls, SynArgPats.Pats args,
-                     _, range) as pat ->
+  | SynPat.LongIdent(longDotId = lid
+                     extraId = extraId
+                     typarDecls = typarDecls
+                     argPats = SynArgPats.Pats args
+                     range = range) as pat ->
     let SynLongIdent(id = lid; dotRanges = dotRanges; trivia = idTrivia) = lid
     let name = (List.last lid).idText
     let case = if not (List.isEmpty args) && isSubPat then PascalCase else case
@@ -53,8 +56,9 @@ let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
         dotRanges args
     PatternMatchingConvention.checkBody src pat
     for arg in args do checkPattern src LowerCamelCase true trivia arg
-  | SynPat.LongIdent(lid, _, _,
-    SynArgPats.NamePatPairs(pats = pat), _, range) ->
+  | SynPat.LongIdent(longDotId = lid
+                     argPats = SynArgPats.NamePatPairs(pats = pat)
+                     range = range) ->
     let SynLongIdent(id = lid) = lid
     let name = (List.last lid).idText
     IdentifierConvention.check src PascalCase true name range
@@ -93,6 +97,7 @@ and checkMatchClause (src: ISourceText) clause =
   else
     ()
   PatternMatchingConvention.checkBody src pat
+  PatternMatchingConvention.checkCommaLayout src pat
   TypeAnnotation.checkParamTypeSpacing src pat
   RecordConvention.checkRecordPat src pat
   match pat with
@@ -105,6 +110,7 @@ and checkMatchClause (src: ISourceText) clause =
     ()
   if whenExpr.IsSome then
     FunctionCallConvention.checkMethodParenSpacing src whenExpr.Value
+    IfThenElseConvention.checkGuardLayout src whenExpr.Value
     checkExpression src whenExpr.Value
   else
     ()

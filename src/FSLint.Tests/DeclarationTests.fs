@@ -357,12 +357,13 @@ let processData input =
       ("  | _ ->\n    " + wide + "\n")
     |> lint
     (* Sitting beside its keyword over the budget: the line answers for its
-       own width, and the group is told to come down besides. *)
+       own width and nothing more. Every body here is inline, so the group is
+       not mixed and has nothing of its own to answer for; break that line and
+       the clause left behind is asked to follow. *)
     chain "  | Num(n, _) -> shortOne n op\n" ("  | _ -> " + wide + "\n")
     |> lintErrors
     |> List.filter (fun e -> e.Message = "Use consistent line breaks")
-    (* Both clauses are named: each is a place the author has to break. *)
-    |> fun errors -> Assert.AreEqual<int>(2, errors.Length)
+    |> fun errors -> Assert.AreEqual<int>(0, errors.Length)
 
   /// What broke is the header rather than the body, and the parameter list
   /// answers for that elsewhere.

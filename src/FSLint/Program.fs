@@ -66,7 +66,16 @@ let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
   | SynPat.Paren(pat = pat) as synPat ->
     ParenConvention.checkPat src synPat
     checkPattern src case true trivia pat
-  | SynPat.Tuple(elementPats = pats; commaRanges = commaRanges) ->
+  | SynPat.Tuple(isStruct = isStruct
+                 elementPats = pats
+                 commaRanges = commaRanges
+                 range = range) ->
+    if isStruct then
+      pats
+      |> List.map (fun (pat: SynPat) -> pat.Range)
+      |> ParenConvention.checkStructSpacing src range
+    else
+      ()
     TupleConvention.checkPat src pats commaRanges
     for pat in pats do checkPattern src case true trivia pat
   | SynPat.OptionalVal(ident = id) ->
@@ -124,7 +133,8 @@ and checkExpression src = function
     RecordConvention.checkAnonymousRecord src info fields range trivia
     if Option.isSome info then info.Value |> fst |> checkExpression src else ()
     fields |> List.iter (fun (_, _, expr) -> checkExpression src expr)
-  | SynExpr.Paren(expr = SynExpr.Tuple(exprs = exprs
+  | SynExpr.Paren(expr = SynExpr.Tuple(isStruct = isStruct
+                                       exprs = exprs
                                        commaRanges = commas
                                        range = tupleRange)
                   range = parenRange) as expr ->
@@ -133,7 +143,7 @@ and checkExpression src = function
        only the gaps between its elements to answer for, so the two are not
        both put to it. *)
     ParenConvention.checkExpr src expr
-    checkTuple src (Some parenRange) tupleRange exprs commas
+    checkTuple src isStruct (Some parenRange) tupleRange exprs commas
   | SynExpr.Paren(expr = innerExpr) as expr ->
     ParenConvention.checkExpr src expr
     checkExpression src innerExpr
@@ -197,8 +207,11 @@ and checkExpression src = function
   | SynExpr.MatchLambda(matchClauses = clauses) ->
     PatternMatchingConvention.checkUniformCaseBody src clauses
     for clause in clauses do checkMatchClause src clause
-  | SynExpr.Tuple(exprs = exprs; commaRanges = commaRanges; range = range) ->
-    checkTuple src None range exprs commaRanges
+  | SynExpr.Tuple(isStruct = isStruct
+                  exprs = exprs
+                  commaRanges = commaRanges
+                  range = range) ->
+    checkTuple src isStruct None range exprs commaRanges
   | SynExpr.TryFinally(tryExpr = tryExpr
                        finallyExpr = finallyExpr
                        range = range
@@ -342,7 +355,16 @@ and checkExpression src = function
 /// An operator applied infix carries its two operands as a tuple of its own,
 /// with no fence around them, so what stands for a parameter list is looked
 /// for whether or not there is one.
-and checkTuple src fence tupleRange exprs commaRanges =
+///
+/// A struct tuple keeps its parentheses inside its own range rather than in a
+/// `SynExpr.Paren` of its own, so the spacing beside them is asked for here.
+and checkTuple src isStruct fence tupleRange exprs commaRanges =
+  if isStruct then
+    exprs
+    |> List.map (fun (expr: SynExpr) -> expr.Range)
+    |> ParenConvention.checkStructSpacing src tupleRange
+  else
+    ()
   TupleConvention.check src exprs commaRanges
   match fence with
   | Some range ->

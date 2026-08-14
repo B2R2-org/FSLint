@@ -386,7 +386,16 @@ let rec checkBody (src: ISourceText) = function
       pats |> List.iter (fun pat -> checkBody src pat.Pattern)
   | SynPat.Paren(pat = pat) ->
     checkBody src pat
-  | SynPat.Tuple(elementPats = elementPats; commaRanges = commaRanges) ->
+  | SynPat.Tuple(isStruct = isStruct
+                 elementPats = elementPats
+                 commaRanges = commaRanges
+                 range = range) ->
+    if isStruct then
+      elementPats
+      |> List.map (fun (pat: SynPat) -> pat.Range)
+      |> ParenConvention.checkStructSpacing src range
+    else
+      ()
     TupleConvention.checkPat src elementPats commaRanges
     elementPats |> List.iter (checkBody src)
   | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat)

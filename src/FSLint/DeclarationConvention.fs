@@ -91,7 +91,8 @@ let checkAttributesLineSpacing src attrs (moduleRange: range) =
     if Option.isNone (findCommentsBetween attrRange moduleRange)
       && attrRange.EndLine + 1 <> moduleRange.StartLine
       && attrRange.StartLine <> moduleRange.StartLine then
-      Range.mkRange "" (Position.mkPos (moduleRange.StartLine - 1) 0)
+      Range.mkRange ""
+        (Position.mkPos (moduleRange.StartLine - 1) 0)
         moduleRange.Start
       |> reportNewLine src
     else

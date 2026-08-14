@@ -35,7 +35,8 @@ let private checkObjExprNewline src (objExprRanges: range list) =
     if isBlankLine src lineIdx then
       if acc >= 1 then
         Range.mkRange objExprRanges[0].FileName
-          (Position.mkPos (lineIdx - 1) 0) (Position.mkPos (lineIdx - 1) 1)
+          (Position.mkPos (lineIdx - 1) 0)
+          (Position.mkPos (lineIdx - 1) 1)
         |> fun range -> reportWarn src range "Use at most single blank line"
       else
         ()

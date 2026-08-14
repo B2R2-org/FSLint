@@ -26,7 +26,8 @@ let private isSymbolOrPunctuation c = Char.IsSymbol c || Char.IsPunctuation c
 let private checkSpacingOrNot (src: ISourceText) (range: range) =
   try
     let createThreeRangeAfterEndCol =
-      Range.mkRange "" (Position.mkPos range.EndLine range.EndColumn)
+      Range.mkRange ""
+        (Position.mkPos range.EndLine range.EndColumn)
         (Position.mkPos range.EndLine (range.EndColumn + 3))
     let str = src.GetSubTextFromRange createThreeRangeAfterEndCol
     str.Length >= 2 && str[0] = ' ' && not (isSymbolOrPunctuation str[1]) &&

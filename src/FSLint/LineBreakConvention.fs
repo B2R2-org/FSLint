@@ -183,8 +183,16 @@ let checkBracketedPlacement src (span: range) ranges =
 ///
 /// A fence left shut is judged as any other bracketed list: it closes up
 /// while it can, and once it cannot its gaps have to agree.
+///
+/// Before either, the whole of it is held to the budget. Opening a fence says
+/// the list is to be read as a block, and a block is a layout in its own right
+/// — but only where the list had to leave its line at all. One that would
+/// stand on a single line inside the budget was not driven down the page by
+/// anything, so it belongs on that line and is asked to come back to it.
 let checkOpenableFence src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
+    ()
+  elif checkClosesUp src span then
     ()
   else
     let first: range = List.head ranges

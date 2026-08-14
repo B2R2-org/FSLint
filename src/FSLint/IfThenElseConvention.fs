@@ -195,6 +195,25 @@ let rec private checkConditionLayout src expr =
     |> LineBreakConvention.checkUniformPlacement src
     for operand in operands do checkConditionLayout src operand
 
+/// The condition with the parentheses wrapped round the whole of it taken off.
+///
+/// Such a fence is not a group inside the condition. A group is asked for a
+/// name so that the chain holding it goes back to reading in one line, and
+/// there is no chain here beside it: what it holds is the condition entire.
+/// Naming it would move the same operands under a `let` and leave the `if`
+/// exactly as long as it was.
+///
+/// So the two spellings have to answer alike, as `elif` and `else if` do:
+///
+/// ```fsharp
+/// if (a = 1 || b = 2 || c = 3) then  // parenthesised
+/// if a = 1 || b = 2 || c = 3 then    // not
+/// ```
+let rec private unfence expr =
+  match expr with
+  | SynExpr.Paren(expr = inner) -> unfence inner
+  | _ -> expr
+
 /// Every operand of a `when` guard must either share one line or each sit on
 /// one of its own, as the operands of an `if` condition do.
 ///
@@ -221,12 +240,13 @@ let rec checkGuardLayout src expr =
 let check src ifExpr thenExpr (elseExpr: Option<SynExpr>) range trivia =
   if isStrict then
     checkBranchLayout src ifExpr thenExpr elseExpr range trivia
-    checkConditionLayout src ifExpr
+    checkConditionLayout src (unfence ifExpr)
     match elseExpr with
     | Some elseBody ->
       checkKeywordSpacing src ifExpr thenExpr elseBody trivia
     | None ->
-      reportWarn src (trivia: SynExprIfThenElseTrivia).IfToThenRange
+      reportWarn src
+        (trivia: SynExprIfThenElseTrivia).IfToThenRange
         "Add else expression"
   else
     ()

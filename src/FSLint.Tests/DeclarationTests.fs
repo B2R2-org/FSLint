@@ -312,17 +312,20 @@ let processData input =
       + "#if ! HASHCONS\n" + thumb + "#else\n" + other + "#endif\n"
     (* The bodies below both directives are named at once, one per build. *)
     clauses "  | Num(n, _) -> shortOne n op\n"
-      "  | _ ->\n    shortTwo op e\n" "  | _ ->\n    shortThree op e\n"
+      "  | _ ->\n    shortTwo op e\n"
+      "  | _ ->\n    shortThree op e\n"
     |> lintErrors
     |> List.filter (fun e -> e.Message = "Remove unnecessary line break")
     |> fun errors -> Assert.AreEqual<int>(2, errors.Length)
     (* Bringing one up leaves the other still asked for. *)
     clauses "  | Num(n, _) -> shortOne n op\n"
-      "  | _ -> shortTwo op e\n" "  | _ ->\n    shortThree op e\n"
+      "  | _ -> shortTwo op e\n"
+      "  | _ ->\n    shortThree op e\n"
     |> lintAssertMsg "Remove unnecessary line break"
     (* With every body up, nothing is left to ask. *)
     clauses "  | Num(n, _) -> shortOne n op\n"
-      "  | _ -> shortTwo op e\n" "  | _ -> shortThree op e\n"
+      "  | _ -> shortTwo op e\n"
+      "  | _ -> shortThree op e\n"
     |> lint
 
   /// Code outside the directives is seen by both parses and reported once.

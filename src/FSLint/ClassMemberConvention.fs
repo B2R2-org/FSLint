@@ -186,14 +186,11 @@ let checkMemberOrder src (members: SynMemberDefn list) =
         let prevScope = getMemberScope prev
         let nextScope = getMemberScope next
         if prevCat <> nextCat then
-          reportWarn src range
-            $"Move {nextCat} before {prevCat}"
+          reportWarn src range $"Move {nextCat} before {prevCat}"
         elif prevScope <> nextScope then
-          reportWarn src range
-            "Move static member before instance members"
+          reportWarn src range "Move static member before instance members"
         else
-          reportWarn src range
-            "Fix member order by access level"
+          reportWarn src range "Fix member order by access level"
       else
         ()
     )

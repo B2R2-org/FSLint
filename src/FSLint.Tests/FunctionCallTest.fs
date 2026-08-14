@@ -23,12 +23,16 @@ type FunctionCallTests() =
 
   let badCurriedFuncPascalCaseNestedTest = """str.Substring(1).TrimStart ()"""
 
+  /// A lambda argument is an argument like any other, and the gaps of the list
+  /// holding it either all carry a line break or none of them does. One given
+  /// a line of its own leaves the short arguments below it no line to share.
   let goodParenNewLineTest =
     """
 let good =
   CountBackForBand
     (fun src _ currentBand -> VisGraph.getLayer src = currentBand)
-    bandIndex true
+    bandIndexValue
+    isReallyTrue
 """
 
   let goodParenNewLineTest2 =
@@ -36,7 +40,16 @@ let good =
 let good =
   countBackForBand
     (fun src _ currentBand -> VisGraph.getLayer src = currentBand)
-    bandIndex true
+    bandIndexValue
+    isReallyTrue
+"""
+
+  let badParenNewLineTest =
+    """
+let good =
+  CountBackForBand
+    (fun src _ currentBand -> VisGraph.getLayer src = currentBand)
+    bandIndexValue isReallyTrue
 """
 
   [<TestMethod>]

@@ -1763,8 +1763,7 @@ type TestClass(aaa: int, bbb: int
   [<TestMethod>]
   member _.``[LineBreak] Bracket Junction Boundary Test``() =
     lint goodBracketJunctionOverBoundaryTest
-    lintAssertMsg "Remove unnecessary line break"
-      badBracketJunctionBoundaryTest
+    lintAssertMsg "Remove unnecessary line break" badBracketJunctionBoundaryTest
 
   [<TestMethod>]
   member _.``[LineBreak] Elif Broken Condition Branch Test``() =

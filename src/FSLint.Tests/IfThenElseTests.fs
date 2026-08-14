@@ -300,6 +300,31 @@ let fn () =
 """
 
   /// The whole condition is one parenthesised group whose operands disagree.
+  /// Parentheses round the whole condition hold no group: what they hold is
+  /// the condition itself, which answers on its gaps exactly as it would with
+  /// no parentheses at all.
+  let goodWholeParenGroupTest =
+    """
+let fn () =
+  if (isSomethingRatherLongHere
+      || isAnotherLongCondition
+      || isYetAnotherLongCondition) then
+    printfn "a message that is much too long to sit beside its keyword here"
+  else
+    printfn "another message far too long to sit beside its keyword as well"
+"""
+
+  let goodBareChainConditionTest =
+    """
+let fn () =
+  if isSomethingRatherLongHere
+    || isAnotherLongCondition
+    || isYetAnotherLongCondition then
+    printfn "a message that is much too long to sit beside its keyword here"
+  else
+    printfn "another message far too long to sit beside its keyword as well"
+"""
+
   let badWholeParenGroupTest =
     """
 let fn () =
@@ -523,10 +548,21 @@ let changeToAliasOfLDM bin =
   [<TestMethod>]
   member _.``[IfThenElse] Paren Condition Group Test``() =
     lint goodParenGroupInlineTest
-    lintAssertMsg "Bind to fit the line" badWholeParenGroupTest
     lintAssertMsg "Bind to fit the line" badNestedParenGroupTest
-    lintAssertMsg "Bind to fit the line"
-      badNestedParenGroupBrokenTest
+    lintAssertMsg "Bind to fit the line" badNestedParenGroupBrokenTest
+
+  /// Parentheses round the whole condition are the condition's own fence, not
+  /// a group inside it, and naming what they hold would leave the 'if' exactly
+  /// as long as it was. So the two spellings answer alike and the chain is read
+  /// on its gaps, a mixture of them and nothing else.
+  [<TestMethod>]
+  member _.``[IfThenElse] Whole Condition Fence Test``() =
+    lint goodWholeParenGroupTest
+    lintAssertMsg "Use consistent line breaks" badWholeParenGroupTest
+    let fenced = lintErrors goodWholeParenGroupTest |> List.length
+    let bare = lintErrors goodBareChainConditionTest |> List.length
+    Assert.AreEqual<int>(bare, fenced)
+    Assert.AreEqual<int>(0, fenced)
 
   /// Input the parser could make nothing of reaches the rules as an error
   /// node, and no rule may fall over on it.

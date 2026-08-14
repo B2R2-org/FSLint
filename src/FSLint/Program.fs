@@ -49,11 +49,18 @@ let rec checkPattern src case isSubPat (trivia: SynBindingTrivia) = function
     IdentifierConvention.check src case true name range
     if isSubPat then () else LineBreakConvention.checkParameters src args
     if trivia.LeadingKeyword.IsStaticMember then
-      ClassMemberConvention.checkStaticMemberSpacing src lid typarDecls
-        args idTrivia
+      ClassMemberConvention.checkStaticMemberSpacing src
+                                                     lid
+                                                     typarDecls
+                                                     args
+                                                     idTrivia
     else
-      ClassMemberConvention.checkMemberSpacing src lid typarDecls extraId
-        dotRanges args
+      ClassMemberConvention.checkMemberSpacing src
+                                               lid
+                                               typarDecls
+                                               extraId
+                                               dotRanges
+                                               args
     PatternMatchingConvention.checkBody src pat
     for arg in args do checkPattern src LowerCamelCase true trivia arg
   | SynPat.LongIdent(longDotId = lid
@@ -216,8 +223,11 @@ and checkExpression src = function
                        finallyExpr = finallyExpr
                        range = range
                        trivia = tryFinallyTrivia) ->
-    TryWithConvention.checkFinallyLayout src tryExpr.Range finallyExpr.Range
-      range tryFinallyTrivia
+    TryWithConvention.checkFinallyLayout src
+                                         tryExpr.Range
+                                         finallyExpr.Range
+                                         range
+                                         tryFinallyTrivia
     checkExpression src tryExpr
     checkExpression src finallyExpr
   | SynExpr.TryWith(tryExpr = tryExpr
@@ -251,6 +261,7 @@ and checkExpression src = function
       FunctionCallConvention.checkMethodParenSpacing src expr
       AppConvention.check src isInfix funcExpr argExpr
       AppConvention.checkBitwiseChain src expr
+      AppConvention.checkArgumentPlacement src expr
       noteApplicationArg argExpr.Range
       checkExpression src funcExpr
       checkExpression src argExpr
@@ -357,14 +368,17 @@ and checkExpression src = function
 /// for whether or not there is one.
 ///
 /// A struct tuple keeps its parentheses inside its own range rather than in a
-/// `SynExpr.Paren` of its own, so the spacing beside them is asked for here.
+/// `SynExpr.Paren` of its own. They fence it in all the same, so they are found
+/// in the text and the tuple is judged with them, as any other fenced list is.
 and checkTuple src isStruct fence tupleRange exprs commaRanges =
-  if isStruct then
-    exprs
-    |> List.map (fun (expr: SynExpr) -> expr.Range)
-    |> ParenConvention.checkStructSpacing src tupleRange
-  else
-    ()
+  let fence =
+    if isStruct then
+      exprs
+      |> List.map (fun (expr: SynExpr) -> expr.Range)
+      |> ParenConvention.checkStructSpacing src tupleRange
+      ParenConvention.structFence src tupleRange
+    else
+      fence
   TupleConvention.check src exprs commaRanges
   match fence with
   | Some range ->
@@ -400,8 +414,10 @@ and checkMemberDefns src members isDelegate =
       if isDelegate then
         ()
       else
-        TypeAnnotation.checkAbstractSpacing src id synType
-          trivia.LeadingKeyword.Range
+        TypeAnnotation.checkAbstractSpacing src
+                                            id
+                                            synType
+                                            trivia.LeadingKeyword.Range
       TypeAnnotation.checkAbstractSlot src id synType
       TypeAnnotation.checkTypeAbbrevWithAnnotation src synType
       TypeAnnotation.checkAnonRecdType src synType
@@ -440,7 +456,9 @@ and checkTypeDefnSimpleRepr src trivia = function
                       valueExpr = valueExpr
                       range = range
                       trivia = trivia) = case
-      TypeConstructor.checkEqualSpacing src id.idRange valueExpr.Range
+      TypeConstructor.checkEqualSpacing src
+        id.idRange
+        valueExpr.Range
         (Some trivia.EqualsRange)
       TypeUseConvention.checkBarAlignment src id.idRange trivia.BarRange
       IdentifierConvention.check src PascalCase false id.idText range
@@ -507,12 +525,18 @@ and checkTypeDefn src defn =
       when ctorArgs.IsParen ->
       ParenConvention.checkPat src ctorArgs
       if Option.isSome innerTriv.AsKeyword then
-        TypeConstructor.checkAsSpacing src ctorArgs.Range
-          innerTriv.AsKeyword.Value selfIdentifier.Value.idRange
-        TypeConstructor.checkEqualSpacing src selfIdentifier.Value.idRange
-          repr.Range trivia.EqualsRange
+        TypeConstructor.checkAsSpacing src
+          ctorArgs.Range
+          innerTriv.AsKeyword.Value
+          selfIdentifier.Value.idRange
+        TypeConstructor.checkEqualSpacing src
+          selfIdentifier.Value.idRange
+          repr.Range
+          trivia.EqualsRange
       else
-        TypeConstructor.checkEqualSpacing src ctorArgs.Range repr.Range
+        TypeConstructor.checkEqualSpacing src
+          ctorArgs.Range
+            repr.Range
           trivia.EqualsRange
     | _ ->
       ()
@@ -520,7 +544,9 @@ and checkTypeDefn src defn =
     match info with
     | SynComponentInfo(typeParams = Some typeParams)
       when typeParams.IsPostfixList ->
-      TypeConstructor.checkEqualSpacing src typeParams.Range repr.Range
+      TypeConstructor.checkEqualSpacing src
+        typeParams.Range
+        repr.Range
         trivia.EqualsRange
     | _ ->
       TypeConstructor.checkEqualSpacing src range repr.Range trivia.EqualsRange
@@ -547,8 +573,11 @@ and checkBinding src case binding =
   TypeAnnotation.checkFieldWidthByPat src pat
   checkPattern src case false trivia pat
   if Option.isSome trivia.EqualsRange && trivia.LeadingKeyword.IsNew |> not then
-    DeclarationConvention.checkEqualSpacing src pat.Range
-      trivia.EqualsRange.Value body.Range returnInfo
+    DeclarationConvention.checkEqualSpacing src
+      pat.Range
+      trivia.EqualsRange.Value
+      body.Range
+      returnInfo
   else
     ()
   DeclarationConvention.checkComputationExprPlacement src binding
@@ -612,7 +641,8 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
                            longId = lid
                            accessibility = access) = info
       if Option.isSome trivia.ModuleKeyword then
-        DeclarationConvention.checkAttributesLineSpacing src attrs
+        DeclarationConvention.checkAttributesLineSpacing src
+          attrs
           trivia.ModuleKeyword.Value
       else
         ()
@@ -672,8 +702,7 @@ let checkWithAST src = function
                                  trivia = trivia) = m
         match trivia.LeadingKeyword with
         | SynModuleOrNamespaceLeadingKeyword.Module range ->
-          DeclarationConvention.checkAttributesLineSpacing src attribs
-            range
+          DeclarationConvention.checkAttributesLineSpacing src attribs range
         | _ ->
           ()
         for id in lid do
@@ -690,10 +719,9 @@ let checkBOM (src: ISourceText) (bs: byte[]) =
   if bs.Length > 3 && bs[0] = 0xEFuy && bs[1] = 0xBBuy && bs[2] = 0xBFuy then
     let firstLine = src.GetLineString(0)
     let range =
-      Range.mkRange ""
-        (Position.mkPos 1 0)
-        (Position.mkPos 1 firstLine.Length)
-    reportWarn src range
+      Range.mkRange "" (Position.mkPos 1 0) (Position.mkPos 1 firstLine.Length)
+    reportWarn src
+      range
       "Byte Order Mark (BOM) should be removed from the file."
   else
     ()

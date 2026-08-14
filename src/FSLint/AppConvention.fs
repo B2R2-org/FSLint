@@ -239,6 +239,70 @@ let rec private noteChainPrefixes name (expr: SynExpr) =
   | _ ->
     ()
 
+/// The arguments a curried application is given, the function itself left out.
+/// `f a b c` nests to the left, so the spine is walked down and the arguments
+/// come off it in order.
+///
+/// The walk stops at anything that is not a curried application: an operator
+/// applied infix is an application too, but its operands are no argument list,
+/// and whatever else is reached is the function being applied.
+let private curriedArguments expr =
+  let rec loop acc e =
+    match e with
+    | SynExpr.App(isInfix = false; funcExpr = func; argExpr = arg) ->
+      loop (arg :: acc) func
+    | _ ->
+      acc
+  loop [] expr
+
+/// Notes every proper prefix of the application, so that none of them answers
+/// again on its own. `f a b` is the function of `f a b c`, and a prefix judged
+/// by itself looks as though it could close up when the whole of it cannot.
+let rec private noteArgumentPrefixes expr =
+  match expr with
+  | SynExpr.App(isInfix = false; funcExpr = func) ->
+    match func with
+    | SynExpr.App(isInfix = false) ->
+      noteCoveredApplication func.Range
+      noteArgumentPrefixes func
+    | _ ->
+      ()
+  | _ ->
+    ()
+
+/// An argument list is a separator list like any other, and answers like the
+/// parameter list it is given to: while the whole of it would close up onto one
+/// line it stays closed up, and once it would not, the gaps between neighbours
+/// have to agree, all of them broken or none.
+///
+/// A call too wide for its line is thus written one argument to a line, however
+/// few of them were left beside the name it is applied to. Packing some across
+/// a line and breaking at the rest reads as though the packed ones belonged
+/// together, and nothing in a curried list makes that so:
+///
+/// ```fsharp
+/// // both of these are asked to break at every argument
+/// eprintfn "[DIAG] ERROR creating diagnostic: %s - %s"
+///   error.Message ex.Message
+///
+/// combineRangeWithComment arrowRange.EndRange
+///   bodyRange.StartRange false bodyRange
+/// ```
+///
+/// Where the arguments land is still the author's, so a list keeping several
+/// on the line it opens and hanging the rest under the last of them reads as a
+/// column and is left alone. The function is no part of the list: an argument
+/// hangs from the one before it, not from the name being applied.
+let checkArgumentPlacement src (expr: SynExpr) =
+  match curriedArguments expr with
+  | _ :: _ :: _ as args when not (isCoveredApplication expr.Range) ->
+    noteArgumentPrefixes expr
+    args
+    |> List.map (fun (arg: SynExpr) -> arg.Range)
+    |> LineBreakConvention.checkUniformPlacement src
+  | _ ->
+    ()
+
 /// A bitwise chain that would stand on one line has to stand on it. Once it
 /// would not, it is left alone: a value built out of bits may be meant as a
 /// row of fields, packed across the line, or as a set of flags, one to a

@@ -33,6 +33,35 @@ let fn () =
   struct (shortOne, shortTwo, shortThree)
 """
 
+  /// A struct tuple wears its parentheses inside its own range, with no
+  /// `SynExpr.Paren` to hold them, so they have to be found before the fence
+  /// can be judged. Opened and left open, it answers as a plain one does.
+  let badStructFenceOpenedTest =
+    """
+let fn () =
+  struct (
+          shortOne, shortTwo)
+"""
+
+  /// Opening a fence says the list is to be read as a block, but only a list
+  /// driven off its line may do so. One that would stand on a single line
+  /// inside the budget is asked back onto it, fence and all.
+  let badStructFenceBlockTest =
+    """
+let fn () =
+  struct (
+    shortOne, shortTwo
+  )
+"""
+
+  let badPlainFenceBlockTest =
+    """
+let fn () =
+  (
+    shortOne, shortTwo
+  )
+"""
+
   /// A plain tuple answers exactly as the struct one does.
   let badPlainTupleTest =
     """
@@ -331,8 +360,21 @@ match bad with
       TuplePlacementSamples.badStructTupleTest
     lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badStructTupleBrokenTest
-    lintAssertMsg "Bind to fit the line"
-      TuplePlacementSamples.badPlainTupleTest
+    lintAssertMsg "Bind to fit the line" TuplePlacementSamples.badPlainTupleTest
+
+  /// A struct tuple's parentheses fence it in exactly as a plain one's do,
+  /// though the syntax tree keeps them inside the tuple rather than handing
+  /// them over in a `SynExpr.Paren`. A fence opened onto a block it did not
+  /// need is asked back onto its line, whether the closing bracket answered
+  /// the opening one or not.
+  [<TestMethod>]
+  member _.``[Tuple] Struct Fence Test``() =
+    lintAssertMsg "Remove unnecessary line break"
+      TuplePlacementSamples.badStructFenceOpenedTest
+    lintAssertMsg "Remove unnecessary line break"
+      TuplePlacementSamples.badStructFenceBlockTest
+    lintAssertMsg "Remove unnecessary line break"
+      TuplePlacementSamples.badPlainFenceBlockTest
 
   /// Where the tuple stands makes no difference to any of this. A row of a
   /// table and a tuple handed back by a function are both tuples of data, and
@@ -372,8 +414,7 @@ match bad with
   member _.``[Tuple] Bind Exemption Test``() =
     lint TuplePlacementSamples.goodMatchScrutineeTest
     lint TuplePlacementSamples.goodBlockElementTest
-    lintAssertMsg "Bind to fit the line"
-      TuplePlacementSamples.badPlainTupleTest
+    lintAssertMsg "Bind to fit the line" TuplePlacementSamples.badPlainTupleTest
 
   /// The exemption reaches only the demand for a name. A pairing is still a
   /// comma list, and answers for its commas like any other: its gaps have to

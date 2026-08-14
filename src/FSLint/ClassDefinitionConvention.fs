@@ -14,7 +14,8 @@ let private findIdxRange fileName lineNumber startCol endColExclusive line =
     if pos <= endColExclusive - 3 then
       if (line: string).Substring(pos, 3) = "\"\"\"" then
         let tripleQuoteRange =
-          Range.mkRange fileName (Position.mkPos lineNumber pos)
+          Range.mkRange fileName
+            (Position.mkPos lineNumber pos)
             (Position.mkPos lineNumber (pos + 3))
         loop (pos + 3) (tripleQuoteRange :: acc)
       else
@@ -135,7 +136,8 @@ let checkBracketElementSpacingInTypar (src: ISourceText) decls =
       if back.StartColumn - 2 <> front.EndColumn
         && front.EndLine = back.StartLine then
         if gapStr.StartsWith "," then
-          Range.mkRange "" (Position.mkPos front.EndLine (front.EndColumn + 1))
+          Range.mkRange ""
+            (Position.mkPos front.EndLine (front.EndColumn + 1))
             back.Start
           |> reportCommaAfterSpacing src
         else
@@ -156,7 +158,8 @@ let checkBracketSpacingInTypar src decls constraints (range: range) =
         (List.last decls |> extractTypeNameRange)
   if range.StartLine = innerRange.StartLine
     && range.StartColumn + 1 <> innerRange.StartColumn then
-    Range.mkRange "" (Position.mkPos range.StartLine (range.StartColumn + 1))
+    Range.mkRange ""
+      (Position.mkPos range.StartLine (range.StartColumn + 1))
       innerRange.Start |> reportLeftAngleInnerSpacing src
   elif range.EndLine = innerRange.EndLine
     && innerRange.EndColumn + 1 <> range.EndColumn then
@@ -180,7 +183,8 @@ let private precedingKeyword (src: ISourceText) (range: range) =
   else
     let column = before.Length - name.Length
     let keyword =
-      Range.mkRange "" (Position.mkPos range.StartLine column)
+      Range.mkRange ""
+        (Position.mkPos range.StartLine column)
         (Position.mkPos range.StartLine before.Length)
     Some(keyword, column, before.TrimStart() = name)
 

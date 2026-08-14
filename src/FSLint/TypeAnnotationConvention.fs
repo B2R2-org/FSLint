@@ -25,7 +25,8 @@ let checkColonSpace src (idRange: range) (sigRange: range) =
           sigRange.Start
         |> fun range -> reportWarn src range "Use single whitespace after ':'"
       elif gap = 0 || str.EndsWith " :" then
-        Range.mkRange "" idRange.End
+        Range.mkRange ""
+          idRange.End
           (Position.mkPos idRange.StartLine (sigRange.StartColumn - 1))
         |> fun range -> reportWarn src range "Remove whitespace before ':'"
       elif gap <> 2 then
@@ -45,7 +46,8 @@ let private checkGapBetweenArrays (src: ISourceText) (ranges: list<range>) =
     let gap = Range.mkRange "" front.End back.End
     let str = gap |> src.GetSubTextFromRange
     if back.EndColumn - front.EndColumn <> 2 && str.StartsWith ' ' then
-      Range.mkRange "" front.End
+      Range.mkRange ""
+        front.End
         (Position.mkPos back.StartLine (back.EndColumn - 2))
       |> fun range -> reportWarn src range "Remove whitespace around '[]'"
     elif back.EndColumn - front.EndColumn <> 2 && str.StartsWith '[' then
@@ -203,11 +205,13 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
         let lastElemToDoubleCol =
           let frontStr = src.GetLineString(front.StartLine - 1)
           if frontStr.Length - front.EndColumn > 1 then
-            Range.mkRange "" front.End
+            Range.mkRange ""
+              front.End
               (Position.mkPos front.StartLine (front.EndColumn + 2))
             |> src.GetSubTextFromRange
           else
-            Range.mkRange "" front.End
+            Range.mkRange ""
+              front.End
               (Position.mkPos front.StartLine frontStr.Length)
             |> src.GetSubTextFromRange
         if front.StartLine = back.StartLine
@@ -221,7 +225,8 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
           if leftSpaces = 1 && rightSpaces = 1 then
             ()
           elif leftSpaces > rightSpaces then
-            Range.mkRange "" front.End
+            Range.mkRange ""
+              front.End
               (Position.mkPos front.StartLine (front.EndColumn + leftSpaces))
             |> reportConsecutiveSpacing src
           else
@@ -242,7 +247,8 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
         elif front.StartLine <> back.StartLine
           && lastElemToDoubleCol.StartsWith "*"
         then
-          Range.mkRange "" front.End
+          Range.mkRange ""
+            front.End
             (Position.mkPos front.StartLine (front.EndColumn + 1))
           |> fun range -> reportWarn src range "Use ' *'"
         elif front.StartLine <> back.StartLine
@@ -279,12 +285,14 @@ let private checkInlineSpacing src (frontCase, endCase) =
     let expectedBarStart = lastFieldEnd + 1
     let expectedCaseStart = barRange.EndColumn + 1
     if barRange.StartColumn <> expectedBarStart then
-      Range.mkRange "" (Position.mkPos barRange.StartLine lastFieldEnd)
+      Range.mkRange ""
+        (Position.mkPos barRange.StartLine lastFieldEnd)
         barRange.Start
       |> fun range -> reportWarn src range "Use single whitespace before '|'"
     elif endRange.StartColumn <> expectedCaseStart
     then
-      Range.mkRange "" endRange.Start
+      Range.mkRange ""
+        endRange.Start
         (Position.mkPos endRange.StartLine barRange.EndColumn)
       |> reportBarAfterSpacing src
     else

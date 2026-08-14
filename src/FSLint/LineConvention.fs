@@ -13,9 +13,7 @@ let checkWindowsLineEndings (src: ISourceText) (txt: string) =
   if txt.Contains WindowsLineEnding then
     let firstLine = src.GetLineString(0)
     let range =
-      Range.mkRange ""
-        (Position.mkPos 1 0)
-        (Position.mkPos 1 firstLine.Length)
+      Range.mkRange "" (Position.mkPos 1 0) (Position.mkPos 1 firstLine.Length)
     reportWarn src range "Use Unix line endings 'LF'"
     Error()
   else
@@ -46,8 +44,7 @@ let check src (txt: string) =
           Range.mkRange ""
             (Position.mkPos lineNum (maxLineLength - 1))
             (Position.mkPos lineNum line.Length)
-        reportWarn src range
-          $"exceeds {maxLineLength} characters."
+        reportWarn src range $"exceeds {maxLineLength} characters."
       elif trailingWhiteSpace.IsMatch line then
         let trailingStart = line.TrimEnd().Length
         let range =

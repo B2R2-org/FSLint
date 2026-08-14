@@ -58,7 +58,7 @@ let checkParenSpacing (src: ISourceText) (exprRange: range) (range: range) =
 /// the parentheses alike, with no `SynExpr.Paren` to be asked about them. The
 /// opening parenthesis is read out of the text and the closing one ends the
 /// range, so the fence is judged as any other is.
-let private structFence (src: ISourceText) (range: range) =
+let structFence (src: ISourceText) (range: range) =
   let line = src.GetLineString(range.StartLine - 1)
   let opening = line.IndexOf('(', range.StartColumn)
   if opening < 0 then

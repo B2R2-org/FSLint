@@ -21,8 +21,7 @@ let private checkParenthesizedNegation (src: ISourceText) = function
     | Some opName ->
       match getOppositeOperator opName with
       | Some(_, oriSymbol, oppSymbol) ->
-        reportWarn src range
-          $"Use '{oppSymbol}' instead of 'not ({oriSymbol})'"
+        reportWarn src range $"Use '{oppSymbol}' instead of 'not ({oriSymbol})'"
       | None ->
         ()
     | None ->
@@ -46,7 +45,8 @@ let private checkPipelineNegation (src: ISourceText) = function
       |> Option.iter (fun opName ->
         match getOppositeOperator opName with
         | Some(_, oriSymbol, oppSymbol) ->
-          reportWarn src range
+          reportWarn src
+            range
             $"Use '{oppSymbol}' instead of '({oriSymbol}) |> not'"
         | None ->
           ()

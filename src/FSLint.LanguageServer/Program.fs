@@ -46,7 +46,8 @@ type LspServer(rpc: JsonRpc) =
                Message = error.Message }
     with ex ->
       eprintfn "[DIAG] ERROR creating diagnostic: %s - %s"
-        error.Message ex.Message
+        error.Message
+        ex.Message
       None
 
   let lintDocument (uri: string) (content: string): LspDiagnostic[] =

@@ -53,6 +53,13 @@ module Diagnostics =
   /// it cannot.
   let coveredChains = new AsyncLocal<ResizeArray<range>>()
 
+  /// Applications already answered for by a longer one above them. A curried
+  /// application nests to the left in the same way a chain does, so `f a b` is
+  /// an expression of its own inside `f a b c` and would be judged twice. It is
+  /// kept apart from the chains above so that noting one can never silence the
+  /// other.
+  let coveredApplications = new AsyncLocal<ResizeArray<range>>()
+
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
@@ -66,6 +73,7 @@ module Diagnostics =
     applicationArgs.Value <- ResizeArray()
     matchScrutinees.Value <- ResizeArray()
     coveredChains.Value <- ResizeArray()
+    coveredApplications.Value <- ResizeArray()
 
   /// True when the store holds the very stretch given.
   let private holds (store: AsyncLocal<ResizeArray<range>>) (range: range) =
@@ -85,6 +93,11 @@ module Diagnostics =
   let noteCoveredChain (range: range) = coveredChains.Value.Add range
 
   let isCoveredChain range = holds coveredChains range
+
+  let noteCoveredApplication (range: range) =
+    coveredApplications.Value.Add range
+
+  let isCoveredApplication range = holds coveredApplications range
 
   /// True when the stretch is an application's argument, and so a parameter
   /// list rather than a tuple standing on its own.
@@ -129,9 +142,7 @@ module Diagnostics =
     match currentLintContext.Value with
     | Some context ->
       let dummyRange =
-        Range.mkRange ""
-          (Position.mkPos 1 0)
-          (Position.mkPos 1 0)
+        Range.mkRange "" (Position.mkPos 1 0) (Position.mkPos 1 0)
       let error =
         { Range = dummyRange
           Message = message
@@ -191,7 +202,9 @@ module Diagnostics =
         else
           Console.Error.WriteLine(
             sprintf "[%s] Line %d: %O"
-              fileName error.Range.StartLine error.Message)
+              fileName
+              error.Range.StartLine
+              error.Message)
         Console.Error.WriteLine error.LineContent
         Console.Error.WriteLine error.ColumnIndicator
     )

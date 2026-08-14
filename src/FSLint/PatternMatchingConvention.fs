@@ -69,8 +69,10 @@ let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   let beforeColonAdjusted =
     combineRangeWithComment lhsRange colonRange.StartRange true lhsRange
   let afterColonAdjusted =
-    combineRangeWithComment colonRange.EndRange (rhsRange: range).StartRange
-      false rhsRange
+    combineRangeWithComment colonRange.EndRange
+      (rhsRange: range).StartRange
+      false
+      rhsRange
   if beforeColonAdjusted.EndColumn + 1 <> colonRange.StartColumn
     && beforeColonAdjusted.StartLine = colonRange.StartLine
   then
@@ -273,7 +275,9 @@ let checkArrowSpacing src
   let patRangeAdjusted =
     combineRangeWithComment patRange arrowRange.StartRange true patRange
   let bodyRangeAdjusted =
-    combineRangeWithComment arrowRange.EndRange bodyRange.StartRange false
+    combineRangeWithComment arrowRange.EndRange
+      bodyRange.StartRange
+      false
       bodyRange
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
     if patRangeAdjusted.EndColumn + 1 <> arrowRange.StartColumn then

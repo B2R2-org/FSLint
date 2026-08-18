@@ -223,6 +223,28 @@ let checkUniformPlacement src (ranges: range list) =
   | _ ->
     ()
 
+/// Judges a list whose first member settles the call it belongs to rather than
+/// joining the list proper. `List.fold2 f` and `eprintfn fmt` name a function
+/// already specialised, and the arguments after it answer among themselves.
+///
+/// The budget is still asked of the whole. What settles the call takes room on
+/// the line like anything else, so a list that could not come back onto one
+/// line with it standing there is not asked to, and the head is named along
+/// with the rest when it could.
+let checkUniformPlacementPastHead src (ranges: range list) =
+  match ranges with
+  | _ :: _ :: _ when isStrict ->
+    let span = List.reduce Range.unionRanges ranges
+    if isClosable src span then
+      ranges
+      |> List.pairwise
+      |> List.tryFind isBrokenGap
+      |> Option.iter (fun (_, next) -> reportNewLine src next)
+    else
+      checkGapAgreement src (List.tail ranges) |> ignore
+  | _ ->
+    ()
+
 /// Reports a list spread over lines though the whole of it would close up
 /// onto one, and asks nothing of it once it would not. Where a list too wide
 /// for its line is broken is left to whoever wrote it: a value built out of

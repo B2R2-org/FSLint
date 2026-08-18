@@ -270,6 +270,21 @@ let rec private noteArgumentPrefixes expr =
   | _ ->
     ()
 
+/// True when the first argument settles what the call does rather than what it
+/// does it to, and so is read with the name it is given to instead of with the
+/// arguments after it.
+///
+/// A lambda is code and a literal is a template or a constant: `List.fold2 f`
+/// and `eprintfn fmt` both name a function already specialised, and what
+/// follows is the data it works on. Such an argument could never have shared a
+/// line with the ones after it in any case, so the break past it is no choice
+/// the author made and nothing there disagrees.
+///
+/// An argument that is neither is data like the rest, and opens the list.
+let private settlesTheCall = function
+  | SynExpr.Paren(expr = inner) -> (inner: SynExpr).IsLambda || inner.IsConst
+  | expr -> (expr: SynExpr).IsLambda || expr.IsConst
+
 /// An argument list is a separator list like any other, and answers like the
 /// parameter list it is given to: while the whole of it would close up onto one
 /// line it stays closed up, and once it would not, the gaps between neighbours
@@ -281,12 +296,14 @@ let rec private noteArgumentPrefixes expr =
 /// together, and nothing in a curried list makes that so:
 ///
 /// ```fsharp
-/// // both of these are asked to break at every argument
-/// eprintfn "[DIAG] ERROR creating diagnostic: %s - %s"
-///   error.Message ex.Message
-///
+/// // the list opens at `bodyRange.StartRange`, and its gaps disagree
 /// combineRangeWithComment arrowRange.EndRange
 ///   bodyRange.StartRange false bodyRange
+///
+/// // the lambda settles the call, so the list is `word slots operands`
+/// // and its gaps agree
+/// List.fold2 (fun acc slot opr -> encodeSlot length slot opr acc)
+///   word slots operands
 /// ```
 ///
 /// Where the arguments land is still the author's, so a list keeping several
@@ -297,9 +314,17 @@ let checkArgumentPlacement src (expr: SynExpr) =
   match curriedArguments expr with
   | _ :: _ :: _ as args when not (isCoveredApplication expr.Range) ->
     noteArgumentPrefixes expr
-    args
-    |> List.map (fun (arg: SynExpr) -> arg.Range)
-    |> LineBreakConvention.checkUniformPlacement src
+    let ranges = args |> List.map (fun (arg: SynExpr) -> arg.Range)
+    if ranges |> List.exists (fun r -> r.StartLine <> r.EndLine) then
+      (* An argument running to lines of its own widens the list without the
+         list having broken anywhere. What follows such a block has nowhere to
+         sit but below it, and that is the block's doing rather than a layout
+         the author chose, so the gaps are not read. *)
+      ()
+    elif settlesTheCall (List.head args) then
+      LineBreakConvention.checkUniformPlacementPastHead src ranges
+    else
+      LineBreakConvention.checkUniformPlacement src ranges
   | _ ->
     ()
 

@@ -68,7 +68,6 @@ type LspServer(rpc: JsonRpc) =
           beginReadings ()
           parseFile sourceText uri
           |> List.iter (Program.checkWithAST sourceText)
-          reportAgreedJoins sourceText
         | _ ->
           ()
       with :? LintException as ex ->

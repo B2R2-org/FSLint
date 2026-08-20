@@ -43,25 +43,6 @@ let fn () =
           shortOne, shortTwo)
 """
 
-  /// Opening a fence says the list is to be read as a block, but only a list
-  /// driven off its line may do so. One that would stand on a single line
-  /// inside the budget is asked back onto it, fence and all.
-  let badStructFenceBlockTest =
-    """
-let fn () =
-  struct (
-    shortOne, shortTwo
-  )
-"""
-
-  let badPlainFenceBlockTest =
-    """
-let fn () =
-  (
-    shortOne, shortTwo
-  )
-"""
-
   /// A plain tuple answers exactly as the struct one does.
   let badPlainTupleTest =
     """
@@ -115,27 +96,6 @@ let fn doc a b c =
         LinearDocument.tryGetItem doc c with
   | Some x, Some y, Some z -> Some(x, y, z)
   | _ -> None
-"""
-
-  /// One short enough to close up has to be closed up, too.
-  let badScrutineeClosesUpTest =
-    """
-let fn x y =
-  match x,
-        y with
-  | Some a, Some b -> Some(a, b)
-  | _ -> None
-"""
-
-  /// A tuple holding a block can never be one line, so a name is no answer to
-  /// it. What is asked is that the neighbour come up beside the comma, and it
-  /// fits: 49 columns of pipeline, then 16 more.
-  let badBlockNeighbourTest =
-    """
-let fn nextModel paneID arbiter =
-  { nextModel with FocusedPaneID = Some paneID }
-  |> syncOffsetSnapshotWithActiveTab arbiter,
-  Elmish.Cmd.none
 """
 
   /// The same tuple with the neighbour already up beside the comma.
@@ -364,17 +324,12 @@ match bad with
 
   /// A struct tuple's parentheses fence it in exactly as a plain one's do,
   /// though the syntax tree keeps them inside the tuple rather than handing
-  /// them over in a `SynExpr.Paren`. A fence opened onto a block it did not
-  /// need is asked back onto its line, whether the closing bracket answered
-  /// the opening one or not.
+  /// them over in a `SynExpr.Paren`, so an opening bracket that its closing
+  /// one does not answer is still reported.
   [<TestMethod>]
   member _.``[Tuple] Struct Fence Test``() =
-    lintAssertMsg "Remove unnecessary line break"
+    lintAssertMsg "Use consistent bracket placement"
       TuplePlacementSamples.badStructFenceOpenedTest
-    lintAssertMsg "Remove unnecessary line break"
-      TuplePlacementSamples.badStructFenceBlockTest
-    lintAssertMsg "Remove unnecessary line break"
-      TuplePlacementSamples.badPlainFenceBlockTest
 
   /// Where the tuple stands makes no difference to any of this. A row of a
   /// table and a tuple handed back by a function are both tuples of data, and
@@ -418,23 +373,18 @@ match bad with
 
   /// The exemption reaches only the demand for a name. A pairing is still a
   /// comma list, and answers for its commas like any other: its gaps have to
-  /// agree, and one that would close up onto a line has to be closed up.
+  /// agree.
   [<TestMethod>]
   member _.``[Tuple] Scrutinee Comma Test``() =
     lintAssertMsg "Use consistent line breaks"
       TuplePlacementSamples.badScrutineeGapsTest
-    lintAssertMsg "Remove unnecessary line break"
-      TuplePlacementSamples.badScrutineeClosesUpTest
 
-  /// A tuple that could be one line is held to that: it closes up or it is
-  /// named. One holding a block never can be, so each neighbour is asked only
-  /// to come up beside the comma before it, and named only where even that
-  /// will not fit.
+  /// A tuple holding a block can never stand on one line, so a name is what
+  /// is asked of it, and only where a neighbour could not have come up beside
+  /// the comma before it anyway.
   [<TestMethod>]
   member _.``[Tuple] Block Neighbour Test``() =
     lint TuplePlacementSamples.goodBlockNeighbourTest
-    lintAssertMsg "Remove unnecessary line break"
-      TuplePlacementSamples.badBlockNeighbourTest
     lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badBlockOverBudgetTest
     lintAssertMsg "Bind to fit the line"

@@ -76,37 +76,10 @@ type Other =
   | Nop
 """
 
-  /// Fixing what the linter asks for must not walk into another complaint.
-  /// Every line the list runs to below the declaration is named at once, so
-  /// lifting them all is one step rather than a march that reverses itself.
-  let badConstraintBothLinesTest =
-    """
-type Edge<'V, 'E
-  when 'V: equality
-  and 'E: equality> = E
-"""
-
-  /// `when` lifted and the `and` left behind: the `and` is asked up, not the
-  /// `when` asked back down.
-  let badConstraintAndLeftBehindTest =
-    """
-type Edge<'V, 'E when 'V: equality
-  and 'E: equality> = E
-"""
-
   /// All the way up.
   let goodConstraintClosedUpTest =
     """
 type Edge<'V, 'E when 'V: equality and 'E: equality> = E
-"""
-
-  /// The whole of it would stand on the declaration line, so the break that
-  /// sent `when` down is not needed. Joined it comes to exactly the budget.
-  let badConstraintClosesUpTest =
-    """
-type RangedDiGraph<'D, 'E
-    when 'D :> RangedVertexData and 'D : equality>(core) =
-  member _.Core = core
 """
 
   /// Joined it would overrun, and the line `when` opened keeps to the budget:
@@ -290,29 +263,13 @@ type ComplexClass (initialValue: int) =
     lint goodDirectiveAttributeTest
     lintAssertMsg "Remove unnecessary line break" badBlankAttributeTest
 
-  /// Fitting comes first, as everywhere: a constraint list that would stand on
-  /// the declaration line is asked back onto it. Once it would not, the list
-  /// sharing the line `when` opened is a layout of its own and is left alone,
-  /// and only one running past the budget is held to the column.
+  /// A constraint list sharing the line `when` opened is a layout of its own
+  /// and is left alone, whether it stands up on the declaration line or on one
+  /// below it. Only a list running past the budget is held to the column.
   [<TestMethod>]
-  member _.``[ClassDefinition] Typar Constraint Closing Test``() =
+  member _.``[ClassDefinition] Typar Constraint Own Line Test``() =
     lint goodConstraintOneLineTest
-    lintAssertMsg "Remove unnecessary line break" badConstraintClosesUpTest
+    lint goodConstraintClosedUpTest
     lintErrors badConstraintOverBudgetTest
     |> List.filter (fun e -> e.Message = "Align 'and' with 'when'")
     |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
-
-  /// A demand must not send the author into another demand. Both lines of a
-  /// list that belongs on the declaration line are named together, and once
-  /// only the `and` is left behind it is that one asked up.
-  [<TestMethod>]
-  member _.``[ClassDefinition] Typar Constraint No Loop Test``() =
-    lint goodConstraintClosedUpTest
-    lintErrors badConstraintBothLinesTest
-    |> fun errors ->
-      Assert.AreEqual<int>(2, errors.Length)
-      StringAssert.Contains(errors.Head.Message, "unnecessary line break")
-    lintErrors badConstraintAndLeftBehindTest
-    |> fun errors ->
-      Assert.AreEqual<int>(1, errors.Length)
-      StringAssert.Contains(errors.Head.Message, "unnecessary line break")

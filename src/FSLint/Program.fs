@@ -581,7 +581,6 @@ and checkBinding src case binding =
   else
     ()
   DeclarationConvention.checkComputationExprPlacement src binding
-  DeclarationConvention.checkBodyPlacement src binding
   TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
@@ -744,7 +743,6 @@ let linterForFsWithContext context =
             setDirectiveLines (directiveLinesOf src)
             beginReadings ()
             parseFile src path |> List.iter (checkWithAST src)
-            reportAgreedJoins src
           | _ ->
             ())
         setCurrentLintContext None }

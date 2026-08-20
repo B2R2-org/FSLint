@@ -37,14 +37,6 @@ let private closedWidth (src: ISourceText) (span: range) =
     |> Array.reduce joinTight
   span.StartColumn + closed.Length
 
-/// Returns true when the stretch is free to close up onto one line: it has to
-/// fit the line budget, and nothing may sit inside it that closing up would
-/// swallow: a comment, or a compiler directive whose own line cannot move.
-let private isClosable src (span: range) =
-  closedWidth src span <= getCurrentMaxLineLength ()
-  && (findCommentsBetween span.StartRange span.EndRange |> Option.isNone)
-  && (findDirectivesBetween span.StartRange span.EndRange |> Option.isNone)
-
 /// True when the stretch would stand on one line inside the line budget.
 let closesUpWithin src (span: range) =
   closedWidth src span <= getCurrentMaxLineLength ()
@@ -114,42 +106,6 @@ let checkGapAgreement src ranges =
     unbrokenStretches ranges |> List.iter (fun r -> reportWarn src r Message)
     true
 
-/// Where what has to come up begins: the first line below the one a construct
-/// opens on, at the column its content starts in.
-let private firstLineBelow (src: ISourceText) (span: range) =
-  let content line =
-    let text = src.GetLineString(line - 1)
-    if text.Trim() = "" then None
-    else Some(Position.mkPos line (text.Length - text.TrimStart().Length))
-  [ span.StartLine + 1 .. span.EndLine ] |> List.tryPick content
-
-/// Reports a construct spread over several lines though the whole of it would
-/// close up onto one inside the line budget. `span` is everything it occupies.
-///
-/// Everything standing below the line the construct opens on has to come up,
-/// and it comes up together: closing a construct is one thing to do, not one
-/// thing for every break inside it. So a single report is raised covering the
-/// whole of what has to move, from where the first line below the opening
-/// begins through to the end of the construct. Naming the breaks one at a time
-/// would send the reader to a keyword with a body beside it that is just as
-/// much in the wrong place, and leave the rest to be found a round later.
-///
-/// Returns true when it reported, so that the caller can leave its finer checks
-/// alone: a construct that belongs on one line has nothing further to answer
-/// for.
-let checkClosesUp src (span: range) =
-  if not isStrict || span.StartLine = span.EndLine then
-    false
-  elif not (isClosable src span) then
-    false
-  else
-    match firstLineBelow src span with
-    | Some start ->
-      Range.mkRange "" start span.End |> reportNewLine src
-      true
-    | None ->
-      false
-
 /// Reports on a list laid out inside `span`, the whole stretch it occupies with
 /// its brackets. Fitting on one line settles it first: while the stretch would
 /// close up inside the line budget it has to stay closed up, and only once it
@@ -162,15 +118,8 @@ let checkClosesUp src (span: range) =
 let checkBracketedPlacement src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
-  elif not (isClosable src span) then
-    checkGapAgreement src ranges |> ignore
-  elif span.StartLine <> span.EndLine then
-    ranges
-    |> List.tryFind (fun (r: range) -> r.StartLine > span.StartLine)
-    |> Option.defaultValue (List.last ranges)
-    |> reportNewLine src
   else
-    ()
+    checkGapAgreement src ranges |> ignore
 
 /// Reports on a list whose fence the author may open into a block. Sending
 /// the first element to a line below the one that opens the fence says the
@@ -192,8 +141,6 @@ let checkBracketedPlacement src (span: range) ranges =
 let checkOpenableFence src (span: range) ranges =
   if not isStrict || List.isEmpty ranges then
     ()
-  elif checkClosesUp src span then
-    ()
   else
     let first: range = List.head ranges
     let last: range = List.last ranges
@@ -212,14 +159,7 @@ let checkOpenableFence src (span: range) ranges =
 let checkUniformPlacement src (ranges: range list) =
   match ranges with
   | _ :: _ :: _ when isStrict ->
-    let span = List.reduce Range.unionRanges ranges
-    if isClosable src span then
-      ranges
-      |> List.pairwise
-      |> List.tryFind isBrokenGap
-      |> Option.iter (fun (_, next) -> reportNewLine src next)
-    else
-      checkGapAgreement src ranges |> ignore
+    checkGapAgreement src ranges |> ignore
   | _ ->
     ()
 
@@ -227,40 +167,10 @@ let checkUniformPlacement src (ranges: range list) =
 /// joining the list proper. `List.fold2 f` and `eprintfn fmt` name a function
 /// already specialised, and the arguments after it answer among themselves.
 ///
-/// The budget is still asked of the whole. What settles the call takes room on
-/// the line like anything else, so a list that could not come back onto one
-/// line with it standing there is not asked to, and the head is named along
-/// with the rest when it could.
 let checkUniformPlacementPastHead src (ranges: range list) =
   match ranges with
   | _ :: _ :: _ when isStrict ->
-    let span = List.reduce Range.unionRanges ranges
-    if isClosable src span then
-      ranges
-      |> List.pairwise
-      |> List.tryFind isBrokenGap
-      |> Option.iter (fun (_, next) -> reportNewLine src next)
-    else
-      checkGapAgreement src (List.tail ranges) |> ignore
-  | _ ->
-    ()
-
-/// Reports a list spread over lines though the whole of it would close up
-/// onto one, and asks nothing of it once it would not. Where a list too wide
-/// for its line is broken is left to whoever wrote it: a value built out of
-/// bits may be read as a row of fields or as a set of flags, and the two want
-/// opposite layouts with nothing in the syntax to tell them apart.
-let checkClosesUpOnly src (ranges: range list) =
-  match ranges with
-  | _ :: _ :: _ when isStrict ->
-    let span = List.reduce Range.unionRanges ranges
-    if isClosable src span then
-      ranges
-      |> List.pairwise
-      |> List.filter isBrokenGap
-      |> List.iter (fun (_, next) -> reportNewLine src next)
-    else
-      ()
+    checkGapAgreement src (List.tail ranges) |> ignore
   | _ ->
     ()
 
@@ -268,27 +178,6 @@ let checkClosesUpOnly src (ranges: range list) =
 /// than broken onto a line of its own.
 let private isInline (keyword: range, body: range) =
   keyword.EndLine = body.StartLine
-
-/// The width the item would take once its body sits beside its keyword: the
-/// keyword's line up to the keyword, one space, then the body's line from where
-/// the body begins. Measuring the body by its line rather than by its own range
-/// keeps whatever trails it, a comment above all, inside the budget.
-let private joinedWidth (src: ISourceText) (keyword: range) (body: range) =
-  let bodyLine = src.GetLineString(body.StartLine - 1)
-  keyword.EndColumn + 1 + (bodyLine.TrimEnd().Length - body.StartColumn)
-
-/// Returns true when the body is free to sit beside its keyword. It has to fit
-/// the line budget, and one that already broke away has to be a single line
-/// with nothing but whitespace behind it: a body needing several lines of its
-/// own, a `let` or a sequence say, can never come back up. Neither can one
-/// standing behind a comment that the join would swallow, nor one reached only
-/// through a compiler directive, whose own line has to stay where it is.
-let private isJoinable src ((keyword, body) as item) =
-  joinedWidth src keyword body <= getCurrentMaxLineLength ()
-  && (isInline item
-      || (body.StartLine = body.EndLine
-          && findCommentsBetween keyword body |> Option.isNone
-          && findDirectivesBetween keyword body |> Option.isNone))
 
 /// The shared body of the two keyword-group checks. Fitting on one line comes
 /// first: when every body in the group could sit beside its keyword, every one
@@ -309,47 +198,31 @@ let private spansDirective (items: (range * range) list) =
   | [] ->
     false
 
-/// Whether every body of a group could sit beside its keyword is a question
-/// with a different answer per build once a directive stands inside it, so a
-/// group reaching across one does not answer for the file on its own: its
-/// demand is held back until every build has been read, and raised only if
-/// every one of them made it. A build that can close up thus asks nothing of
-/// a build that cannot, while a group every build can close up is still
-/// closed up.
-let private checkGroup src joinable items =
+/// The shared body of the two keyword-group checks. All that is asked is that
+/// the bodies agree: either every one sits beside its keyword or every one
+/// breaks away. A group whose bodies all sit inline is not mixed however wide
+/// its lines read, and what is wrong with it then is the length of a line,
+/// which the budget says by itself.
+let private checkGroup src items =
   if not isStrict || List.isEmpty items then
     ()
+  elif List.length items > 1 && not (items |> List.forall isInline) then
+    items
+    |> List.filter isInline
+    |> List.iter (fun (_, body) -> reportWarn src body Message)
   else
-    let canJoin = joinable && items |> List.forall (isJoinable src)
-    let straddles = spansDirective items
-    if straddles && not canJoin then blockJoin (groupRange items) else ()
-    if canJoin then
-      items
-      |> List.tryFind (isInline >> not)
-      |> Option.iter (fun (_, body) ->
-        if straddles then deferJoin (groupRange items) body
-        else reportNewLine src body)
-    elif List.length items > 1 && not (items |> List.forall isInline) then
-      (* Mixed, so the ones still beside their keyword have to come down. A
-         group every body of which is inline is not mixed, whatever its width:
-         what is wrong with it is the length of a line, and the budget says so
-         by itself. Break that line and the group answers here next. *)
-      items
-      |> List.filter isInline
-      |> List.iter (fun (_, body) -> reportWarn src body Message)
-    else
-      ()
+    ()
 
 /// Judges sibling bodies that hang off a keyword such as '->', 'then' or
 /// 'else'. Each item pairs that keyword's range with the body's range.
 let checkUniformBreak src (items: (range * range) list) =
-  checkGroup src true items
+  checkGroup src items
 
 /// Judges a group whose members can never share their keyword's line, such as
 /// the '|' of a barred handler sitting under its 'with'. Joining is off the
 /// table, so all that is left to ask is whether every one of them broke away.
 let checkUniformlyBroken src (items: (range * range) list) =
-  checkGroup src false items
+  checkGroup src items
 
 /// Checks a parameter list, covering both the tupled form `(a, b, c)` and the
 /// curried form `a b c`. A tupled list is measured by its elements inside the

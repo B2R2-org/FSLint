@@ -19,21 +19,6 @@ module Diagnostics =
   /// The lines the conditional-compilation directives of the file sit on.
   let directiveLines = new AsyncLocal<int list>()
 
-  /// Demands to close a group up, raised by a group reaching across a
-  /// directive. Such a group holds different members in each build, so the
-  /// demand is held here against the group that raised it until every build
-  /// has been read.
-  ///
-  /// It is kept unless some build objects, not required of every build in
-  /// turn: a build already closed up raises nothing and is no reason to
-  /// leave the others open, while a build whose body can never come up is
-  /// reason enough to ask no build to bring it. Each build names its own
-  /// stray body, since that body is a different one in each.
-  let deferredJoins = new AsyncLocal<ResizeArray<range * range>>()
-
-  /// Groups some build cannot close up, whatever the others manage.
-  let blockedGroups = new AsyncLocal<ResizeArray<range>>()
-
   /// The expressions standing as the argument of an application. A comma list
   /// there is a parameter list, which nothing else in the tree tells apart
   /// from a tuple of data, and the two are not laid out the same way: a
@@ -68,8 +53,6 @@ module Diagnostics =
   let setDirectiveLines (lines: int list) = directiveLines.Value <- lines
 
   let beginReadings () =
-    deferredJoins.Value <- ResizeArray()
-    blockedGroups.Value <- ResizeArray()
     applicationArgs.Value <- ResizeArray()
     matchScrutinees.Value <- ResizeArray()
     coveredChains.Value <- ResizeArray()
@@ -107,11 +90,6 @@ module Diagnostics =
   /// things being tested rather than build a value, so there is no tuple there
   /// to be given a name.
   let isMatchScrutinee range = holds matchScrutinees range
-
-  let deferJoin (group: range) (body: range) =
-    deferredJoins.Value.Add(group, body)
-
-  let blockJoin (group: range) = blockedGroups.Value.Add group
 
   /// True when a directive stands between the two lines, so that what they
   /// hold is not one stretch of code but a different stretch per build. A
@@ -230,24 +208,6 @@ module CustomReports =
   /// An `and` that does not stand in the column its `when` opened.
   let reportAndAlignment src range =
     reportWarn src range "Align 'and' with 'when'"
-
-  /// Raises the held demands no build objected to, and drops the rest.
-  let reportAgreedJoins src =
-    match box deferredJoins.Value with
-    | null ->
-      ()
-    | _ ->
-      let key (r: range) = r.StartLine, r.StartColumn, r.EndLine, r.EndColumn
-      let blocked = blockedGroups.Value |> Seq.map key |> Set.ofSeq
-      let isBlocked (group: range) = blocked |> Set.contains (key group)
-      deferredJoins.Value
-      |> Seq.filter (fun (group, _) -> not (isBlocked group))
-      |> Seq.map snd
-      |> Seq.distinctBy key
-      |> Seq.sortBy key
-      |> Seq.iter (reportNewLine src)
-      deferredJoins.Value <- ResizeArray()
-      blockedGroups.Value <- ResizeArray()
 
 /// We intentionally do not suggest a concrete fix here because some malformed
 /// operator-spacing cases (for example, generic-looking syntax parsed as infix

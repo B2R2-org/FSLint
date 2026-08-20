@@ -177,37 +177,9 @@ let fn oldType newType =
   else castErr newType oldType
 """
 
-  /// A chain that does close up is still held to it, in either spelling.
-  let badNarrowElifSpellingTest =
-    """
-let fn v =
-  if v = 0 then 1
-  elif v = 1 then 2
-  else 3
-"""
-
-  let badNarrowElseIfSpellingTest =
-    """
-let fn v =
-  if v = 0 then 1
-  else if v = 1 then 2
-  else 3
-"""
-
   let goodNarrowInlineElseIfTest =
     """
 let fn v = if v = 0 then 1 else if v = 1 then 2 else 3
-"""
-
-  /// A chain that closes up names the whole of what has to come up, not the
-  /// last break alone: the body below its 'then' is as much in the wrong place
-  /// as the 'else' hanging under it.
-  let badClosableChainRangeTest =
-    """
-let fn count srcA srcB =
-  if count < 64 then
-      (srcB + srcA)
-    else (srcB - srcA)
 """
 
   /// An 'else' handing its body a line of its own opens a nested expression
@@ -271,20 +243,6 @@ let changeToAliasOfLDM bin =
     && (bitCount (extract bin 15 0) 15 > 1)
   then struct (Op.POP, OD.OprRegs)
   else struct (Op.LDM, OD.OprRnRegsA)
-"""
-
-  /// The same chain with bodies that could have sat beside their keywords but
-  /// were sent below instead.
-  let badBrokenConditionBelowBodyTest =
-    """
-let changeToAliasOfLDM bin =
-  if (wbackW bin)
-    && (pickFour bin 16 = 0b1101u)
-    && (bitCount (extract bin 15 0) 15 > 1)
-  then
-    struct (Op.POP, OD.OprRegs)
-  else
-    struct (Op.LDM, OD.OprRnRegsA)
 """
 
   /// Parentheses fence off a group of their own, judged on the same terms.
@@ -463,26 +421,11 @@ let changeToAliasOfLDM bin =
     lint goodWideElifSpellingTest
     lint goodWideElseIfSpellingTest
 
-  /// One that does close up is held to it however its links are spelled.
+  /// An `elif` and an `else if` are one and the same link, so a chain whose
+  /// links all share a line is in order however it is spelled.
   [<TestMethod>]
   member _.``[IfThenElse] Narrow Chain Spelling Test``() =
-    lintAssertMsg "Remove unnecessary line break" badNarrowElifSpellingTest
-    lintAssertMsg "Remove unnecessary line break" badNarrowElseIfSpellingTest
     lint goodNarrowInlineElseIfTest
-
-  /// Closing a chain up is one thing to do, so it takes one report, and the
-  /// report covers everything standing below the line the chain opens on.
-  [<TestMethod>]
-  member _.``[IfThenElse] Closable Chain Range Test``() =
-    lintErrors badClosableChainRangeTest
-    |> fun errors ->
-      Assert.AreEqual<int>(1, errors.Length)
-      let range = errors.Head.Range
-      (* from the body under 'then' through the end of the else body *)
-      Assert.AreEqual<int>(4, range.StartLine)
-      Assert.AreEqual<int>(6, range.StartColumn)
-      Assert.AreEqual<int>(5, range.EndLine)
-      Assert.AreEqual<int>(22, range.EndColumn)
 
   /// The two spellings must agree exactly, or the budget lands on one half of
   /// an 'else if' chain and tears it in two.
@@ -494,10 +437,10 @@ let changeToAliasOfLDM bin =
     Assert.AreEqual<int>(0, elseIfErrors)
 
   /// An 'else' that hands its body a line of its own is a nested expression,
-  /// not a chain link, and the whole of it still closes up.
+  /// not a chain link, so the two answer for their gaps separately.
   [<TestMethod>]
   member _.``[IfThenElse] Nested Under Else Test``() =
-    lintAssertMsg "Remove unnecessary line break" badNestedUnderElseTest
+    lintAssertMsg "Use consistent line breaks" badNestedUnderElseTest
 
   /// Links that disagree are reported though the chain is too wide to close
   /// up: closing up half of it is no more consistent than not closing it.
@@ -526,14 +469,13 @@ let changeToAliasOfLDM bin =
     lintErrors badMixedLinksBrokenBodyTest
     |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
 
-  /// A condition spread over several lines leaves the bodies to answer for
-  /// their own widths, exactly as an unbroken one would.
+  /// A condition spread over several lines settles nothing about its bodies.
+  /// They answer among themselves, inline or broken alike, and the condition
+  /// standing above them is no part of that question.
   [<TestMethod>]
   member _.``[IfThenElse] Broken Condition Body Test``() =
     lint goodBrokenConditionInlineBodyTest
     lint goodBrokenConditionWideBodyTest
-    lintAssertMsg "Remove unnecessary line break"
-      badBrokenConditionBelowBodyTest
 
   /// One body that cannot come up takes the whole chain down with it, rather
   /// than leaving its narrow sibling beside a keyword on its own.
@@ -594,9 +536,9 @@ let changeToAliasOfLDM bin =
     lintAssertMsg "Use consistent line breaks"
       BareInnerIfSamples.badBareInnerIfTest
 
-  /// Parenthesised, the inner `if` is an operand like any other and the chain
-  /// closes up as it would have.
+  /// Parenthesised, the inner `if` is an operand like any other, so the chain
+  /// holding it answers for its gaps as any other chain does.
   [<TestMethod>]
   member _.``[IfThenElse] Paren Inner If Test``() =
-    lintAssertMsg "Remove unnecessary line break"
+    lintAssertMsg "Use consistent line breaks"
       BareInnerIfSamples.badParenInnerIfTest

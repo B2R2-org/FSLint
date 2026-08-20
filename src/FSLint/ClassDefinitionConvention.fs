@@ -188,16 +188,6 @@ let private precedingKeyword (src: ISourceText) (range: range) =
         (Position.mkPos range.StartLine before.Length)
     Some(keyword, column, before.TrimStart() = name)
 
-/// The stretch the declaration and its constraints take together, read from
-/// the head of the line the parameter list opens on. Whatever trails the last
-/// constraint, the closing angle and what follows it, lands on that line too
-/// and counts against the budget.
-let private declarationSpan (src: ISourceText) (range: range) constraints =
-  let line = src.GetLineString(range.StartLine - 1)
-  let indent = line.Length - line.TrimStart().Length
-  let last = (List.last constraints: SynTypeConstraint).Range
-  Range.mkRange "" (Position.mkPos range.StartLine indent) last.End
-
 /// True when the whole constraint list keeps to the one line `when` opened,
 /// and that line keeps to the budget. Such a line is a layout of its own and
 /// is left alone; one running past the budget has to break at its `and`s like
@@ -211,22 +201,6 @@ let private sharesOneLine (src: ISourceText) constraints =
      |> List.forall (fun (c: SynTypeConstraint) ->
        c.Range.StartLine = head.StartLine)
 
-/// Names every line the constraint list runs to below the declaration, at the
-/// keyword that opens it. Closing the list up takes all of them, so naming
-/// only the first would have the author lift that one and be told to put it
-/// back: the state between is no better than the one it came from.
-let private reportConstraintsClosingUp src (range: range) constraints =
-  let below (c: SynTypeConstraint) = c.Range.StartLine > range.StartLine
-  constraints
-  |> List.filter below
-  |> List.groupBy (fun c -> c.Range.StartLine)
-  |> List.iter (fun (_, group) ->
-    let head = (List.head group).Range
-    match precedingKeyword src head with
-    | Some(keyword, _, _) -> reportNewLine src keyword
-    | None -> reportNewLine src head
-  )
-
 /// The constraints of a type parameter list are a separator list like any
 /// other: `when` opens it and `and` divides it. Either the whole list keeps to
 /// the line the parameters are on, or `when` starts a line of its own and each
@@ -237,10 +211,9 @@ let private reportConstraintsClosingUp src (range: range) constraints =
 /// list. Sending it down takes the constraints below it along, and what the
 /// `and`s under it are doing cannot be judged until it lands.
 ///
-/// Fitting comes first, as everywhere: a list that would stand on the
-/// declaration line is asked back onto it. Once it would not, the constraints
-/// sharing the line `when` opened are a layout of their own and are left
-/// alone; only a list already spread past that line is held to the column.
+/// The constraints sharing the line `when` opened are a layout of their own
+/// and are left alone; only a list already spread past that line is held to
+/// the column.
 ///
 /// Where that column falls is not asked. `when` and `and` are the one pair of
 /// separators in the language of unequal length, so a column can hold the
@@ -251,12 +224,6 @@ let checkTyparConstraints src (constraints: SynTypeConstraint list) range =
     ()
   elif (range: range).StartLine = range.EndLine then
     ()
-  elif declarationSpan src range constraints
-       |> LineBreakConvention.closesUpWithin src then
-    (* The whole of it would stand on the declaration line, so every line it
-       runs to below has to come up. That is asked before anything else: a
-       list that belongs on one line is not first sent down to be tidied. *)
-    reportConstraintsClosingUp src range constraints
   else
     match constraints with
     | head :: rest ->

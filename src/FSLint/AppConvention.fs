@@ -328,16 +328,7 @@ let checkArgumentPlacement src (expr: SynExpr) =
   | _ ->
     ()
 
-/// A bitwise chain that would stand on one line has to stand on it. Once it
-/// would not, it is left alone: a value built out of bits may be meant as a
-/// row of fields, packed across the line, or as a set of flags, one to a
-/// line, and nothing in the syntax tells the two apart.
-let checkBitwiseChain src (expr: SynExpr) =
-  match flattenBitwiseChain expr with
-  | _ :: _ :: _ as operands when not (isCoveredChain expr.Range) ->
-    noteChainPrefixes (bitwiseOperator expr) expr
-    operands
-    |> List.map (fun (operand: SynExpr) -> operand.Range)
-    |> LineBreakConvention.checkClosesUpOnly src
-  | _ ->
-    ()
+/// A bitwise chain is left to whoever wrote it. A value built out of bits may
+/// be meant as a row of fields, packed across the line, or as a set of flags,
+/// one to a line, and nothing in the syntax tells the two apart.
+let checkBitwiseChain _src (_expr: SynExpr) = ()

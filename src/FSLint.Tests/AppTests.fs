@@ -200,15 +200,3 @@ let f x = if x.Y > 42 then x.X else -x.X + 1
     "    ||| unsignedImm 8 value\n" +
     "  imm\n"
     |> lint
-
-  /// A chain short enough to close up has to be closed up, however evenly it
-  /// was spread.
-  [<TestMethod>]
-  member _.``[App] Bitwise Chain Placement Test(3)``() =
-    "let f p u =\n" +
-    "  let imm =\n" +
-    "    (1u <<< 11)\n" +
-    "    ||| (p <<< 10)\n" +
-    "    ||| (u <<< 9)\n" +
-    "  imm\n"
-    |> lintAssertMsg "Remove unnecessary line break"

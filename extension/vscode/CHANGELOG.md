@@ -2,6 +2,25 @@
 
 All notable changes to the FSLint extension.
 
+## 1.1.8
+
+- Added a line-break convention for strict mode: a separator list stays on one
+  line while the whole of it fits, and once it does not, every gap between its
+  members must agree.
+- Added `Use consistent line breaks`, `Bind to fit the line`,
+  `Move 'when' to the next line`, and `Align 'and' with 'when'`.
+- Extended the convention to tuples, argument and parameter lists, `&&`/`||`
+  chains, `if`/`elif`/`else` links, bitwise chains, array and list literals,
+  type-parameter constraints, and `try`/`with` blocks.
+- Reported the whole of what must move as one warning instead of one per break.
+- Fixed the missing whitespace check before `)` on a single-line parenthesis.
+- Fixed whitespace checks skipping `struct (...)`, in expressions and patterns.
+- Fixed false whitespace reports where a comment sits inside the parentheses.
+- Fixed `Bind to fit the line` on a fully parenthesised `if` condition.
+- Fixed two strict-only checks running without `--strict`.
+- Removed the `Use consistent indentation` rule.
+- Stopped stray FCS trace output reaching the console.
+
 ## 1.1.7
 
 - Disable FSLintLSP diagnostic logging

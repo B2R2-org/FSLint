@@ -17,7 +17,8 @@ let checkAsSpacing src (idRange: range) (asRange: range) (selfRange: range) =
     ()
 
 let checkEqualSpacing src (idRange: range) (reprRange: range) equalRange =
-  if Option.isNone equalRange then ()
+  if Option.isNone equalRange then
+    ()
   else
     if idRange.EndLine = (equalRange.Value: range).StartLine
       && idRange.EndColumn + 1 <> equalRange.Value.StartColumn then
@@ -52,8 +53,7 @@ let checkConstructorSpacing src targetType = function
       warn $"[Constructor]TODO: {typ}"
     | SynType.LongIdent(longDotId = SynLongIdent(id = id)) ->
       let id = List.last id
-      if isPascalCase id.idText
-        && id.idRange.EndColumn <> range.StartColumn
+      if isPascalCase id.idText && id.idRange.EndColumn <> range.StartColumn
       then
         Range.mkRange "" id.idRange.End range.Start
         |> reportPascalCaseError src

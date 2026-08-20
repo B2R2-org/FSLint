@@ -16,21 +16,24 @@ let private getMethodName = function
     id |> List.tryLast |> Option.map (fun ident -> ident.idText, ident.idRange)
   | SynExpr.DotGet(longDotId = SynLongIdent(id = id)) ->
     getHeadMethodName id
-  | SynExpr.Ident ident -> Some(ident.idText, ident.idRange)
-  | _ -> None
+  | SynExpr.Ident ident ->
+    Some(ident.idText, ident.idRange)
+  | _ ->
+    None
 
 let private isSymbolOrPunctuation c = Char.IsSymbol c || Char.IsPunctuation c
 
 let private checkSpacingOrNot (src: ISourceText) (range: range) =
   try
     let createThreeRangeAfterEndCol =
-      Range.mkRange "" (Position.mkPos range.EndLine range.EndColumn)
+      Range.mkRange ""
+        (Position.mkPos range.EndLine range.EndColumn)
         (Position.mkPos range.EndLine (range.EndColumn + 3))
     let str = src.GetSubTextFromRange createThreeRangeAfterEndCol
     str.Length >= 2 && str[0] = ' ' && not (isSymbolOrPunctuation str[1]) &&
     str = " wi" || str = " th" (* Heuristic: 'with' / 'then' detection *)
-  with
-    _ -> true
+  with _ ->
+    true
 
 let private getLineAfterExpr (src: ISourceText) (expr: SynExpr) =
   let line = src.GetLineString(expr.Range.EndLine - 1)
@@ -51,15 +54,16 @@ let private ensureMethodSpacing (src: ISourceText) flag funcExpr =
         try
           src.GetSubTextFromRange spaceRange |> Some
         with
-          | :? ArgumentOutOfRangeException -> None
-          | _ -> Some ""
+        | :? ArgumentOutOfRangeException -> None
+        | _ -> Some ""
       if Option.isNone checkExn then ()
       else reportPascalCaseError src spaceRange
     elif isPascalCase methodName |> not && flag = ExprAtomicFlag.Atomic then
       reportLowerCaseError src spaceRange
     else
       ()
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkTypeApp src expr (typeRange: range) argExpr =
   if not ((getLineAfterExpr src argExpr).StartsWith("(")) then
@@ -72,7 +76,8 @@ let checkTypeApp src expr (typeRange: range) argExpr =
         |> reportPascalCaseError src
       else
         ()
-    | _ -> ()
+    | _ ->
+      ()
   else
     ()
 
@@ -96,11 +101,12 @@ let checkIdent src (ident: Ident) argExpr =
     ()
 
 let checkDotGet src expr id flag =
-  match expr with
-  | SynExpr.App(funcExpr = funcExpr
-                argExpr = SynExpr.Const(SynConst.Unit, _)) ->
-    getMethodName funcExpr
-  | _ -> getMethodName expr
+  (match expr with
+   | SynExpr.App(funcExpr = funcExpr
+                 argExpr = SynExpr.Const(SynConst.Unit, _)) ->
+     getMethodName funcExpr
+   | _ ->
+     getMethodName expr)
   |> fun str -> str |> Option.map fst
   |> fun prevMethodName ->
     match prevMethodName, getHeadMethodName id |> Option.map fst with
@@ -119,9 +125,9 @@ let checkDotGet src expr id flag =
       ()
 
 let checkNewKeywordSpacing src = function
-  | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ])),
-    (argExpr: SynExpr)
-    when id.idText = "new" && argExpr.IsParen
+  | SynExpr.LongIdent(longDotId = SynLongIdent(id = [ id ])), (argExpr: SynExpr)
+    when id.idText = "new"
+    && argExpr.IsParen
     && id.idRange.EndColumn <> argExpr.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argExpr.Range.Start
     |> reportPascalCaseError src
@@ -143,7 +149,8 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
     | SynExpr.TypeApp(expr = expr; range = typeRange) ->
       checkTypeApp src expr typeRange argExpr
     | SynExpr.LongIdent(isOptional = false; longDotId = SynLongIdent(id = id))
-      when id.Length <> 1 && argExpr.IsParen
+      when id.Length <> 1
+      && argExpr.IsParen
       && argExpr.Range.StartLine = (List.last id).idRange.StartLine ->
       checkIdent src (List.last id) argExpr
     | SynExpr.Ident ident when argExpr.IsParen ->
@@ -201,7 +208,8 @@ let checkDotGetSpacing src (expr: SynExpr) (dotRange: range) longDotId =
       && dotRange.EndColumn <> id[0].idRange.StartColumn then
       Range.mkRange "" dotRange.End id[0].idRange.Start
       |> fun range -> reportWarn src range "Remove whitespace after '.'"
-    else ()
+    else
+      ()
 
 let checkDotsGetSpacing (src: ISourceText) (lid: LongIdent) dotRanges =
   lid
@@ -211,7 +219,8 @@ let checkDotsGetSpacing (src: ISourceText) (lid: LongIdent) dotRanges =
     if front.idRange.EndLine = back.idRange.StartLine then
       let gapStr =
         Range.unionRanges front.idRange back.idRange |> src.GetSubTextFromRange
-      if gapStr.Contains(".(") || gapStr.Contains(").") then ()
+      if gapStr.Contains(".(") || gapStr.Contains(").") then
+        ()
       elif front.idRange.EndColumn <> dotRange.StartColumn then
         Range.mkRange front.idRange.FileName front.idRange.End dotRange.Start
         |> fun range -> reportWarn src range "Remove whitespace before '.'"

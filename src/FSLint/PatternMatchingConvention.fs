@@ -53,8 +53,10 @@ let private collectElemAndOptSeparatorRanges (src: ISourceText) elementPats =
   let elementRanges = List.map (fun (pat: SynPat) -> pat.Range) elementPats
   let rec interleave elements separators acc =
     match elements, separators with
-    | [], [] -> List.rev acc
-    | [ elem ], [] -> List.rev (elem :: acc)
+    | [], [] ->
+      List.rev acc
+    | [ elem ], [] ->
+      List.rev (elem :: acc)
     | elem :: restElems, sep :: restSeps ->
       interleave restElems restSeps (sep :: elem :: acc)
     | _ ->
@@ -67,8 +69,10 @@ let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   let beforeColonAdjusted =
     combineRangeWithComment lhsRange colonRange.StartRange true lhsRange
   let afterColonAdjusted =
-    combineRangeWithComment colonRange.EndRange (rhsRange: range).StartRange
-      false rhsRange
+    combineRangeWithComment colonRange.EndRange
+      (rhsRange: range).StartRange
+      false
+      rhsRange
   if beforeColonAdjusted.EndColumn + 1 <> colonRange.StartColumn
     && beforeColonAdjusted.StartLine = colonRange.StartLine
   then
@@ -79,7 +83,8 @@ let private checkConsOperatorSpacing src lhsRange rhsRange (colonRange: range) =
   then
     Range.mkRange "" colonRange.End afterColonAdjusted.Start
     |> fun range -> reportWarn src range "Use single whitespace after ':'"
-  else ()
+  else
+    ()
 
 /// Checks if the given pattern contains record with incorrect bracket spacing,
 /// such as `{field}` instead of `{ field }`, within the specified range.
@@ -90,7 +95,8 @@ let private checkRecordBracketSpacing src (range: range) (innerRange: range) =
   elif range.EndColumn - 2 <> innerRange.EndColumn then
     Range.mkRange "" innerRange.End range.End
     |> reportRightCurlyBraceSpacing src
-  else ()
+  else
+    ()
 
 /// Checks for incorrect spacing in record pattern matching.
 let private checkRecordFuncSpacing src = function
@@ -173,7 +179,8 @@ let private checkRecordSeparatorSpacing (src: ISourceText) (field: SynPat) =
             match subStr[index + 1] with
             | ' ' when index < subStr.Length - 2 && subStr.[index + 2] = ' ' ->
               reportSemiColonAfterSpacing src field.Range
-            | ' ' -> ()
+            | ' ' ->
+              ()
             | _ ->
               reportSemiColonAfterSpacing src field.Range
           else
@@ -186,27 +193,30 @@ let rec private checkRecordInPattern src (idRange: range) = function
   | [ field: SynPat ] ->
     match field with
     | SynPat.Paren(pat = pat) ->
-      if pat.IsRecord then checkRecordInPattern src idRange [ pat ]
-      else ()
+      if pat.IsRecord then checkRecordInPattern src idRange [ pat ] else ()
     | _ ->
       match collectRecordEdgeRange [] field with
       | Some startRange, Some endRange, Some range ->
         Range.unionRanges startRange endRange
         |> checkRecordBracketSpacing src range
-      | _ -> ()
+      | _ ->
+        ()
       if not field.IsParen && idRange.EndColumn + 1 <> field.Range.StartColumn
       then reportWarn src field.Range "Use single whitespace"
       else ()
       checkRecordFuncSpacing src field
       checkRecordOperatorSpacing src field
       checkRecordSeparatorSpacing src field
-  | _ :: _ -> warn $"[RecordPattern]TODO: Various Args"
-  | [] -> ()
+  | _ :: _ ->
+    warn $"[RecordPattern]TODO: Various Args"
+  | [] ->
+    ()
 
 and private checkLongIdentPatternCase src typarDecls argPats = function
   | [ qualifier; method: Ident ]
-    when isPascalCase method.idText &&
-         qualifier.idText <> "_" && qualifier.idText <> "this" ->
+    when isPascalCase method.idText
+         && qualifier.idText <> "_"
+         && qualifier.idText <> "this" ->
     checkFuncSpacing src typarDecls method.idRange argPats
   | [ id ] when isPascalCase id.idText && not argPats.Patterns.IsEmpty ->
     if argPats.Patterns.Head.IsRecord then
@@ -218,11 +228,13 @@ and private checkLongIdentPatternCase src typarDecls argPats = function
     else
       ()
   | [ id ]
-    when id.idText = "new" && argPats.Patterns.Head.IsParen &&
-         id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
+    when id.idText = "new"
+         && argPats.Patterns.Head.IsParen
+         && id.idRange.EndColumn <> argPats.Patterns.Head.Range.StartColumn ->
     Range.mkRange "" id.idRange.End argPats.Patterns.Head.Range.Start
     |> reportPascalCaseError src
-  | _ -> ()
+  | _ ->
+    ()
 
 /// checks pattern cases with incorrect spacing or newlines.
 let private checkPatternSpacing src clauses =
@@ -252,15 +264,20 @@ let private checkPatternSpacing src clauses =
     ()
 
 /// Checks for missing or extra spaces around '->' in match cases.
-let checkArrowSpacing src patRange whenExpr (bodyRange: range)
-  (arrowRange: range) =
+let checkArrowSpacing src
+                      patRange
+                      whenExpr
+                      (bodyRange: range)
+                      (arrowRange: range) =
   let patRange =
     if Option.isSome (whenExpr: option<SynExpr>) then whenExpr.Value.Range
     else patRange
   let patRangeAdjusted =
     combineRangeWithComment patRange arrowRange.StartRange true patRange
   let bodyRangeAdjusted =
-    combineRangeWithComment arrowRange.EndRange bodyRange.StartRange false
+    combineRangeWithComment arrowRange.EndRange
+      bodyRange.StartRange
+      false
       bodyRange
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
     if patRangeAdjusted.EndColumn + 1 <> arrowRange.StartColumn then
@@ -332,7 +349,28 @@ let checkBarIsSameColWithMatch src clauses (trivia: SynExprMatchTrivia) =
   else
     ()
 
-let checkFormat src clauses = checkPatternSpacing src clauses
+/// Every case body must either stay inline with its '->' or break onto its own
+/// line; mixing the two styles within one match is reported. This applies to
+/// `function` just as much as to `match`, so it is exposed separately from
+/// `checkFormat`, whose other checks are driven from the `match` keyword.
+let checkUniformCaseBody src clauses =
+  clauses
+  |> List.choose (fun (SynMatchClause(resultExpr = expr; trivia = trivia)) ->
+    trivia.ArrowRange
+    |> Option.map (fun arrow -> arrow, (expr: SynExpr).Range))
+  |> LineBreakConvention.checkUniformBreak src
+
+/// The handler cases of a 'try' answer to each other exactly as a match's do,
+/// with one exception: a lone bar-less handler is no case list at all. Its '->'
+/// is the very anchor the try/with pairing is measured from, so judging it here
+/// as well would leave the two checks pulling the same arrow opposite ways
+/// whenever the 'try' body is too long to come up but the handler is not.
+let checkUniformHandlerBody src (clauses: SynMatchClause list) =
+  if clauses.Length > 1 then checkUniformCaseBody src clauses else ()
+
+let checkFormat src clauses =
+  checkPatternSpacing src clauses
+  checkUniformCaseBody src clauses
 
 let rec checkBody (src: ISourceText) = function
   | SynPat.ArrayOrList(isArray, elementPats, range) ->
@@ -352,14 +390,24 @@ let rec checkBody (src: ISourceText) = function
       pats |> List.iter (fun pat -> checkBody src pat.Pattern)
   | SynPat.Paren(pat = pat) ->
     checkBody src pat
-  | SynPat.Tuple(elementPats = elementPats; commaRanges = commaRanges) ->
+  | SynPat.Tuple(isStruct = isStruct
+                 elementPats = elementPats
+                 commaRanges = commaRanges
+                 range = range) ->
+    if isStruct then
+      elementPats
+      |> List.map (fun (pat: SynPat) -> pat.Range)
+      |> ParenConvention.checkStructSpacing src range
+    else
+      ()
     TupleConvention.checkPat src elementPats commaRanges
     elementPats |> List.iter (checkBody src)
   | SynPat.As(lhsPat = lhsPat; rhsPat = rhsPat)
   | SynPat.Or(lhsPat = lhsPat; rhsPat = rhsPat) ->
     checkBody src lhsPat
     checkBody src rhsPat
-  | _ -> () (* no need to check this *)
+  | _ ->
+    () (* no need to check this *)
 
 and private checkArrayOrList src isArray elementPats (range: range) =
   if elementPats.IsEmpty then
@@ -380,3 +428,34 @@ and private checkArrayOrList src isArray elementPats (range: range) =
     else
       ()
     elementPats |> List.iter (checkBody src)
+
+/// A comma list in a pattern is laid out as one in an expression is: its gaps
+/// either all carry a line break or none of them does. What a pattern is never
+/// asked is a name, since there is nowhere in a pattern to put one; the gaps
+/// are all of it.
+///
+/// The walk reaches down through whatever fences a pattern nests behind, since
+/// a list buried inside a constructor is a list still.
+let rec checkCommaLayout src (pat: SynPat) =
+  match pat with
+  | SynPat.Tuple(elementPats = pats) ->
+    pats
+    |> List.map (fun (p: SynPat) -> p.Range)
+    |> LineBreakConvention.checkUniformPlacement src
+    for p in pats do checkCommaLayout src p
+  | SynPat.Paren(pat = inner)
+  | SynPat.Typed(pat = inner)
+  | SynPat.Attrib(pat = inner) ->
+    checkCommaLayout src inner
+  | SynPat.As(lhsPat = lhs; rhsPat = rhs)
+  | SynPat.Or(lhsPat = lhs; rhsPat = rhs)
+  | SynPat.ListCons(lhsPat = lhs; rhsPat = rhs) ->
+    checkCommaLayout src lhs
+    checkCommaLayout src rhs
+  | SynPat.LongIdent(argPats = SynArgPats.Pats args) ->
+    for arg in args do checkCommaLayout src arg
+  | SynPat.Ands(pats = pats)
+  | SynPat.ArrayOrList(elementPats = pats) ->
+    for p in pats do checkCommaLayout src p
+  | _ ->
+    ()

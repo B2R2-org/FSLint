@@ -46,7 +46,8 @@ type LspServer(rpc: JsonRpc) =
                Message = error.Message }
     with ex ->
       eprintfn "[DIAG] ERROR creating diagnostic: %s - %s"
-        error.Message ex.Message
+        error.Message
+        ex.Message
       None
 
   let lintDocument (uri: string) (content: string): LspDiagnostic[] =
@@ -62,8 +63,14 @@ type LspServer(rpc: JsonRpc) =
       setCurrentFile uri
       try
         match LineConvention.check sourceText content with
-        | Ok() -> parseFile sourceText uri |> Program.checkWithAST sourceText
-        | _ -> ()
+        | Ok() ->
+          setDirectiveLines (directiveLinesOf sourceText)
+          beginReadings ()
+          parseFile sourceText uri
+          |> List.iter (Program.checkWithAST sourceText)
+          reportAgreedJoins sourceText
+        | _ ->
+          ()
       with :? LintException as ex ->
         eprintfn "[LINT] LintException: %s" ex.Message
       setCurrentLintContext None
@@ -118,27 +125,25 @@ type LspServer(rpc: JsonRpc) =
         ()
       let diagnosticsArray = JArray()
       for diag in validDiagnostics do
+        let startPos =
+          JObject(JProperty("line", diag.Range.Start.Line),
+                  JProperty("character", diag.Range.Start.Character))
+        let endPos =
+          JObject(JProperty("line", diag.Range.End.Line),
+                  JProperty("character", diag.Range.End.Character))
+        let range =
+          JObject(JProperty("start", startPos), JProperty("end", endPos))
         let diagObj =
-          JObject(
-            JProperty("range",
-              JObject(
-                JProperty("start",
-                  JObject(
-                    JProperty("line", diag.Range.Start.Line),
-                    JProperty("character", diag.Range.Start.Character))),
-                JProperty("end",
-                  JObject(
-                    JProperty("line", diag.Range.End.Line),
-                    JProperty("character", diag.Range.End.Character))))),
-            JProperty("severity", diag.Severity),
-            JProperty("source", diag.Source),
-            JProperty("message", diag.Message))
+          JObject(JProperty("range", range),
+                  JProperty("severity", diag.Severity),
+                  JProperty("source", diag.Source),
+                  JProperty("message", diag.Message))
         diagnosticsArray.Add(diagObj)
-      rpc.NotifyWithParameterObjectAsync(
-        "textDocument/publishDiagnostics",
-        JObject(
-          JProperty("uri", uri),
-          JProperty("diagnostics", diagnosticsArray)))
+      let payload =
+        JObject(JProperty("uri", uri),
+                JProperty("diagnostics", diagnosticsArray))
+      rpc.NotifyWithParameterObjectAsync("textDocument/publishDiagnostics",
+                                         payload)
     with ex ->
       eprintfn "[LSP] ERROR publishing diagnostics: %s" ex.Message
       eprintfn "[LSP] STACK: %s" ex.StackTrace
@@ -155,7 +160,8 @@ type LspServer(rpc: JsonRpc) =
             eprintfn "[SCAN] ERROR: Directory does not exist: %s" root
           else
             let fsFiles =
-              Directory.EnumerateFiles(root, "*.fs",
+              Directory.EnumerateFiles(root,
+                                       "*.fs",
                                        SearchOption.AllDirectories)
               |> Seq.filter (fun path ->
                 not (path.Contains("node_modules") ||
@@ -248,7 +254,8 @@ type LspServer(rpc: JsonRpc) =
     | Some watcher ->
       watcher.Dispose()
       editorConfigWatcher <- None
-    | None -> ()
+    | None ->
+      ()
 
   [<JsonRpcMethod("initialize")>]
   member _.Initialize(p: JToken) =
@@ -296,30 +303,19 @@ type LspServer(rpc: JsonRpc) =
         ()
     else
       ()
-    JObject(
-      JProperty("capabilities",
-        JObject(
-          JProperty("textDocumentSync",
-            JObject(
-              JProperty("openClose", true),
+    let sync =
+      JObject(JProperty("openClose", true),
               JProperty("change", 0),
-              JProperty("save", JObject(JProperty("includeText", true)))
-            )
-          ),
-          JProperty("workspace",
-            JObject(
-              JProperty("configuration", true)
-            )
-          )
-        )
-      ),
-      JProperty("serverInfo",
-        JObject(
-          JProperty("name", "FSLint Language Server"),
-          JProperty("version", "1.0.0")
-        )
-      )
-    )
+              JProperty("save", JObject(JProperty("includeText", true))))
+    let workspace = JObject(JProperty("configuration", true))
+    let capabilities =
+      JObject(JProperty("textDocumentSync", sync),
+              JProperty("workspace", workspace))
+    let serverInfo =
+      JObject(JProperty("name", "FSLint Language Server"),
+              JProperty("version", "1.0.0"))
+    JObject(JProperty("capabilities", capabilities),
+            JProperty("serverInfo", serverInfo))
 
   [<JsonRpcMethod("initialized")>]
   member _.Initialized(p: JToken) =
@@ -416,7 +412,8 @@ type LspServer(rpc: JsonRpc) =
               do! publishDiagnostics uri [||] |> Async.AwaitTask
         else
           match p["text"] with
-          | null -> ()
+          | null ->
+            ()
           | text ->
             let content = text.ToString()
             let diagnostics = lintDocument uri content

@@ -28,6 +28,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Diagnostics.fs" />
     <Compile Include="Utils.fs" />
+    <Compile Include="LineBreakConvention.fs" />
     <Compile Include="LineConvention.fs" />
     <Compile Include="IdentifierConvention.fs" />
     <Compile Include="TryWithConvention.fs" />

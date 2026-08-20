@@ -16,10 +16,114 @@ module Diagnostics =
 
   let currentLintContext = new AsyncLocal<LintContext option>()
 
+  /// The lines the conditional-compilation directives of the file sit on.
+  let directiveLines = new AsyncLocal<int list>()
+
+  /// Demands to close a group up, raised by a group reaching across a
+  /// directive. Such a group holds different members in each build, so the
+  /// demand is held here against the group that raised it until every build
+  /// has been read.
+  ///
+  /// It is kept unless some build objects, not required of every build in
+  /// turn: a build already closed up raises nothing and is no reason to
+  /// leave the others open, while a build whose body can never come up is
+  /// reason enough to ask no build to bring it. Each build names its own
+  /// stray body, since that body is a different one in each.
+  let deferredJoins = new AsyncLocal<ResizeArray<range * range>>()
+
+  /// Groups some build cannot close up, whatever the others manage.
+  let blockedGroups = new AsyncLocal<ResizeArray<range>>()
+
+  /// The expressions standing as the argument of an application. A comma list
+  /// there is a parameter list, which nothing else in the tree tells apart
+  /// from a tuple of data, and the two are not laid out the same way: a
+  /// parameter list too wide for its line breaks at every comma, while a
+  /// tuple of data is asked to be named instead.
+  let applicationArgs = new AsyncLocal<ResizeArray<range>>()
+
+  /// The expressions a match is taken on. A comma list there pairs the things
+  /// being tested rather than building a value, so it is never asked for a
+  /// name; what it answers for is only that its gaps agree.
+  let matchScrutinees = new AsyncLocal<ResizeArray<range>>()
+
+  /// Sub-chains already answered for by a longer chain above them. An operator
+  /// chain nests to the left, so every prefix of it is an expression in its
+  /// own right and would otherwise be judged again on its own; a short prefix
+  /// of a long chain looks as though it could close up when the chain holding
+  /// it cannot.
+  let coveredChains = new AsyncLocal<ResizeArray<range>>()
+
+  /// Applications already answered for by a longer one above them. A curried
+  /// application nests to the left in the same way a chain does, so `f a b` is
+  /// an expression of its own inside `f a b c` and would be judged twice. It is
+  /// kept apart from the chains above so that noting one can never silence the
+  /// other.
+  let coveredApplications = new AsyncLocal<ResizeArray<range>>()
+
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
     currentLintContext.Value <- context
+
+  let setDirectiveLines (lines: int list) = directiveLines.Value <- lines
+
+  let beginReadings () =
+    deferredJoins.Value <- ResizeArray()
+    blockedGroups.Value <- ResizeArray()
+    applicationArgs.Value <- ResizeArray()
+    matchScrutinees.Value <- ResizeArray()
+    coveredChains.Value <- ResizeArray()
+    coveredApplications.Value <- ResizeArray()
+
+  /// True when the store holds the very stretch given.
+  let private holds (store: AsyncLocal<ResizeArray<range>>) (range: range) =
+    match box store.Value with
+    | null ->
+      false
+    | _ ->
+      store.Value
+      |> Seq.exists (fun (seen: range) ->
+        seen.StartLine = range.StartLine && seen.StartColumn = range.StartColumn
+        && seen.EndLine = range.EndLine && seen.EndColumn = range.EndColumn)
+
+  let noteApplicationArg (range: range) = applicationArgs.Value.Add range
+
+  let noteMatchScrutinee (range: range) = matchScrutinees.Value.Add range
+
+  let noteCoveredChain (range: range) = coveredChains.Value.Add range
+
+  let isCoveredChain range = holds coveredChains range
+
+  let noteCoveredApplication (range: range) =
+    coveredApplications.Value.Add range
+
+  let isCoveredApplication range = holds coveredApplications range
+
+  /// True when the stretch is an application's argument, and so a parameter
+  /// list rather than a tuple standing on its own.
+  let isApplicationArg range = holds applicationArgs range
+
+  /// True when the stretch is what a match is taken on. Its commas pair the
+  /// things being tested rather than build a value, so there is no tuple there
+  /// to be given a name.
+  let isMatchScrutinee range = holds matchScrutinees range
+
+  let deferJoin (group: range) (body: range) =
+    deferredJoins.Value.Add(group, body)
+
+  let blockJoin (group: range) = blockedGroups.Value.Add group
+
+  /// True when a directive stands between the two lines, so that what they
+  /// hold is not one stretch of code but a different stretch per build. A
+  /// group reaching across such a line is read differently in each, and the
+  /// two readings can want opposite things of it.
+  let straddlesDirective (startLine: int) (endLine: int) =
+    match box directiveLines.Value with
+    | null ->
+      false
+    | _ ->
+      directiveLines.Value
+      |> List.exists (fun line -> line > startLine && line < endLine)
 
   let setCliEditorConfig config = cliEditorConfig.Value <- config
 
@@ -38,16 +142,15 @@ module Diagnostics =
     match currentLintContext.Value with
     | Some context ->
       let dummyRange =
-        Range.mkRange ""
-          (Position.mkPos 1 0)
-          (Position.mkPos 1 0)
+        Range.mkRange "" (Position.mkPos 1 0) (Position.mkPos 1 0)
       let error =
         { Range = dummyRange
           Message = message
           LineContent = ""
           ColumnIndicator = "" }
       context.Errors <- error :: context.Errors
-    | None -> raise <| LintException message
+    | None ->
+      raise <| LintException message
 
   let reportWarn (src: ISourceText) (range: range) message =
     match currentLintContext.Value with
@@ -91,8 +194,7 @@ module Diagnostics =
   let reportWarns (errors: LintError list) (filePath: string) =
     lock outputLock (fun () ->
       let fileName =
-        if String.IsNullOrEmpty filePath then ""
-        else Path.GetFileName filePath
+        if String.IsNullOrEmpty filePath then "" else Path.GetFileName filePath
       for error in List.rev errors do
         if String.IsNullOrEmpty fileName then
           Console.Error.WriteLine(
@@ -100,7 +202,9 @@ module Diagnostics =
         else
           Console.Error.WriteLine(
             sprintf "[%s] Line %d: %O"
-              fileName error.Range.StartLine error.Message)
+              fileName
+              error.Range.StartLine
+              error.Message)
         Console.Error.WriteLine error.LineContent
         Console.Error.WriteLine error.ColumnIndicator
     )
@@ -114,6 +218,36 @@ module CustomReports =
 
   let reportNewLine src range =
     reportWarn src range "Remove unnecessary line break"
+
+  let reportBindToLet src range = reportWarn src range "Bind to fit the line"
+
+  /// A `when` clause still sharing the line its type parameters stand on.
+  /// Sending it down takes the constraints below it along, so it is the only
+  /// thing said of such a list.
+  let reportWhenPlacement src range =
+    reportWarn src range "Move 'when' to the next line"
+
+  /// An `and` that does not stand in the column its `when` opened.
+  let reportAndAlignment src range =
+    reportWarn src range "Align 'and' with 'when'"
+
+  /// Raises the held demands no build objected to, and drops the rest.
+  let reportAgreedJoins src =
+    match box deferredJoins.Value with
+    | null ->
+      ()
+    | _ ->
+      let key (r: range) = r.StartLine, r.StartColumn, r.EndLine, r.EndColumn
+      let blocked = blockedGroups.Value |> Seq.map key |> Set.ofSeq
+      let isBlocked (group: range) = blocked |> Set.contains (key group)
+      deferredJoins.Value
+      |> Seq.filter (fun (group, _) -> not (isBlocked group))
+      |> Seq.map snd
+      |> Seq.distinctBy key
+      |> Seq.sortBy key
+      |> Seq.iter (reportNewLine src)
+      deferredJoins.Value <- ResizeArray()
+      blockedGroups.Value <- ResizeArray()
 
 /// We intentionally do not suggest a concrete fix here because some malformed
 /// operator-spacing cases (for example, generic-looking syntax parsed as infix

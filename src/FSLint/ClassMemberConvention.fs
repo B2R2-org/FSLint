@@ -13,19 +13,22 @@ let private getMemberCategory (memberDefn: SynMemberDefn) =
     MemberCategory.Constructor, range
   | SynMemberDefn.Member(binding, _) ->
     let SynBinding(headPat = pat; trivia = trivia) = binding
-    (match pat with
-     | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
-       match longDotId with
-       | SynLongIdent(id = [ id ]) when id.idText = "new" ->
-         MemberCategory.Constructor
-       | _ ->
-         match args with
-         | SynArgPats.Pats [] -> MemberCategory.Property
-         | _ -> MemberCategory.Method
-     | _ -> MemberCategory.Method), trivia.LeadingKeyword.Range
+    let category =
+      match pat with
+      | SynPat.LongIdent(longDotId, _, _, args, _, _) ->
+        match longDotId with
+        | SynLongIdent(id = [ id ]) when id.idText = "new" ->
+          MemberCategory.Constructor
+        | _ ->
+          match args with
+          | SynArgPats.Pats [] -> MemberCategory.Property
+          | _ -> MemberCategory.Method
+      | _ ->
+        MemberCategory.Method
+    category, trivia.LeadingKeyword.Range
   | SynMemberDefn.GetSetMember(range = range; trivia = trivia) ->
-    MemberCategory.Property,
-    Range.mkRange "" range.Start trivia.WithKeyword.Start
+    let keyword = Range.mkRange "" range.Start trivia.WithKeyword.Start
+    MemberCategory.Property, keyword
   | SynMemberDefn.AutoProperty(trivia = trivia) ->
     MemberCategory.Property, trivia.LeadingKeyword.Range
   | SynMemberDefn.AbstractSlot(range = range) ->
@@ -36,13 +39,15 @@ let private getMemberCategory (memberDefn: SynMemberDefn) =
     MemberCategory.Field, range
   | SynMemberDefn.NestedType(range = range) ->
     MemberCategory.NestedType, range
-  | _ as other -> MemberCategory.Method, other.Range
+  | _ as other ->
+    MemberCategory.Method, other.Range
 
 let private isStaticMember (memberDefn: SynMemberDefn) =
   match memberDefn with
   | SynMemberDefn.Member(SynBinding(trivia = trivia), _) ->
     trivia.LeadingKeyword.IsStaticMember
-  | _ -> false
+  | _ ->
+    false
 
 let private getMemberScope (memberDefn: SynMemberDefn) =
   if isStaticMember memberDefn then MemberScope.Static else MemberScope.Instance
@@ -54,7 +59,8 @@ let private getAccessLevel = function
     | Some(SynAccess.Internal _) -> AccessLevel.Internal
     | Some(SynAccess.Public _) -> AccessLevel.Public
     | None -> AccessLevel.Public
-  | _ -> AccessLevel.Public
+  | _ ->
+    AccessLevel.Public
 
 let private getMemberOrderKey (memberDefn: SynMemberDefn) =
   let category = int (getMemberCategory memberDefn |> fst)
@@ -67,9 +73,12 @@ let private getMemberOrderKey (memberDefn: SynMemberDefn) =
 /// accumulating results as it matches the specified pattern identifier.
 let rec private findSelfIdentifierInApp src patIdent acc = function
   | SynExpr.LongIdent(longDotId = SynLongIdent(id = id))
-    when not id.IsEmpty && id.Head.idText = patIdent -> true
-  | SynExpr.For(ident = ident) when ident.idText = patIdent -> true
-  | SynExpr.Ident(ident = ident) when ident.idText = patIdent -> true
+    when not id.IsEmpty && id.Head.idText = patIdent ->
+    true
+  | SynExpr.For(ident = ident) when ident.idText = patIdent ->
+    true
+  | SynExpr.Ident(ident = ident) when ident.idText = patIdent ->
+    true
   | SynExpr.LongIdentSet(expr = expr)
   | SynExpr.Typed(expr = expr)
   | SynExpr.Assert(expr = expr)
@@ -103,7 +112,8 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
       findSelfIdentifierInApp src patIdent acc resultExpr ||
       if whenExpr.IsSome then
         findSelfIdentifierInApp src patIdent acc whenExpr.Value
-      else false
+      else
+        false
     )
   | SynExpr.TryWith(tryExpr = expr; withCases = clauses)
   | SynExpr.Match(expr = expr; clauses = clauses) ->
@@ -114,7 +124,8 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
       findSelfIdentifierInApp src patIdent acc resultExpr ||
       if whenExpr.IsSome then
         findSelfIdentifierInApp src patIdent acc whenExpr.Value
-      else false
+      else
+        false
     )
   | SynExpr.NamedIndexedPropertySet(longDotId = SynLongIdent(id = id)
                                     expr1 = expr1; expr2 = expr2) ->
@@ -127,7 +138,8 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
       |> List.exists (function
         | SynInterpolatedStringPart.FillExpr(expr, _) ->
           findSelfIdentifierInApp src patIdent acc expr
-        | _ -> acc
+        | _ ->
+          acc
       )
   | SynExpr.LetOrUse(bindings = bindings; body = body) ->
     bindings
@@ -141,7 +153,8 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
     findSelfIdentifierInApp src patIdent acc thenExpr ||
     if elseExpr.IsSome then
       findSelfIdentifierInApp src patIdent acc elseExpr.Value
-    else false
+    else
+      false
   | SynExpr.Record(recordFields = recordFields) ->
     recordFields
     |> List.exists (fun field ->
@@ -149,7 +162,8 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
       if expr.IsSome then findSelfIdentifierInApp src patIdent acc expr.Value
       else acc
     )
-  | _ -> acc
+  | _ ->
+    acc
 
 let checkMemberOrder src (members: SynMemberDefn list) =
   if isStrict then
@@ -172,14 +186,11 @@ let checkMemberOrder src (members: SynMemberDefn list) =
         let prevScope = getMemberScope prev
         let nextScope = getMemberScope next
         if prevCat <> nextCat then
-          reportWarn src range
-            $"Move {nextCat} before {prevCat}"
+          reportWarn src range $"Move {nextCat} before {prevCat}"
         elif prevScope <> nextScope then
-          reportWarn src range
-            "Move static member before instance members"
+          reportWarn src range "Move static member before instance members"
         else
-          reportWarn src range
-            "Fix member order by access level"
+          reportWarn src range "Fix member order by access level"
       else
         ()
     )
@@ -201,7 +212,8 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
            parenRange.Start)
           ||> Range.mkRange ""
           |> fun range -> reportWarn src range "Remove whitespace after '``'"
-        else ()
+        else
+          ()
         false
       else
         true
@@ -210,7 +222,8 @@ let checkBackticMethodSpacing (src: ISourceText) dotRanges (parenRange: range) =
 
 let private getEffectiveExtraIdRange (extraId: Ident option) lastId typarDecls =
   match typarDecls with
-  | Some(SynValTyparDecls(typars = Some typars)) -> typars.Range
+  | Some(SynValTyparDecls(typars = Some typars)) ->
+    typars.Range
   | _ ->
     match extraId with
     | Some id -> id.idRange
@@ -263,10 +276,14 @@ let checkMemberSpacing src longId typarDecls extraId dotRanges args =
         then
           Range.mkRange "" effectiveLastIdRange.End range.Start
           |> reportLowerCaseError src
-        else ()
-      else ()
-    | _ -> ()
-  | _ -> ()
+        else
+          ()
+      else
+        ()
+    | _ ->
+      ()
+  | _ ->
+    ()
 
 /// Checks spacing between static member identifiers and parentheses in F# code.
 /// For PascalCase members, ensures no space before the parenthesis.
@@ -289,8 +306,10 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
       if idRange.EndColumn <> range.StartColumn then
         Range.mkRange "" idRange.End range.Start
         |> reportPascalCaseError src
-      else ()
-    | _ -> ()
+      else
+        ()
+    | _ ->
+      ()
   | _ when (idTrivia: list<option<IdentTrivia>>).Head.IsSome ->
     match idTrivia.Head.Value with
     | IdentTrivia.OriginalNotationWithParen(rightParenRange = range) ->
@@ -300,10 +319,14 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
           Range.mkRange "" range.End argRange.Start
           |> fun range ->
             reportWarn src range "Add single whitespace between Infix and '('"
-        else ()
-      | _ -> ()
-    | _ -> warn $"[checkStaticMemberSpacing]TODO: {longId}"
-  | _ -> ()
+        else
+          ()
+      | _ ->
+        ()
+    | _ ->
+      warn $"[checkStaticMemberSpacing]TODO: {longId}"
+  | _ ->
+    ()
 
 let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
   let idRange =
@@ -373,7 +396,8 @@ let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
         reportCommaFormat src gap
       else
         ()
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkSelfIdentifierUsage (src: ISourceText) pat body =
   match pat with
@@ -399,4 +423,5 @@ let checkSelfIdentifierUsage (src: ISourceText) pat body =
           reportWarn src id.Head.idRange "Remove unused self-identifier"
         else
           ()
-  | _ -> ()
+  | _ ->
+    ()

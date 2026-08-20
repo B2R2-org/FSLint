@@ -17,7 +17,8 @@ let checkLetBinding src (binding: SynBinding) (context: ScopeContext) =
       else
         ()
     )
-  | _ -> ()
+  | _ ->
+    ()
 
 let checkTypeMember src (context: ScopeContext) (memberDefn: SynMemberDefn) =
   match memberDefn with
@@ -27,8 +28,10 @@ let checkTypeMember src (context: ScopeContext) (memberDefn: SynMemberDefn) =
       let memberAccess = getAccessLevel (Some acc)
       if isRedundant typeAccess memberAccess then reportRedundant src acc.Range
       else ()
-    | _ -> ()
-  | _ -> ()
+    | _ ->
+      ()
+  | _ ->
+    ()
 
 let checkNestModule src access range (context: ScopeContext) =
   access

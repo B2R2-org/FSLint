@@ -14,7 +14,8 @@ let private findIdxRange fileName lineNumber startCol endColExclusive line =
     if pos <= endColExclusive - 3 then
       if (line: string).Substring(pos, 3) = "\"\"\"" then
         let tripleQuoteRange =
-          Range.mkRange fileName (Position.mkPos lineNumber pos)
+          Range.mkRange fileName
+            (Position.mkPos lineNumber pos)
             (Position.mkPos lineNumber (pos + 3))
         loop (pos + 3) (tripleQuoteRange :: acc)
       else
@@ -63,6 +64,8 @@ let checkIdentifierWithParen (src: ISourceText) members =
     | SynMemberDefn.ImplicitCtor(accessibility = accessibility
                                  ctorArgs = ctorArgs
                                  range = range) ->
+      LineBreakConvention.checkParameters src [ ctorArgs ]
+      TypeAnnotation.checkParamTypeSpacing src ctorArgs
       match accessibility with
       | Some(SynAccess.Internal idRange)
       | Some(SynAccess.Public idRange)
@@ -72,7 +75,6 @@ let checkIdentifierWithParen (src: ISourceText) members =
           |> fun wRange -> reportPascalCaseError src wRange
         else
           ()
-        TypeAnnotation.checkParamTypeSpacing src ctorArgs
       | _ ->
         Range.mkRange "" range.End ctorArgs.Range.Start
         |> checkMultiLineIdentWithParen src ctorArgs.Range
@@ -90,18 +92,26 @@ let checkIdentifierWithParen (src: ISourceText) members =
         |> fun wRange -> reportPascalCaseError src wRange
       else
         ()
-    | _ -> ()
+    | _ ->
+      ()
   )
 
 let checkAttributesLineSpacing src (attribute: SynAttributes) trivia =
   let lastAttr = List.tryLast attribute
-  if Option.isNone lastAttr then ()
+  if Option.isNone lastAttr then
+    ()
   else
     match (trivia: SynTypeDefnTrivia).LeadingKeyword with
     | SynTypeDefnLeadingKeyword.StaticType(typeRange = range)
     | SynTypeDefnLeadingKeyword.Type range ->
+      (* A directive standing between the attribute and its type holds the two
+         apart, and its own line cannot be taken away to close the gap. The
+         attribute is as near its type as it is allowed to be. *)
+      let heldApart =
+        findDirectivesBetween lastAttr.Value.Range range |> Option.isSome
       if lastAttr.Value.Range.EndLine + 1 <> range.StartLine
-        && lastAttr.Value.Range.StartLine <> range.StartLine then
+        && lastAttr.Value.Range.StartLine <> range.StartLine
+        && not heldApart then
         Range.mkRange "" (Position.mkPos (range.StartLine - 1) 0) range.Start
         |> reportNewLine src
       else
@@ -126,7 +136,8 @@ let checkBracketElementSpacingInTypar (src: ISourceText) decls =
       if back.StartColumn - 2 <> front.EndColumn
         && front.EndLine = back.StartLine then
         if gapStr.StartsWith "," then
-          Range.mkRange "" (Position.mkPos front.EndLine (front.EndColumn + 1))
+          Range.mkRange ""
+            (Position.mkPos front.EndLine (front.EndColumn + 1))
             back.Start
           |> reportCommaAfterSpacing src
         else
@@ -147,7 +158,8 @@ let checkBracketSpacingInTypar src decls constraints (range: range) =
         (List.last decls |> extractTypeNameRange)
   if range.StartLine = innerRange.StartLine
     && range.StartColumn + 1 <> innerRange.StartColumn then
-    Range.mkRange "" (Position.mkPos range.StartLine (range.StartColumn + 1))
+    Range.mkRange ""
+      (Position.mkPos range.StartLine (range.StartColumn + 1))
       innerRange.Start |> reportLeftAngleInnerSpacing src
   elif range.EndLine = innerRange.EndLine
     && innerRange.EndColumn + 1 <> range.EndColumn then
@@ -155,6 +167,118 @@ let checkBracketSpacingInTypar src decls constraints (range: range) =
     |> reportRightAngleInnerSpacing src
   else
     ()
+
+/// The `when` or `and` standing ahead of a constraint on its line: where the
+/// keyword sits, and whether it opens that line. Neither keyword is part of
+/// the constraint the tree gives back, so the line ahead of it is read.
+let private precedingKeyword (src: ISourceText) (range: range) =
+  let line = src.GetLineString(range.StartLine - 1)
+  let before = line.Substring(0, range.StartColumn).TrimEnd()
+  let name =
+    if before.EndsWith "when" then "when"
+    elif before.EndsWith "and" then "and"
+    else ""
+  if name = "" then
+    None
+  else
+    let column = before.Length - name.Length
+    let keyword =
+      Range.mkRange ""
+        (Position.mkPos range.StartLine column)
+        (Position.mkPos range.StartLine before.Length)
+    Some(keyword, column, before.TrimStart() = name)
+
+/// The stretch the declaration and its constraints take together, read from
+/// the head of the line the parameter list opens on. Whatever trails the last
+/// constraint, the closing angle and what follows it, lands on that line too
+/// and counts against the budget.
+let private declarationSpan (src: ISourceText) (range: range) constraints =
+  let line = src.GetLineString(range.StartLine - 1)
+  let indent = line.Length - line.TrimStart().Length
+  let last = (List.last constraints: SynTypeConstraint).Range
+  Range.mkRange "" (Position.mkPos range.StartLine indent) last.End
+
+/// True when the whole constraint list keeps to the one line `when` opened,
+/// and that line keeps to the budget. Such a line is a layout of its own and
+/// is left alone; one running past the budget has to break at its `and`s like
+/// any other list too wide for its line.
+let private sharesOneLine (src: ISourceText) constraints =
+  let head = (List.head constraints: SynTypeConstraint).Range
+  let line = src.GetLineString(head.StartLine - 1)
+  let budget = Diagnostics.getCurrentMaxLineLength ()
+  line.TrimEnd().Length <= budget
+  && constraints
+     |> List.forall (fun (c: SynTypeConstraint) ->
+       c.Range.StartLine = head.StartLine)
+
+/// Names every line the constraint list runs to below the declaration, at the
+/// keyword that opens it. Closing the list up takes all of them, so naming
+/// only the first would have the author lift that one and be told to put it
+/// back: the state between is no better than the one it came from.
+let private reportConstraintsClosingUp src (range: range) constraints =
+  let below (c: SynTypeConstraint) = c.Range.StartLine > range.StartLine
+  constraints
+  |> List.filter below
+  |> List.groupBy (fun c -> c.Range.StartLine)
+  |> List.iter (fun (_, group) ->
+    let head = (List.head group).Range
+    match precedingKeyword src head with
+    | Some(keyword, _, _) -> reportNewLine src keyword
+    | None -> reportNewLine src head
+  )
+
+/// The constraints of a type parameter list are a separator list like any
+/// other: `when` opens it and `and` divides it. Either the whole list keeps to
+/// the line the parameters are on, or `when` starts a line of its own and each
+/// constraint takes one after it, every `and` standing in the column `when`
+/// opened.
+///
+/// A `when` still up on the parameter line is the only thing said of such a
+/// list. Sending it down takes the constraints below it along, and what the
+/// `and`s under it are doing cannot be judged until it lands.
+///
+/// Fitting comes first, as everywhere: a list that would stand on the
+/// declaration line is asked back onto it. Once it would not, the constraints
+/// sharing the line `when` opened are a layout of their own and are left
+/// alone; only a list already spread past that line is held to the column.
+///
+/// Where that column falls is not asked. `when` and `and` are the one pair of
+/// separators in the language of unequal length, so a column can hold the
+/// keywords or the constraints but not both, and it is the keywords that are
+/// held; how far in they sit is left to the author.
+let checkTyparConstraints src (constraints: SynTypeConstraint list) range =
+  if not isStrict || constraints.IsEmpty then
+    ()
+  elif (range: range).StartLine = range.EndLine then
+    ()
+  elif declarationSpan src range constraints
+       |> LineBreakConvention.closesUpWithin src then
+    (* The whole of it would stand on the declaration line, so every line it
+       runs to below has to come up. That is asked before anything else: a
+       list that belongs on one line is not first sent down to be tidied. *)
+    reportConstraintsClosingUp src range constraints
+  else
+    match constraints with
+    | head :: rest ->
+      match precedingKeyword src head.Range with
+      | None ->
+        reportWhenPlacement src head.Range
+      | Some(keyword, _, false) ->
+        reportWhenPlacement src keyword
+      | Some(_, _, true) when sharesOneLine src constraints ->
+        (* Broken once and no further, and inside the budget: the constraints
+           share the line `when` opened, which is a layout in its own right. *)
+        ()
+      | Some(_, column, true) ->
+        rest
+        |> List.iter (fun constr ->
+          match precedingKeyword src constr.Range with
+          | Some(_, found, true) when found = column -> ()
+          | Some(keyword, _, _) -> reportAndAlignment src keyword
+          | None -> reportAndAlignment src constr.Range
+        )
+    | [] ->
+      ()
 
 let checkSynTypar src idRange (typeParams: SynTyparDecls) =
   match typeParams with
@@ -164,7 +288,18 @@ let checkSynTypar src idRange (typeParams: SynTyparDecls) =
     checkNameBracketSpacing src idRange range
     checkBracketElementSpacingInTypar src decls
     checkBracketSpacingInTypar src decls constraints range
-  | _ -> warn "[checkSynTypar] TODO"
+    checkTyparConstraints src constraints range
+    let declRanges = decls |> List.map extractTypeNameRange
+    (* The parameters are measured by their own width, not by the fence they
+       share with the constraints. A constraint list too wide for the line says
+       nothing about whether the parameters ahead of it fit on one, and reading
+       the two together would leave them broken with nothing gained. *)
+    let declSpan =
+      if constraints.IsEmpty then range
+      else Range.mkRange "" range.Start (List.last declRanges).End
+    LineBreakConvention.checkBracketedPlacement src declSpan declRanges
+  | _ ->
+    warn "[checkSynTypar] TODO"
 
 let checkNestedTypeDefns (src: ISourceText) (range: range) typeDefns =
   if isStrict then

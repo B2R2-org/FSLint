@@ -71,9 +71,11 @@ type Class() =
     """
 type Class() =
   member _.A() =
+    printfn "a"
     42
 
   member _.B() =
+    printfn "b"
     42
 """
 
@@ -81,10 +83,12 @@ type Class() =
     """
 type Class() =
   member _.A() =
+    printfn "a"
     42
 
 
   member _.B() =
+    printfn "b"
     42
 """
 

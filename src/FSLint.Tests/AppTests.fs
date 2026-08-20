@@ -82,9 +82,7 @@ let bad = genericFn2 <int, string> 1 "x"
 
   let goodInfixOperatorInCondTest =
     """
-let f x =
-  if x.Y > 42 then x.X
-  else -x.X + 1
+let f x = if x.Y > 42 then x.X else -x.X + 1
 """
 
   [<TestMethod>]
@@ -175,3 +173,42 @@ let f x =
   [<TestMethod>]
   member _.``[UnaryOp] DEBUG - without space``() =
     try "let negate x = -x\n" |> lint with _ -> ()
+
+  /// A chain of bitwise operators is a separator list like the operands of a
+  /// condition: while the whole of it would close up onto one line it stays
+  /// closed up, and once it would not, every gap between its operands has to
+  /// agree. A chain nests to the left, so its prefixes must not be judged
+  /// again on their own: a short prefix of a long chain looks as though it
+  /// could close up when the chain holding it cannot.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Placement Test``() =
+    "let numberFormat =\n" +
+    "  NumberLiteralOptions.AllowBinary\n" +
+    "  ||| NumberLiteralOptions.AllowOctal\n" +
+    "  ||| NumberLiteralOptions.AllowHexadecimal\n" +
+    "  ||| NumberLiteralOptions.AllowMinusSign\n" +
+    "  ||| NumberLiteralOptions.AllowPlusSign\n"
+    |> lint
+
+  /// Too wide for one line, and packed rather than spread. Where a chain that
+  /// will not fit is broken is the author's to choose, so nothing is asked.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Placement Test(2)``() =
+    "let f p u w value =\n" +
+    "  let imm =\n" +
+    "    (1u <<< 11) ||| (p <<< 10) ||| (u <<< 9) ||| (w <<< 8)\n" +
+    "    ||| unsignedImm 8 value\n" +
+    "  imm\n"
+    |> lint
+
+  /// A chain short enough to close up has to be closed up, however evenly it
+  /// was spread.
+  [<TestMethod>]
+  member _.``[App] Bitwise Chain Placement Test(3)``() =
+    "let f p u =\n" +
+    "  let imm =\n" +
+    "    (1u <<< 11)\n" +
+    "    ||| (p <<< 10)\n" +
+    "    ||| (u <<< 9)\n" +
+    "  imm\n"
+    |> lintAssertMsg "Remove unnecessary line break"

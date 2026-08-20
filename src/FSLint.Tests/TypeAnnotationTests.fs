@@ -252,14 +252,155 @@ type Class() =
   member _.Foo(sb:System.Text.StringBuilder) = None
 """
 
+  let goodConstrainedTypeTest =
+    """
+let fn (opcode: 'Op when 'Op: enum<int>) = opcode
+"""
+
+  /// The colon is judged through the wrapper, in each of its three ways.
+  let badConstrainedColonAfterTest =
+    """
+let fn (opcode:'Op when 'Op: enum<int>) = opcode
+"""
+
+  let badConstrainedColonBeforeTest =
+    """
+let fn (opcode :'Op when 'Op: enum<int>) = opcode
+"""
+
+  let badConstrainedColonSpacedTest =
+    """
+let fn (opcode : 'Op when 'Op: enum<int>) = opcode
+"""
+
+  let badConstrainedColonWideTest =
+    """
+let fn (opcode:  'Op when 'Op: enum<int>) = opcode
+"""
+
+  /// The constrained type keeps its own rules: a type application is still
+  /// measured for its angle brackets on both sides.
+  let goodConstrainedAppTest =
+    """
+let fn (xs: List<'T> when 'T: comparison) = xs
+"""
+
+  let badConstrainedAppOpenTest =
+    """
+let fn (xs: List< 'T> when 'T: comparison) = xs
+"""
+
+  let badConstrainedAppCloseTest =
+    """
+let fn (xs: List<'T > when 'T: comparison) = xs
+"""
+
+  let badConstrainedAppCommaTest =
+    """
+let fn (m: Map<'K,'V> when 'K: comparison) = m
+"""
+
+  /// An array, a tuple and a parenthesised type under a constraint likewise.
+  let badConstrainedArrayTest =
+    """
+let fn (xs: 'T[] [] when 'T: comparison) = xs
+"""
+
+  let badConstrainedTupleTest =
+    """
+let fn (pair: 'T*'T when 'T: comparison) = pair
+"""
+
+  let badConstrainedParenTest =
+    """
+let fn (x: ( 'T) when 'T: comparison) = x
+"""
+
+  /// The clause is not about 'enum': every kind of constraint wraps the type
+  /// the same way, and so does a chain of them.
+  let goodConstraintKindsTest =
+    """
+let f1 (x: 'T when 'T: comparison) = x
+let f2 (x: 'T when 'T: equality) = x
+let f3 (x: 'T when 'T: null) = x
+let f4 (x: 'T when 'T: unmanaged) = x
+let f5 (x: 'T when 'T: struct) = x
+let f6 (x: 'T when 'T :> System.IDisposable) = x
+let f7 (x: 'T when 'T: comparison and 'T: equality) = x
+"""
+
+  let badConstraintKindComparisonTest =
+    """
+let fn (x:'T when 'T: comparison) = x
+"""
+
+  let badConstraintKindSubtypeTest =
+    """
+let fn (x:'T when 'T :> System.IDisposable) = x
+"""
+
+  let badConstraintKindChainTest =
+    """
+let fn (x:'T when 'T: comparison and 'T: equality) = x
+"""
+
+  /// The clause reaches every place an annotation can sit.
+  let goodConstrainedPositionsTest =
+    """
+let fn (x: 'T when 'T: comparison) (y: 'U when 'U: equality) = x, y
+let lam = fun (x: 'T when 'T: comparison) -> x
+type Holder(x: 'T when 'T: comparison) =
+  member _.Take(y: 'U when 'U: equality) = y
+"""
+
+  let badConstrainedSecondParamTest =
+    """
+let fn (x: 'T when 'T: comparison) (y:'U when 'U: equality) = x, y
+"""
+
+  let badConstrainedLambdaParamTest =
+    """
+let lam = fun (x:'T when 'T: comparison) -> x
+"""
+
+  let badConstrainedCtorParamTest =
+    """
+type Holder(x:'T when 'T: comparison) =
+  member _.X = x
+"""
+
+  let badConstrainedMemberParamTest =
+    """
+type Holder() =
+  member _.Take(y:'U when 'U: equality) = y
+"""
+
+  /// A constraint written on the binding's own type parameter list never took
+  /// this path, and still does not.
+  let goodTyparDeclConstraintTest =
+    """
+let fn<'T when 'T: comparison> (x: 'T) = x
+"""
+
+  let badTyparDeclConstraintTest =
+    """
+let fn<'T when 'T: comparison> (x:'T) = x
+"""
+
+  /// The clause itself carries no rule of its own, so spacing inside it is
+  /// left alone. This pins the edge of what was added.
+  let goodLooseSpacingInsideClauseTest =
+    """
+let fn (opcode: 'Op when 'Op: enum< int >) = opcode
+"""
+
   [<TestMethod>]
   member _.``Type Annotation Empty Paren Test``() =
     lint goodEmptyParenTest
     lintAssert badEmptyParenTest
 
   [<TestMethod>]
-  member _.``Type Annotation Extern Decl Test``() =
-    lint goodExternDeclTest
+  member _.``Type Annotation Extern Decl Test``() = lint goodExternDeclTest
 
   [<TestMethod>]
   member _.``Type Annotation Int Array Test``() =
@@ -352,3 +493,66 @@ type Class() =
       lintErrors duplicateColonTest
       |> List.filter (fun e -> e.Message = "Use single whitespace after ':'")
     Assert.AreEqual<int>(1, colonWarnings.Length)
+
+  /// The colon before a constrained type is judged in each of its three ways.
+  [<TestMethod>]
+  member _.``Type Annotation Constrained Colon Test``() =
+    lint goodConstrainedTypeTest
+    lintAssertMsg "Use single whitespace after ':'" badConstrainedColonAfterTest
+    lintAssertMsg "Remove whitespace before ':'" badConstrainedColonBeforeTest
+    lintAssertMsg "Use ': '" badConstrainedColonSpacedTest
+    lintAssertMsg "Use single whitespace after ':'" badConstrainedColonWideTest
+
+  /// The constrained type keeps the rules of its own shape.
+  [<TestMethod>]
+  member _.``Type Annotation Constrained Application Test``() =
+    lint goodConstrainedAppTest
+    lintAssertMsg "Remove whitespace after '<'" badConstrainedAppOpenTest
+    lintAssertMsg "Remove whitespace before '>'" badConstrainedAppCloseTest
+    lintAssertMsg "Use single whitespace after ','" badConstrainedAppCommaTest
+
+  [<TestMethod>]
+  member _.``Type Annotation Constrained Shape Test``() =
+    lintAssertMsg "Remove whitespace around '[]'" badConstrainedArrayTest
+    lintAssertMsg "Use ' * '" badConstrainedTupleTest
+    lintAssertMsg "Remove whitespace after '('" badConstrainedParenTest
+
+  /// Every kind of constraint wraps the type the same way, 'enum' included.
+  [<TestMethod>]
+  member _.``Type Annotation Constraint Kinds Test``() =
+    lint goodConstraintKindsTest
+    lintAssertMsg "Use single whitespace after ':'"
+      badConstraintKindComparisonTest
+    lintAssertMsg "Use single whitespace after ':'" badConstraintKindSubtypeTest
+    lintAssertMsg "Use single whitespace after ':'" badConstraintKindChainTest
+
+  /// The clause reaches every place an annotation can sit.
+  [<TestMethod>]
+  member _.``Type Annotation Constrained Positions Test``() =
+    lint goodConstrainedPositionsTest
+    lintAssertMsg "Use single whitespace after ':'"
+      badConstrainedSecondParamTest
+    lintAssertMsg "Use single whitespace after ':'"
+      badConstrainedLambdaParamTest
+
+  [<TestMethod>]
+  member _.``Type Annotation Constrained Positions Test(2)``() =
+    lintAssertMsg "Use single whitespace after ':'" badConstrainedCtorParamTest
+    lintAssertMsg "Use single whitespace after ':'"
+      badConstrainedMemberParamTest
+
+  /// A constraint on the binding's own type parameter list is a separate path,
+  /// and was working before.
+  [<TestMethod>]
+  member _.``Type Annotation Typar Declaration Constraint Test``() =
+    lint goodTyparDeclConstraintTest
+    lintAssertMsg "Use single whitespace after ':'" badTyparDeclConstraintTest
+
+  /// Spacing inside the clause carries no rule of its own, and the annotation
+  /// ahead of it is still judged. Both halves are pinned here.
+  [<TestMethod>]
+  member _.``Type Annotation Constraint Clause Untouched Test``() =
+    lint goodLooseSpacingInsideClauseTest
+    lintErrors badConstrainedColonAfterTest
+    |> List.filter (fun e -> e.Message = "Use single whitespace after ':'")
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)

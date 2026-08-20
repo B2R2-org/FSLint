@@ -2,6 +2,10 @@
 
 All notable changes to the FSLint extension.
 
+## 1.1.9
+
+- Removed the 80-column line length check.
+
 ## 1.1.8
 
 - Added a line-break convention for strict mode: a separator list stays on one

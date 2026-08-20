@@ -70,10 +70,11 @@ let private isLiftable src (prev: range) (next: range) =
 /// wrong with it is the length of the line, and the line budget says so.
 ///
 /// A tuple holding an element that runs to lines of its own can never be
-/// brought onto one line, so a name is no answer to it. What is asked of that
-/// one is that a neighbour come up beside the comma before it, and a name
-/// wherever it cannot: a neighbour too wide for that line, or one that is
-/// itself a block and so has nowhere to be brought up to.
+/// brought onto one line, so a name is no answer to it. Where a neighbour
+/// could still come up beside the comma before it, the gap is left alone and
+/// answers only for agreeing with the rest; a name is asked wherever it could
+/// not, the neighbour being too wide for that line, or itself a block with
+/// nowhere to be brought up to.
 let private checkWidth src (exprs: SynExpr list) isParameterList =
   if not isStrict || isParameterList || not (isSpread exprs) then
     false
@@ -85,11 +86,10 @@ let private checkWidth src (exprs: SynExpr list) isParameterList =
       true
   else
     match firstBrokenGap exprs with
-    | Some(prev, next) ->
-      if isLiftable src prev next then reportNewLine src next
-      else tupleSpan exprs |> reportBindToLet src
+    | Some(prev, next) when not (isLiftable src prev next) ->
+      tupleSpan exprs |> reportBindToLet src
       true
-    | None ->
+    | _ ->
       false
 
 /// Every element of a tuple must either share one line or each sit on a line

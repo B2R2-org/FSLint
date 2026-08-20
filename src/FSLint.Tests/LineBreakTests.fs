@@ -75,16 +75,6 @@ type LineBreakTests() =
       printfn "another message far too long to sit beside its keyword as well"
 """
 
-  /// Short enough to close up onto one line, and so it has to.
-  let badConditionShortTest =
-    """
-    if foo &&
-       bar then
-      printfn "good"
-    else
-      printfn "good2"
-"""
-
   /// Mixing '&&' and '||' changes nothing: unparenthesised, the operands form
   /// one flat list, and every separator of it carries a break.
   let goodConditionMixedTest =
@@ -186,15 +176,6 @@ type TestClass(parameterNumberOne: int,
                parameterNumberTwo: int,
                parameterNumberThree: int) =
   member _.Param1 = parameterNumberOne
-"""
-
-  /// A short parameter list spread over several lines would close up well
-  /// inside the budget, so it has to.
-  let badCtorParamShortTest =
-    """
-type TestClass(param1: int,
-               param2: int) =
-  member _.Param1 = param1
 """
 
   let badCtorParamTest =
@@ -305,27 +286,6 @@ type TestClass(lookup: Map<int, string,
     if isSomethingRatherLongHere &&
        isAnotherRatherLongCondition &&
        isYetAnotherLongCondition then printfn "good"
-    else printfn "good2"
-"""
-
-  /// The same condition with branches that could have come up beside their
-  /// keywords but did not.
-  let badBrokenConditionBrokenBranchTest =
-    """
-    if isSomethingRatherLongHere &&
-       isAnotherRatherLongCondition &&
-       isYetAnotherLongCondition then
-      printfn "short"
-    else
-      printfn "short2"
-"""
-
-  /// A condition that fits on one line does not oblige its branches either way,
-  /// but the chain as a whole still has to close up while it can: with the
-  /// 'else' left below, this one is reported for the break, not the mixture.
-  let badInlineConditionInlineBranchTest =
-    """
-    if foo && bar && baz then printfn "good"
     else printfn "good2"
 """
 
@@ -473,29 +433,9 @@ type TestClass() =
                   ccc: int) = aaa
 """
 
-  /// 'try' and its handler form a group of their own. The handler is measured
-  /// from its '->', the same anchor a `match` case uses, so where the 'with'
-  /// keyword sits does not enter into it. But the whole of a bar-less 'try'
-  /// that would close up onto one line has to be on one line first, so both
-  /// shapes below are reported for the break rather than for the pairing.
-  let badTryWithInlineTest =
-    """
-    let func () =
-      try foo ()
-      with ex -> bar ()
-"""
-
   let goodTryWithOneLineTest =
     """
     let func () = try foo () with ex -> bar ()
-"""
-
-  let badTryWithKeywordOwnLineTest =
-    """
-    let func () =
-      try foo ()
-      with
-        ex -> bar ()
 """
 
   /// The 'try' body is broken out while the handler body stays beside its
@@ -591,13 +531,6 @@ type TestClass() =
   let goodTryFinallyOneLineTest =
     """
     let func () = try foo () finally bar ()
-"""
-
-  let badTryFinallyInlineTest =
-    """
-    let func () =
-      try foo ()
-      finally bar ()
 """
 
   let goodTryFinallyBrokenTest =
@@ -756,15 +689,6 @@ type Record =
       printfn "a message that is much too long to sit beside its keyword here"
     else
       printfn "good2"
-"""
-
-  /// A single type argument has no gap for a break to land between, but the
-  /// angle brackets it sits inside are ends of their own, and this one would
-  /// close up onto the line above with room to spare.
-  let badSingleTypeArgTest =
-    """
-    let func (x: Option<
-                   int>) = x
 """
 
   /// The same shape, with an argument that genuinely will not fit up there.
@@ -939,16 +863,6 @@ type TestClass<'aLongTypeParameterName,
   member _.Value = 1
 """
 
-  /// Parameters broken though they fit, leaving them indented past the
-  /// constraints that follow them.
-  let badBackwardsTypeParamTest =
-    """
-type TestClass<'aLongTypeParameterName,
-               'bLongTypeParamName
-  when 'bLongTypeParamName: comparison>() =
-  member _.Value = 1
-"""
-
   /// The try/with pairing and the handler-clause consistency are two separate
   /// checks: here the pairing is fine and only the clauses disagree.
   let badTryWithClauseOnlyTest =
@@ -1063,27 +977,6 @@ type TestClass(lookup: Map<AnExtremelyLongKeyTypeNameHere,
   member _.Lookup = lookup
 """
 
-  /// Both branches would fit beside their keywords, so breaking them out is
-  /// reported even though the two agree with each other perfectly well.
-  let badShortBranchBrokenTest =
-    """
-    if foo then
-      printfn "bad"
-    else
-      printfn "bad2"
-"""
-
-  /// The same holds all the way along an 'elif' chain.
-  let badShortElifBrokenTest =
-    """
-    if foo then
-      printfn "bad"
-    elif bar then
-      printfn "bad2"
-    else
-      printfn "bad3"
-"""
-
   /// One body too wide to come up settles the chain on the broken layout, and
   /// the branch left inline beside its keyword is what gets reported.
   let badWideBranchMixedTest =
@@ -1123,16 +1016,6 @@ type TestClass(lookup: Map<AnExtremelyLongKeyTypeNameHere,
       0
 """
 
-  /// Every case would fit beside its arrow, so none of them may break away.
-  let badShortCaseBrokenTest =
-    """
-    match value with
-    | 1 ->
-      printfn "bad"
-    | _ ->
-      printfn "bad2"
-"""
-
   /// One case too wide to come up, and the short one left inline is reported.
   let badWideCaseMixedTest =
     """
@@ -1140,15 +1023,6 @@ type TestClass(lookup: Map<AnExtremelyLongKeyTypeNameHere,
     | 1 ->
       printfn "a message that is much too long to sit beside its arrow there"
     | _ -> printfn "bad2"
-"""
-
-  /// A lone case has nothing to agree with, yet it still has to come up while
-  /// it fits.
-  let badSingleCaseBrokenTest =
-    """
-    match value with
-    | _ ->
-      printfn "bad"
 """
 
   /// Too wide to come up, and with no sibling to disagree with, it is left be.
@@ -1219,48 +1093,6 @@ type TestClass(lookup: Map<AnExtremelyLongKeyTypeNameHere,
       ()
 """
 
-  /// 'try' and its handler are held to the budget just as branches are.
-  let badShortTryWithBrokenTest =
-    """
-    let func () =
-      try
-        foo ()
-      with ex ->
-        bar ()
-"""
-
-  let badShortTryFinallyBrokenTest =
-    """
-    let func () =
-      try
-        foo ()
-      finally
-        bar ()
-"""
-
-  /// A short type argument list closes up just as a parameter list does.
-  let badShortTypeArgBrokenTest =
-    """
-type TestClass(lookup: Map<int,
-                           string>) =
-  member _.Lookup = lookup
-"""
-
-  let badShortTypeParamBrokenTest =
-    """
-type TestClass<'a,
-               'b,
-               'c>() =
-  member _.Value = 1
-"""
-
-  let badShortCurriedParamBrokenTest =
-    """
-    let func (a: int)
-             (b: int)
-             (c: int) = a + b + c
-"""
-
   /// A comment between two elements would be swallowed by closing the list up,
   /// so the list stays as it is.
   let goodCommentedListTest =
@@ -1286,13 +1118,6 @@ type TestClass(param1: int,
   let goodListBoundaryTest =
     """
 type TestClass(parameterNumberOneIsHere1: int, parameterNumberTwoIsHere2: int) =
-  member _.Value = 1
-"""
-
-  let badListBoundaryTest =
-    """
-type TestClass(parameterNumberOneIsHere1: int,
-               parameterNumberTwoIsHere2: int) =
   member _.Value = 1
 """
 
@@ -1344,38 +1169,10 @@ type TestClass(parameterNumberOneIsHere12: int,
         baz ()
 """
 
-  /// The stretch runs past its last element to the bracket that closes it, so a
-  /// break landing there is a break in the list. With nothing further down to
-  /// point at, the last element takes the report.
-  let badTrailingBracketBreakTest =
-    """
-type TestClass(aaa: int, bbb: int
-              ) =
-  member _.Aaa = aaa
-"""
-
-  /// Where a bracket meets what it fences in the closed-up form has no space
-  /// between them, and this argument lands on the eightieth column exactly. A
-  /// space wrongly counted at that junction would push it to the eighty-first
-  /// and let it off, so the pair below pins the junction as well as the budget.
-  let badBracketJunctionBoundaryTest =
-    """
-    let func (x: Option<
-                   AnExtremelyLongTypeNameLandingRightOnTheLastColumn>) = x
-"""
-
   let goodBracketJunctionOverBoundaryTest =
     """
     let func (x: Option<
                    AnExtremelyLongTypeNameLandingJustPastTheLastColumn>) = x
-"""
-
-  /// The chain closes up onto one line while it fits, so the 'else' below is
-  /// reported even though its body sits neatly beside it.
-  let badElseOnOwnLineTest =
-    """
-    if ins.Flag then pushToStack bld (AST.undef rt "NULL")
-    else ()
 """
 
   /// One column too wide to close up, and the two-line shape is what is left.
@@ -1394,14 +1191,6 @@ type TestClass(aaa: int, bbb: int
       printfn "good2"
     else
       ()
-"""
-
-  /// A bar-less 'try' closes up on the same terms as an 'if'.
-  let badTryClosesUpTest =
-    """
-    let func () =
-      try riskyOp ()
-      with ex -> report ex
 """
 
   let goodTryTooWideToCloseTest =
@@ -1452,15 +1241,6 @@ type TestClass(aaa: int, bbb: int
         printfn "bad2"
 #endif
       | _ -> printfn "bad3"
-"""
-
-  /// A closing bracket that opens a line joins tight when the list closes up,
-  /// so 'Map<int, string>' is measured at the width it would really have.
-  let badClosingBracketOwnLineTest =
-    """
-    let func (x: Map<int,
-                     string
-                     >) = x
 """
 
   /// The outer condition fits on one line but an 'elif' further along does not,
@@ -1521,16 +1301,12 @@ type TestClass(aaa: int, bbb: int
     lintAssertMsg "Use consistent line breaks" badConditionFirstBreakTest
 
   /// A condition's own layout settles nothing about its branches: broken or
-  /// not, each body answers to whether it fits beside its keyword.
+  /// not, the bodies answer only for agreeing among themselves.
   [<TestMethod>]
   member _.``[LineBreak] Group Independence Test``() =
     lint goodBranchInlineTest
     lint goodInlineConditionBrokenBranchTest
     lint goodBrokenConditionInlineBranchTest
-    lintAssertMsg "Remove unnecessary line break"
-      badBrokenConditionBrokenBranchTest
-    lintAssertMsg "Remove unnecessary line break"
-      badInlineConditionInlineBranchTest
 
   [<TestMethod>]
   member _.``[LineBreak] Case Line Break Test``() =
@@ -1599,8 +1375,6 @@ type TestClass(aaa: int, bbb: int
   [<TestMethod>]
   member _.``[LineBreak] Try With Line Break Test``() =
     lint goodTryWithOneLineTest
-    lintAssertMsg "Remove unnecessary line break" badTryWithInlineTest
-    lintAssertMsg "Remove unnecessary line break" badTryWithKeywordOwnLineTest
     lintAssert badTryWithTest
 
   [<TestMethod>]
@@ -1629,7 +1403,6 @@ type TestClass(aaa: int, bbb: int
   member _.``[LineBreak] Try Finally Line Break Test``() =
     lint goodTryFinallyOneLineTest
     lint goodTryFinallyBrokenTest
-    lintAssertMsg "Remove unnecessary line break" badTryFinallyInlineTest
     lintAssert badTryFinallyTest
 
   [<TestMethod>]
@@ -1687,12 +1460,11 @@ type TestClass(aaa: int, bbb: int
     lint goodSingleOperandConditionTest
     lint goodSingleCtorParamTest
 
-  /// Brackets give a lone element somewhere for a break to land, so it is held
-  /// to the budget like any other list.
+  /// A lone element has no sibling to disagree with, so a bracketed list of
+  /// one is in order wherever the break around it lands.
   [<TestMethod>]
   member _.``[LineBreak] Single Bracketed Item Test``() =
     lint goodSingleWideTypeArgTest
-    lintAssertMsg "Remove unnecessary line break" badSingleTypeArgTest
 
   /// The over-wide body being the inline one settles the chain just as surely.
   /// Its line breaks the budget as well, so the group's own report is picked
@@ -1725,29 +1497,19 @@ type TestClass(aaa: int, bbb: int
   member _.``[LineBreak] Lone Handler Follows Try Test``() =
     lint goodLoneHandlerFollowsTryTest
 
-  /// A break landing between the last element and its closing bracket is still
-  /// a break in the list.
+  /// Branches keeping their bodies beside their keywords agree with one
+  /// another, and so do branches sending them below.
   [<TestMethod>]
-  member _.``[LineBreak] Trailing Bracket Break Test``() =
-    lintErrors badTrailingBracketBreakTest
-    |> List.filter (fun e -> e.Message = "Remove unnecessary line break")
-    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
-
-  /// A construct that would close up onto one line has to be on one line, so
-  /// an 'else' left below is reported however neatly its body sits beside it.
-  [<TestMethod>]
-  member _.``[LineBreak] Chain Closes Up On One Line Test``() =
+  member _.``[LineBreak] Chain Branch Agreement Test``() =
     lint goodElseOnOwnLineTest
     lint goodSequentialKeepsBranchesTest
-    lintAssertMsg "Remove unnecessary line break" badElseOnOwnLineTest
 
-  /// A 'try' is held to the same demand, and a barred handler is exempt from it
-  /// because its '|' can never join the 'with' above.
+  /// A 'try' answers for its gaps as any other group does, and a barred
+  /// handler stands apart because its '|' can never join the 'with' above.
   [<TestMethod>]
-  member _.``[LineBreak] Try Closes Up On One Line Test``() =
+  member _.``[LineBreak] Try Branch Agreement Test``() =
     lint goodTryTooWideToCloseTest
     lint goodBarredHandlerNeverClosesTest
-    lintAssertMsg "Remove unnecessary line break" badTryClosesUpTest
 
   /// A body reachable only through a compiler directive stays where it is.
   [<TestMethod>]
@@ -1755,15 +1517,11 @@ type TestClass(aaa: int, bbb: int
     lint goodDirectiveInGapTest
     lintAssertMsg "Use consistent line breaks" badDirectiveInGapTest
 
-  [<TestMethod>]
-  member _.``[LineBreak] Closing Bracket On Own Line Test``() =
-    lintAssertMsg "Remove unnecessary line break" badClosingBracketOwnLineTest
-
-  /// The bracket junction is measured tight, to the column.
+  /// A type argument sent below the name it belongs to is a list of one, and
+  /// stands wherever it must in order to fit.
   [<TestMethod>]
   member _.``[LineBreak] Bracket Junction Boundary Test``() =
     lint goodBracketJunctionOverBoundaryTest
-    lintAssertMsg "Remove unnecessary line break" badBracketJunctionBoundaryTest
 
   [<TestMethod>]
   member _.``[LineBreak] Elif Broken Condition Branch Test``() =
@@ -1773,7 +1531,6 @@ type TestClass(aaa: int, bbb: int
   member _.``[LineBreak] Type Parameter Line Break Test(2)``() =
     lint goodConstrainedTypeParamTest
     lintAssertMsg "Move 'when' to the next line" badConstrainedTypeParamTest
-    lintAssertMsg "Remove unnecessary line break" badBackwardsTypeParamTest
 
   [<TestMethod>]
   member _.``[LineBreak] Try With Clause Line Break Test(2)``() =
@@ -1801,13 +1558,6 @@ type TestClass(aaa: int, bbb: int
     lint goodLongTypeArgTest
     lintAssert badTypeArgTest
 
-  /// A group that fits on one line has to be on one line, however neatly its
-  /// members agree with each other on breaking away.
-  [<TestMethod>]
-  member _.``[LineBreak] Branch Fits On One Line Test``() =
-    lintAssertMsg "Remove unnecessary line break" badShortBranchBrokenTest
-    lintAssertMsg "Remove unnecessary line break" badShortElifBrokenTest
-
   /// Once one body cannot come up the group falls back on the weaker demand,
   /// and it is the branch left inline that is reported.
   [<TestMethod>]
@@ -1820,11 +1570,6 @@ type TestClass(aaa: int, bbb: int
     lint goodSequentialBranchTest
     lint goodLetBranchTest
     lintAssertMsg "Use consistent line breaks" badSequentialBranchTest
-
-  [<TestMethod>]
-  member _.``[LineBreak] Case Fits On One Line Test``() =
-    lintAssertMsg "Remove unnecessary line break" badShortCaseBrokenTest
-    lintAssertMsg "Remove unnecessary line break" badSingleCaseBrokenTest
 
   [<TestMethod>]
   member _.``[LineBreak] Case Too Wide To Join Test``() =
@@ -1841,34 +1586,17 @@ type TestClass(aaa: int, bbb: int
     lint goodCommentedCaseTest
     lintAssertMsg "Use consistent line breaks" badCommentedCaseTest
 
-  /// The budget is measured to the column, and both sides of it are checked.
+  /// Clauses all keeping their bodies beside the arrow agree, and so do
+  /// clauses all sending them below; one of each does not.
   [<TestMethod>]
-  member _.``[LineBreak] Line Budget Boundary Test``() =
+  member _.``[LineBreak] Case Break Agreement Test``() =
     lint goodBoundaryCaseTest
     lint goodOverBoundaryCaseTest
-    lintAssertMsg "Remove unnecessary line break" badBoundaryCaseTest
-
-  [<TestMethod>]
-  member _.``[LineBreak] Try Fits On One Line Test``() =
-    lintAssertMsg "Remove unnecessary line break" badShortTryWithBrokenTest
-    lintAssertMsg "Remove unnecessary line break" badShortTryFinallyBrokenTest
+    lintAssertMsg "Use consistent line breaks" badBoundaryCaseTest
 
   [<TestMethod>]
   member _.``[LineBreak] Barred Handler Never Joins Test``() =
     lint goodBarredHandlerRoomTest
-
-  /// A list that would close up onto one line has to be on one line, whether it
-  /// holds parameters, type arguments or type parameters.
-  [<TestMethod>]
-  member _.``[LineBreak] List Closes Up On One Line Test``() =
-    lintAssertMsg "Remove unnecessary line break" badCtorParamShortTest
-    lintAssertMsg "Remove unnecessary line break" badShortTypeArgBrokenTest
-    lintAssertMsg "Remove unnecessary line break" badShortTypeParamBrokenTest
-
-  [<TestMethod>]
-  member _.``[LineBreak] List Closes Up On One Line Test(2)``() =
-    lintAssertMsg "Remove unnecessary line break" badShortCurriedParamBrokenTest
-    lintAssertMsg "Remove unnecessary line break" badConditionShortTest
 
   /// Closing up would swallow a comment sitting between two elements.
   [<TestMethod>]
@@ -1877,10 +1605,9 @@ type TestClass(aaa: int, bbb: int
     lintAssertMsg "Use consistent line breaks" badCommentedListTest
 
   [<TestMethod>]
-  member _.``[LineBreak] List Budget Boundary Test``() =
+  member _.``[LineBreak] List Break Agreement Test``() =
     lint goodListBoundaryTest
     lint goodListOverBoundaryTest
-    lintAssertMsg "Remove unnecessary line break" badListBoundaryTest
 
   /// Where the members of a broken list stand is left to the author. A list
   /// whose every comma is broken has answered for itself, however ragged the

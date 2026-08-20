@@ -150,15 +150,7 @@ let private checkBranchLayout src ifExpr thenExpr elseExpr range trivia =
     let branches = collectBranches [] thenExpr elseExpr trivia |> List.rev
     let links = List.map fst branches
     let bare = carriesBareIf thenExpr elseExpr trivia
-    let fitsOnOneLine =
-      branches
-      |> List.forall (fun (_, body: range) -> body.StartLine = body.EndLine)
-    let closesUp =
-      not bare
-      && fitsOnOneLine
-      && LineBreakConvention.checkClosesUp src range
-    if closesUp then ()
-    elif LineBreakConvention.checkGapAgreement src links then ()
+    if LineBreakConvention.checkGapAgreement src links then ()
     elif bare then LineBreakConvention.checkUniformlyBroken src branches
     else LineBreakConvention.checkUniformBreak src branches
 

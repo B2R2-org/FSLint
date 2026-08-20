@@ -4,9 +4,20 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which package to publish'
+        type: choice
+        options:
+          - nuget
+          - vscode
+          - vs
+        required: true
 
 jobs:
   publish-nuget:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'nuget'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +40,11 @@ jobs:
 
       - name: Pack
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep '"version"' extension/vscode/package.json | sed 's/.*"version": "\(.*\)".*/\1/')
+          fi
           dotnet pack src/FSLint/B2R2.FSLint.fsproj -c Release --output . -p:Version=$VERSION
 
       - name: Push
@@ -42,6 +57,7 @@ jobs:
             --skip-duplicate
 
   publish-vscode:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'vscode'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +80,7 @@ jobs:
           node-version: '20'
 
       - name: Verify version
+        if: startsWith(github.ref, 'refs/tags/')
         working-directory: extension/vscode
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
@@ -92,6 +109,7 @@ jobs:
         run: npx @vscode/vsce publish -p $VSCE_PAT
 
   publish-visual-studio:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'vs'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

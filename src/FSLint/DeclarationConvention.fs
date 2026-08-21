@@ -116,6 +116,38 @@ let checkComputationExprPlacement (src: ISourceText) (binding: SynBinding) =
   else
     ()
 
+/// How many rows a binding body may run to. Fixed here for now; it moves to
+/// the settings once they carry it.
+let [<Literal>] private MaxBodyRows = 42
+
+/// Where the report belongs: the identifier the binding is known by. The whole
+/// body is what is wrong, and underlining forty rows of it says nothing the
+/// count has not already said. A binding named by a pattern rather than an
+/// identifier is named at the pattern.
+let private reportTarget (pat: SynPat) =
+  match pat with
+  | SynPat.LongIdent(longDotId = SynLongIdent(id = ids)) when not ids.IsEmpty ->
+    (List.last ids).idRange
+  | _ ->
+    pat.Range
+
+/// A binding whose body runs past the budget is asked to be broken up.
+///
+/// A binding written inside another is passed over. Its rows are already
+/// counted in the body holding it, and the two are not two lengths but one;
+/// the outermost is where the splitting has to start.
+let checkBodyLength src (binding: SynBinding) =
+  let SynBinding(headPat = pat; expr = body) = binding
+  if not isStrict then
+    ()
+  elif isInsideCoveredFunction body.Range then
+    ()
+  else
+    noteCoveredFunction body.Range
+    let rows = body.Range.EndLine - body.Range.StartLine + 1
+    if rows <= MaxBodyRows then ()
+    else reportLongFunction src (reportTarget pat)
+
 let checkSingleBlankLine (src: ISourceText) decls =
   if isStrict then
     decls

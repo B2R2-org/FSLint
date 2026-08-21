@@ -302,15 +302,24 @@ let private checkInlineSpacing src (frontCase, endCase) =
   | _ ->
     ()
 
-let checkSynFields src fields =
+/// The fields of a union case are separated by `*`, and what `checkFieldsWidth`
+/// reads is the spacing round that star.
+let checkUnionFields src fields =
   fields |> checkFieldsWidth src
+  fields |> List.iter (checkFieldWidth src)
+
+/// A record's fields are divided by `;` or by a line break, never by a star.
+/// Asking the gap between them to read ` * ` would have the author write a
+/// tuple where they wrote a record, so only what is asked of a field on its
+/// own is asked here.
+let checkRecordFields src fields =
   fields |> List.iter (checkFieldWidth src)
 
 let private checkFieldsInUnion src case =
   let SynUnionCase(caseType = caseType) = case
   match caseType with
   | SynUnionCaseKind.Fields fields ->
-    checkSynFields src fields
+    checkUnionFields src fields
   | SynUnionCaseKind.FullType(fullType = fullType) ->
     checkTypeInternal src fullType
 

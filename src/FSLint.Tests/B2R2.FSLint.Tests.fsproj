@@ -46,6 +46,7 @@
     <Compile Include="FunctionBodyTests.fs" />
     <Compile Include="IfThenElseTests.fs" />
     <Compile Include="LineBreakTests.fs" />
+    <Compile Include="RowLengthTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

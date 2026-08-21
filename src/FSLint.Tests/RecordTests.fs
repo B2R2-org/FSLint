@@ -113,6 +113,94 @@ let bad = {|original with Age = 31; Name = "Bob" |}
 let bad = {| original with Age = 31; Name = "Bob"|}
 """
 
+  let goodFieldPerLineTest =
+    """
+type Point =
+  { X: int
+    Y: int
+    Z: int }
+
+let origin =
+  { X = 42
+    Y = 42
+    Z = 42 }
+"""
+
+  /// A record standing on one line has chosen no layout to answer for.
+  let goodFieldsOnOneLineTest =
+    """
+type Point =
+  { X: int
+    Y: int
+    Z: int }
+
+let origin = { X = 42; Y = 42; Z = 42 }
+"""
+
+  let badFieldPerLineTest =
+    """
+type Point =
+  { X: int
+    Y: int
+    Z: int }
+
+let origin =
+  { X = 42; Y = 42
+    Z = 42 }
+"""
+
+  let badFieldsSharingALineTest =
+    """
+type Point =
+  { X: int
+    Y: int
+    Z: int
+    W: int }
+
+let origin =
+  { X = 42; Y = 42; Z = 42
+    W = 42 }
+"""
+
+  let badCopyFieldPerLineTest =
+    """
+type Point =
+  { X: int
+    Y: int
+    Z: int }
+
+let move (p: Point) =
+  { p with X = 42; Y = 42
+           Z = 42 }
+"""
+
+  let goodAnonFieldPerLineTest =
+    """
+let origin =
+  {| X = 42
+     Y = 42
+     Z = 42 |}
+"""
+
+  let goodAnonFieldsOnOneLineTest =
+    """
+let origin = {| X = 42; Y = 42; Z = 42 |}
+"""
+
+  let badAnonFieldPerLineTest =
+    """
+let origin =
+  {| X = 42; Y = 42
+     Z = 42 |}
+"""
+
+  let badAnonCopyFieldPerLineTest =
+    """
+let move p =
+  {| p with X = 42; Y = 42
+            Z = 42 |}
+"""
+
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
     lint goodBracketPositionTest
@@ -153,3 +241,31 @@ let bad = {| original with Age = 31; Name = "Bob"|}
     lintAssert badAnonRecdRightBracketSpacingTest
     lintAssert badAnonRecdCopyLeftBracketSpacingTest
     lintAssert badAnonRecdCopyRightBracketSpacingTest
+
+  /// Every field of a record spread down the page begins a line of its own,
+  /// and where several share a line it is the ones after the first that are
+  /// named. A record still on one line is asked nothing: what is wrong with a
+  /// line too long is its length, and the budget says so.
+  [<TestMethod>]
+  member _.``[Record] Field Per Line Test``() =
+    lint goodFieldPerLineTest
+    lint goodFieldsOnOneLineTest
+    lintAssertMsg "Use one element per line" badFieldPerLineTest
+    lintAssertMsg "Use one element per line" badCopyFieldPerLineTest
+
+  /// An anonymous record keeps its field names in a different node of the
+  /// tree, and answers the same way for all that.
+  [<TestMethod>]
+  member _.``[Record] Anonymous Field Per Line Test``() =
+    lint goodAnonFieldPerLineTest
+    lint goodAnonFieldsOnOneLineTest
+    lintAssertMsg "Use one element per line" badAnonFieldPerLineTest
+    lintAssertMsg "Use one element per line" badAnonCopyFieldPerLineTest
+
+  /// Two fields following the first on its line are two reports, so lifting
+  /// one leaves the other still named.
+  [<TestMethod>]
+  member _.``[Record] Field Per Line Test(2)``() =
+    lintErrors badFieldsSharingALineTest
+    |> List.filter (fun e -> e.Message = "Use one element per line")
+    |> fun errors -> Assert.AreEqual<int>(2, errors.Length)

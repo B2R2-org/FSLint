@@ -26,63 +26,54 @@ let private calculateSpacingBetweenDecls (src: ISourceText) prevDecl nextDecl =
   then normalCase - 1
   else normalCase
 
-let checkEqualSpacing src patRange equalRange bodyRange retInfo =
+/// The gap before `=`. A comment standing in it is a layout of its own and
+/// what it does to the spacing is not the author's doing.
+let private checkBeforeEqual src (patRange: range) (equalRange: range) =
+  if patRange.EndColumn + 1 = equalRange.StartColumn then
+    ()
+  else
+    match findCommentsBetween patRange.EndRange equalRange.StartRange with
+    | Some _ ->
+      ()
+    | None ->
+      Range.mkRange "" patRange.End equalRange.Start
+      |> reportEqaulBeforeSpacing src
+
+/// The gap after `=`, read the same way.
+let private checkAfterEqual src (equalRange: range) (bodyRange: range) =
+  if equalRange.EndColumn + 1 = bodyRange.StartColumn then
+    ()
+  else
+    match findCommentsBetween equalRange.EndRange bodyRange.StartRange with
+    | Some _ ->
+      ()
+    | None ->
+      Range.mkRange "" equalRange.End bodyRange.Start
+      |> reportEqaulAfterSpacing src
+
+/// A binding written on one line answers for both sides of its `=`, and for
+/// having no space at all on either. One broken across lines answers only for
+/// the side the break did not fall on: where the body went down, the gap after
+/// `=` is the break itself, and where the header went down, the gap before it
+/// is.
+let checkEqualSpacing src patRange (equalRange: range) bodyRange retInfo =
   let patRange =
-    if Option.isSome (retInfo: option<SynBindingReturnInfo>) then
-      let SynBindingReturnInfo(range = range) = retInfo.Value
-      range
-    else
-      patRange
+    match (retInfo: option<SynBindingReturnInfo>) with
+    | Some(SynBindingReturnInfo(range = range)) -> range
+    | None -> patRange
   if (patRange: range).EndLine = (bodyRange: range).StartLine then
-    if patRange.EndColumn + 1 <> (equalRange: range).StartColumn then
-      let commentBeforeEqual =
-        findCommentsBetween patRange.EndRange equalRange.StartRange
-      if Option.isNone commentBeforeEqual then
-        Range.mkRange "" patRange.End equalRange.Start
-        |> reportEqaulBeforeSpacing src
-      else
-        ()
-    else
-      ()
-    if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
-      let commentAfterEqual =
-        findCommentsBetween equalRange.EndRange bodyRange.StartRange
-      if Option.isNone commentAfterEqual then
-        Range.mkRange "" equalRange.End bodyRange.Start
-        |> reportEqaulAfterSpacing src
-      else
-        ()
-    else
-      ()
+    checkBeforeEqual src patRange equalRange
+    checkAfterEqual src equalRange bodyRange
     if patRange.EndColumn = equalRange.StartColumn
       && equalRange.EndColumn = bodyRange.StartColumn then
       Range.mkRange "" patRange.End bodyRange.Start
       |> fun range -> reportWarn src range "Use single whitespace around '='"
     else
       ()
+  elif patRange.EndLine = equalRange.StartLine then
+    checkBeforeEqual src patRange equalRange
   else
-    if patRange.EndLine = equalRange.StartLine then
-      if patRange.EndColumn + 1 <> equalRange.StartColumn then
-        let commentBeforeEqual =
-          findCommentsBetween patRange.EndRange equalRange.StartRange
-        if Option.isNone commentBeforeEqual then
-          Range.mkRange "" patRange.End equalRange.Start
-          |> reportEqaulBeforeSpacing src
-        else
-          ()
-      else
-        ()
-    else
-      if equalRange.EndColumn + 1 <> bodyRange.StartColumn then
-        let commentAfterEqual =
-          findCommentsBetween equalRange.EndRange bodyRange.StartRange
-        if Option.isNone commentAfterEqual then
-          Range.mkRange "" equalRange.End bodyRange.Start
-          |> reportEqaulAfterSpacing src
-        else
-          ()
-      else
-        ()
+    checkAfterEqual src equalRange bodyRange
 
 let checkAttributesLineSpacing src attrs (moduleRange: range) =
   let lastAttr = List.tryLast (attrs: SynAttributes)

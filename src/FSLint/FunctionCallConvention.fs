@@ -137,46 +137,38 @@ let checkNewKeywordSpacing src = function
 /// Checks spacing between method ident and paren based on naming convention.
 /// Ensures that PascalCase have no space before paren
 /// and lowerCase methods have a single space.
+/// What stands ahead of a call's parentheses. A generic instantiation, a
+/// qualified name and a bare one each name the method differently, and only
+/// the last identifier of the three is what the parentheses hang from.
+let private checkCallHead src funcExpr (argExpr: SynExpr) =
+  match funcExpr with
+  | SynExpr.TypeApp(expr = expr; range = typeRange) ->
+    checkTypeApp src expr typeRange argExpr
+  | SynExpr.LongIdent(isOptional = false; longDotId = SynLongIdent(id = id))
+    when id.Length <> 1
+    && argExpr.IsParen
+    && argExpr.Range.StartLine = (List.last id).idRange.StartLine ->
+    checkIdent src (List.last id) argExpr
+  | SynExpr.Ident ident when argExpr.IsParen ->
+    checkIdent src ident argExpr
+  | _ ->
+    ()
+
 let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
-  let checkByFlag flag funcExpr =
-    ensureMethodSpacing src flag funcExpr
-    checkMethodParenSpacing src funcExpr
   match expr with
   | SynExpr.App(flag = ExprAtomicFlag.NonAtomic
                 funcExpr = funcExpr
                 argExpr = argExpr) ->
-    match funcExpr with
-    | SynExpr.TypeApp(expr = expr; range = typeRange) ->
-      checkTypeApp src expr typeRange argExpr
-    | SynExpr.LongIdent(isOptional = false; longDotId = SynLongIdent(id = id))
-      when id.Length <> 1
-      && argExpr.IsParen
-      && argExpr.Range.StartLine = (List.last id).idRange.StartLine ->
-      checkIdent src (List.last id) argExpr
-    | SynExpr.Ident ident when argExpr.IsParen ->
-      checkIdent src ident argExpr
-    | _ ->
-      ()
-    match argExpr with
-    | SynExpr.Paren(expr = parenExpr; range = range) ->
-      if checkSpacingOrNot src range then
-        ensureMethodSpacing src ExprAtomicFlag.NonAtomic funcExpr
-      else
-        ()
-      checkMethodParenSpacing src funcExpr
-      checkMethodParenSpacing src parenExpr
-    | SynExpr.Const(SynConst.Unit, _) ->
-      checkByFlag ExprAtomicFlag.NonAtomic funcExpr
-    | _ ->
-      ()
+    checkCallHead src funcExpr argExpr
+    checkCallArgument src funcExpr argExpr
   | SynExpr.App(flag = flag
                 funcExpr = funcExpr
                 argExpr = SynExpr.Const(SynConst.Unit, _)) ->
-    checkByFlag flag funcExpr
+    checkByFlag src flag funcExpr
   | SynExpr.App(flag = flag
                 funcExpr = funcExpr
                 argExpr = SynExpr.Paren(expr = parenExpr; range = range)) ->
-    if checkSpacingOrNot src range then checkByFlag flag funcExpr
+    if checkSpacingOrNot src range then checkByFlag src flag funcExpr
     else checkMethodParenSpacing src funcExpr
     checkMethodParenSpacing src parenExpr
   | SynExpr.App(funcExpr = funcExpr; argExpr = argExpr) ->
@@ -192,6 +184,27 @@ let rec checkMethodParenSpacing (src: ISourceText) (expr: SynExpr) =
     checkMethodParenSpacing src innerExpr
   | SynExpr.Tuple(exprs = exprs) ->
     exprs |> List.iter (checkMethodParenSpacing src)
+  | _ ->
+    ()
+
+/// The spacing the call's own flag asks for, and then what it is applied to.
+and private checkByFlag src flag funcExpr =
+  ensureMethodSpacing src flag funcExpr
+  checkMethodParenSpacing src funcExpr
+
+/// What stands inside a call's parentheses, and the gap in front of them.
+/// A unit argument fences nothing in, so only the gap answers.
+and private checkCallArgument src funcExpr argExpr =
+  match argExpr with
+  | SynExpr.Paren(expr = parenExpr; range = range) ->
+    if checkSpacingOrNot src range then
+      ensureMethodSpacing src ExprAtomicFlag.NonAtomic funcExpr
+    else
+      ()
+    checkMethodParenSpacing src funcExpr
+    checkMethodParenSpacing src parenExpr
+  | SynExpr.Const(SynConst.Unit, _) ->
+    checkByFlag src ExprAtomicFlag.NonAtomic funcExpr
   | _ ->
     ()
 

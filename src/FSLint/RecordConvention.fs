@@ -132,57 +132,62 @@ let private checkBracketCompFlag src fullRange fieldRange exprRange =
 /// Checks for correct spacing and formatting in record field assignments,
 /// ensuring the format `{ field = expr }` is used instead of `{field = expr}`.
 /// Also validates bracket positioning and formatting in multi-line records.
-let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
-  if range.StartLine = range.EndLine && not (List.isEmpty fields) then
-    match getFieldRange (List.head fields), getExprRange (List.last fields) with
-    | Some fieldRange, Some exprRange ->
-      let fieldRange =
-        match (copyInfo: option<SynExpr * _>) with
-        | Some(expr, _) -> expr.Range
-        | _ -> fieldRange
-      if fieldRange.StartColumn - 2 <> range.StartColumn then
-        Range.mkRange "" range.Start fieldRange.Start
-        |> reportLeftCurlyBraceSpacing src
-      elif exprRange.EndColumn + 2 <> range.EndColumn then
-        Range.mkRange "" exprRange.End range.End
-        |> reportRightCurlyBraceSpacing src
-      else
-        ()
-    | _ ->
-      ()
-  elif range.StartLine <> range.EndLine && not (List.isEmpty fields) then
-    match getFieldRange (List.head fields), getExprRange (List.last fields) with
-    | Some fieldRange, Some exprRange ->
-      let fieldRange =
-        match (copyInfo: option<SynExpr * _>) with
-        | Some(expr, _) -> expr.Range
-        | _ -> fieldRange
-      if fieldRange.StartLine <> range.StartLine
-        || exprRange.EndLine <> range.EndLine then
-        if isStrict then
-          try
-            checkBracketCompFlag src range fieldRange exprRange
-          with
-          | LintException _ ->
-            (* What it found stands. Catching it here would answer a report
-               with a different report. *)
-            reraise ()
-          | _ ->
-            reportWarn src exprRange "Move field to inline with Bracket"
-        else
-          ()
-      elif fieldRange.StartColumn - 2 <> range.StartColumn then
-        Range.mkRange "" range.Start fieldRange.Start
-        |> reportLeftCurlyBraceSpacing src
-      elif exprRange.EndColumn + 2 <> range.EndColumn then
-        Range.mkRange "" exprRange.End range.End
-        |> reportRightCurlyBraceSpacing src
-      else
-        ()
-    | _ ->
-      ()
+/// Where the braces are read from: the first field, or the expression being
+/// copied from where the record was written with `with`.
+let private innerEdges copyInfo fields =
+  match getFieldRange (List.head fields), getExprRange (List.last fields) with
+  | Some fieldRange, Some exprRange ->
+    let fieldRange =
+      match (copyInfo: option<SynExpr * _>) with
+      | Some(expr, _) -> expr.Range
+      | _ -> fieldRange
+    Some(fieldRange, exprRange)
+  | _ ->
+    None
+
+/// A brace takes one space between it and what it fences in.
+let private checkBraceSpacing src (range: range) (inner: range) (last: range) =
+  if inner.StartColumn - 2 <> range.StartColumn then
+    Range.mkRange "" range.Start inner.Start
+    |> reportLeftCurlyBraceSpacing src
+  elif last.EndColumn + 2 <> range.EndColumn then
+    Range.mkRange "" last.End range.End
+    |> reportRightCurlyBraceSpacing src
   else
     ()
+
+/// A record spread over rows keeps its first field beside the opening brace
+/// and its last expression beside the closing one. Where it does not, what is
+/// wrong is the placement rather than the spacing, and that is asked first.
+let private checkSpreadBraces src range (inner: range) (last: range) =
+  if inner.StartLine <> (range: range).StartLine
+    || last.EndLine <> range.EndLine then
+    if isStrict then
+      try
+        checkBracketCompFlag src range inner last
+      with
+      | LintException _ ->
+        (* What it found stands. Catching it here would answer a report
+           with a different report. *)
+        reraise ()
+      | _ ->
+        reportWarn src last "Move field to inline with Bracket"
+    else
+      ()
+  else
+    checkBraceSpacing src range inner last
+
+let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
+  if List.isEmpty fields then
+    ()
+  else
+    match innerEdges copyInfo fields with
+    | None ->
+      ()
+    | Some(inner, last) when range.StartLine = range.EndLine ->
+      checkBraceSpacing src range inner last
+    | Some(inner, last) ->
+      checkSpreadBraces src range inner last
 
 /// Checks spacing around '=' operator in the given source code.
 /// Recursively analyzes the source for proper operator spacing.
@@ -248,6 +253,69 @@ let checkSeparatorSpacing src fields =
       ()
   )
 
+/// The separator between two fields sharing a row: `; ` and nothing else.
+let private checkPairSeparator src (front: range) (back: range) separator =
+  let separator = (separator: (range * _) option).Value |> fst
+  if front.EndColumn <> separator.StartColumn then
+    Range.mkRange "" front.End separator.Start
+    |> reportSemiColonBeforeSpacing src
+  elif separator.EndColumn + 1 <> back.StartColumn then
+    Range.mkRange "" separator.End back.Start
+    |> reportSemiColonAfterSpacing src
+  else
+    ()
+
+/// The gap two neighbouring fields leave between them. A `;` divides them
+/// where they share a row and trails where they do not.
+let private checkPatGap src (front: range) back frontSep backSep =
+  if front.EndLine = (back: range).StartLine then
+    checkPairSeparator src front back frontSep
+  elif (frontSep: (range * _) option).IsSome then
+    reportTrailingSeparator src (frontSep.Value |> fst)
+  elif (backSep: (range * _) option).IsSome then
+    reportTrailingSeparator src (backSep.Value |> fst)
+  else
+    ()
+
+/// A pattern naming one field: the braces round it and the `;` it must not
+/// carry.
+let private checkSinglePat src topRange (field: NamePatPairField) =
+  let NamePatPairField(pat = pat; range = range; blockSeparator = sepa) = field
+  if sepa.IsSome then
+    sepa.Value |> fst |> reportTrailingSeparator src
+  else
+    ()
+  TypeAnnotation.checkParamTypeSpacing src pat
+  checkBracketSpacing src topRange range
+
+/// A pattern naming several: the braces round the whole, whatever trails the
+/// last field, and every neighbouring pair.
+let private checkManyPats (src: ISourceText)
+                          (topRange: range)
+                          (fieldPats: list<NamePatPairField>) =
+  let startPat = List.head fieldPats
+  let lastPat = List.last fieldPats
+  let innerRange = Range.unionRanges startPat.Range lastPat.Range
+  let gap = Range.mkRange "" innerRange.End topRange.End
+  if (gap |> src.GetSubTextFromRange).Contains ';' then
+    reportTrailingSeparator src gap
+  else
+    ()
+  checkBracketSpacing src topRange innerRange
+  fieldPats
+  |> List.pairwise
+  |> List.iter (fun (front, back) ->
+    match front, back with
+    | NamePatPairField(range = frontRange; blockSeparator = frontSep),
+      NamePatPairField(range = backRange; blockSeparator = backSep) ->
+      checkPatGap src frontRange backRange frontSep backSep
+  )
+  fieldPats
+  |> List.iter (function
+    | NamePatPairField(pat = pat) ->
+      TypeAnnotation.checkParamTypeSpacing src pat
+  )
+
 let checkRecordPat (src: ISourceText) = function
   | SynPat.Record(fieldPats = fieldPats; range = range)
     when fieldPats.IsEmpty ->
@@ -255,62 +323,8 @@ let checkRecordPat (src: ISourceText) = function
     |> fun range -> reportWarn src range "Remove whitespace around '{}'"
   | SynPat.Record(fieldPats = fieldPats; range = topRange) ->
     AssignmentConvention.checkNamePatPairs src fieldPats
-    if fieldPats.Length = 1 then
-      let NamePatPairField(pat = pat
-                           range = range
-                           blockSeparator = sepa) = fieldPats.Head
-      if sepa.IsSome then sepa.Value |> fst |> reportTrailingSeparator src
-      else ()
-      TypeAnnotation.checkParamTypeSpacing src pat
-      checkBracketSpacing src topRange range
-    else
-      let startPat = List.head fieldPats
-      let lastPat = List.last fieldPats
-      let innerRange = Range.unionRanges startPat.Range lastPat.Range
-      let gap = Range.mkRange "" innerRange.End topRange.End
-      if (gap |> src.GetSubTextFromRange).Contains ';' then
-        reportTrailingSeparator src gap
-      else
-        ()
-      checkBracketSpacing src topRange innerRange
-      fieldPats
-      |> List.pairwise
-      |> List.iter (fun pairs ->
-        match pairs with
-        | NamePatPairField(pat = frontPat
-                           range = frontRange
-                           blockSeparator = frontSeparator),
-          NamePatPairField(pat = backPat
-                           range = backRange
-                           blockSeparator = backSeparator) ->
-          if frontRange.EndLine <> backRange.StartLine
-            && frontSeparator.IsSome then
-            reportTrailingSeparator src (frontSeparator.Value |> fst)
-          elif frontRange.EndLine <> backRange.StartLine
-            && backSeparator.IsSome then
-            reportTrailingSeparator src (backSeparator.Value |> fst)
-          else
-            ()
-          if frontRange.EndLine = backRange.StartLine then
-            let frontSeparator = frontSeparator.Value |> fst
-            if frontRange.EndColumn <> frontSeparator.StartColumn then
-              Range.mkRange "" frontRange.End frontSeparator.Start
-              |> reportSemiColonBeforeSpacing src
-            elif frontSeparator.EndColumn + 1 <> backRange.StartColumn then
-              Range.mkRange "" frontSeparator.End backRange.Start
-              |> reportSemiColonAfterSpacing src
-            else
-              ()
-          else
-            ()
-          TypeAnnotation.checkParamTypeSpacing src frontPat
-          TypeAnnotation.checkParamTypeSpacing src backPat
-      )
-      fieldPats
-      |> List.iter (function
-       | NamePatPairField(pat = pat; blockSeparator = blockSeparator) ->
-         TypeAnnotation.checkParamTypeSpacing src pat
-      )
+    if fieldPats.Length = 1 then checkSinglePat src topRange fieldPats.Head
+    else checkManyPats src topRange fieldPats
   | _ ->
     ()
 

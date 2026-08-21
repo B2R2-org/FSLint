@@ -193,6 +193,9 @@ let getFieldDeclaration (src: ISourceText) (field: SynField) =
   | None ->
     ""
 
+/// The gap between two fields is read out of the source text by column, so a
+/// range landing past the end of a line throws rather than answering. What is
+/// guarded here is that; a report raised from inside is let through.
 let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
   try
     fields
@@ -261,7 +264,14 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
         else
           ()
     )
-  with _ ->
+  with
+  | LintException _ ->
+    (* A report is not a failure. Without a lint context `reportWarn` raises
+       rather than records, and catching that here would drop the very finding
+       the block above just made -- and stop the walk before the fields after
+       it are read at all. *)
+    reraise ()
+  | _ ->
     fields
     |> List.iter (fun field ->
       let fieldDecl = getFieldDeclaration src field
@@ -302,15 +312,24 @@ let private checkInlineSpacing src (frontCase, endCase) =
   | _ ->
     ()
 
-let checkSynFields src fields =
+/// The fields of a union case are separated by `*`, and what `checkFieldsWidth`
+/// reads is the spacing round that star.
+let checkUnionFields src fields =
   fields |> checkFieldsWidth src
+  fields |> List.iter (checkFieldWidth src)
+
+/// A record's fields are divided by `;` or by a line break, never by a star.
+/// Asking the gap between them to read ` * ` would have the author write a
+/// tuple where they wrote a record, so only what is asked of a field on its
+/// own is asked here.
+let checkRecordFields src fields =
   fields |> List.iter (checkFieldWidth src)
 
 let private checkFieldsInUnion src case =
   let SynUnionCase(caseType = caseType) = case
   match caseType with
   | SynUnionCaseKind.Fields fields ->
-    checkSynFields src fields
+    checkUnionFields src fields
   | SynUnionCaseKind.FullType(fullType = fullType) ->
     checkTypeInternal src fullType
 

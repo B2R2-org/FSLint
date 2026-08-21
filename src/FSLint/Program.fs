@@ -463,7 +463,7 @@ and checkTypeDefnSimpleRepr src trivia = function
       TypeUseConvention.checkBarAlignment src id.idRange trivia.BarRange
       IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
-    TypeAnnotation.checkSynFields src fields
+    TypeAnnotation.checkRecordFields src fields
     RecordConvention.checkDefinition src fields range trivia
     for field in fields do
       let SynField(idOpt = idOpt; fieldType = fieldType) = field

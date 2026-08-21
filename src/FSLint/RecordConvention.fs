@@ -160,8 +160,15 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
       if fieldRange.StartLine <> range.StartLine
         || exprRange.EndLine <> range.EndLine then
         if isStrict then
-          try checkBracketCompFlag src range fieldRange exprRange
-          with _ -> reportWarn src exprRange "Move field to inline with Bracket"
+          try
+            checkBracketCompFlag src range fieldRange exprRange
+          with
+          | LintException _ ->
+            (* What it found stands. Catching it here would answer a report
+               with a different report. *)
+            reraise ()
+          | _ ->
+            reportWarn src exprRange "Move field to inline with Bracket"
         else
           ()
       elif fieldRange.StartColumn - 2 <> range.StartColumn then
@@ -309,10 +316,32 @@ let checkRecordPat (src: ISourceText) = function
 
 /// Checks the format of record constructors.
 /// Ensures that the record fields conform to formatting conventions.
+/// Every field of a record spread down the page begins a line of its own.
+/// Where several share a line it is the ones after the first that have to come
+/// down, and it is those the report names: the first is already where it
+/// belongs, and naming it would send the reader to the wrong field.
+///
+/// Only a record already spread over lines is asked this. One standing on a
+/// single line has chosen no layout to answer for, and nothing here asks a
+/// spread record to come back up: what is wrong with a line too long is its
+/// length, and the line budget says so.
+let private checkSingleFieldPerLine src (range: range) (fields: range list) =
+  if isStrict && range.StartLine <> range.EndLine then
+    fields
+    |> List.groupBy (fun (field: range) -> field.StartLine)
+    |> List.iter (fun (_, fields) ->
+      fields
+      |> List.skip 1
+      |> List.iter (reportSingleElementPerLineError src)
+    )
+  else
+    ()
+
 let checkConstructor src copyInfo (fields: list<SynExprRecordField>) range =
   checkBracketSpacingAndFormat src copyInfo fields range
   checkOperatorSpacing src fields
   checkSeparatorSpacing src fields
+  fields |> List.choose getFieldRange |> checkSingleFieldPerLine src range
 
 /// Checks a record definition for convention compliance.
 let checkDefinition src fields range trivia =
@@ -356,6 +385,14 @@ let private checkAnonymousRecordBracketSpacing src
 
 /// The separator information is not present in a regular anonymous record
 /// so it is excluded.
+/// An anonymous record names its fields with a `SynLongIdent` rather than
+/// wrapping them in a `SynExprRecordField`, so its names are read out of the
+/// triple the parser hands over. What is asked of them is the same.
+let private getAnonFieldRange (id: SynLongIdent, _, _) =
+  match id with
+  | SynLongIdent(id = head :: _) -> Some head.idRange
+  | _ -> None
+
 let checkAnonymousRecord src
                          copyInfo
                          (recordFields: list<SynLongIdent *
@@ -364,6 +401,9 @@ let checkAnonymousRecord src
                          range
                          trivia =
   checkAnonymousRecordBracketSpacing src copyInfo recordFields range trivia
+  recordFields
+  |> List.choose getAnonFieldRange
+  |> checkSingleFieldPerLine src range
   if isStrict then
     recordFields
     |> List.iter (fun (id: SynLongIdent, oprRange: option<range>, expr) ->

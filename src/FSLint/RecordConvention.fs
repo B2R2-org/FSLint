@@ -160,8 +160,15 @@ let private checkBracketSpacingAndFormat src copyInfo fields (range: range) =
       if fieldRange.StartLine <> range.StartLine
         || exprRange.EndLine <> range.EndLine then
         if isStrict then
-          try checkBracketCompFlag src range fieldRange exprRange
-          with _ -> reportWarn src exprRange "Move field to inline with Bracket"
+          try
+            checkBracketCompFlag src range fieldRange exprRange
+          with
+          | LintException _ ->
+            (* What it found stands. Catching it here would answer a report
+               with a different report. *)
+            reraise ()
+          | _ ->
+            reportWarn src exprRange "Move field to inline with Bracket"
         else
           ()
       elif fieldRange.StartColumn - 2 <> range.StartColumn then

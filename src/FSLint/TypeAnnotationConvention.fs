@@ -193,6 +193,9 @@ let getFieldDeclaration (src: ISourceText) (field: SynField) =
   | None ->
     ""
 
+/// The gap between two fields is read out of the source text by column, so a
+/// range landing past the end of a line throws rather than answering. What is
+/// guarded here is that; a report raised from inside is let through.
 let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
   try
     fields
@@ -261,7 +264,14 @@ let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
         else
           ()
     )
-  with _ ->
+  with
+  | LintException _ ->
+    (* A report is not a failure. Without a lint context `reportWarn` raises
+       rather than records, and catching that here would drop the very finding
+       the block above just made -- and stop the walk before the fields after
+       it are read at all. *)
+    reraise ()
+  | _ ->
     fields
     |> List.iter (fun field ->
       let fieldDecl = getFieldDeclaration src field

@@ -276,17 +276,10 @@ type Shape =
   /// The fields of a union case are divided by `*` and answer for the spacing
   /// round it. A record's are divided by `;`, and asking that gap to read
   /// ` * ` would have the author write a tuple where they wrote a record.
-  ///
-  /// The union half is read through `lintErrors` rather than asserted on:
-  /// `checkFieldsWidth` wraps itself in a `try`, which swallows the exception
-  /// a context-free lint raises and leaves nothing for `lintAssertMsg` to
-  /// catch. Given a context the report is recorded rather than raised.
   [<TestMethod>]
   member _.``[Record] Definition Separator Test``() =
     lint goodRecordDefinitionOnOneLineTest
-    lintErrors badUnionFieldStarTest
-    |> List.filter (fun e -> e.Message = "Use ' * '")
-    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+    lintAssertMsg "Use ' * '" badUnionFieldStarTest
 
   /// Two fields following the first on its line are two reports, so lifting
   /// one leaves the other still named.

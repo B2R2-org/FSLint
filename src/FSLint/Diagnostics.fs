@@ -50,12 +50,6 @@ module Diagnostics =
   /// lengths but one, and the outermost is where the demand belongs.
   let coveredFunctions = new AsyncLocal<ResizeArray<range>>()
 
-  /// The name of the declaration now being walked into: a top-level binding,
-  /// or the type where members are being read. A binding with no name of its
-  /// own -- a `do` block -- is reported here, there being nowhere else to
-  /// point that a reader could act on.
-  let enclosingDecl = new AsyncLocal<range option>()
-
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
@@ -69,7 +63,6 @@ module Diagnostics =
     coveredChains.Value <- ResizeArray()
     coveredFunctions.Value <- ResizeArray()
     coveredApplications.Value <- ResizeArray()
-    enclosingDecl.Value <- None
 
   /// True when the store holds the very stretch given.
   let private holds (store: AsyncLocal<ResizeArray<range>>) (range: range) =
@@ -89,11 +82,6 @@ module Diagnostics =
   let noteCoveredChain (range: range) = coveredChains.Value.Add range
 
   let isCoveredChain range = holds coveredChains range
-
-  let noteEnclosingDecl (range: range) = enclosingDecl.Value <- Some range
-
-  /// Where the declaration now being walked is named, if it has a name.
-  let enclosingDeclRange () = enclosingDecl.Value
 
   let noteCoveredFunction (range: range) = coveredFunctions.Value.Add range
 

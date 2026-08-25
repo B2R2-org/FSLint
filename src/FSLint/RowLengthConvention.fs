@@ -8,6 +8,10 @@ open Diagnostics
 /// the settings once they carry it.
 let [<Literal>] private MaxBodyRows = 42
 
+/// How many rows a `match` or a loop may run to before the body holding it
+/// stops answering for its own length.
+let [<Literal>] private MaxEnumerationRows = 35
+
 /// True when the head of a call is a plain name, so that what stands beside it
 /// is the call's only argument.
 ///
@@ -34,41 +38,22 @@ let private (|PipedFrom|_|) expr =
   | _ ->
     None
 
-/// True when the body is one piece of data written out rather than code.
+/// True when the body is data written out rather than executable code.
 ///
-/// A record or a literal spread down the page is a table, and a table is no
-/// easier to read for being cut in three. There is no smaller function to take
-/// out of one: an alphabetical table halved gives two halves and no name worth
-/// having, and a table read by its index cannot be halved at all. What is long
-/// about one is its width on the page, and the line budget answers that.
+/// Records, collections, and other literals are treated as tables. Splitting
+/// them does not improve readability, so their size is governed by line width
+/// rather than this rule.
 ///
-/// Which side of an `=` it was written on makes no difference: `let regs () =
-/// [| ... |]` names the same table `let regs = [| ... |]` does.
+/// Wrappers such as annotations, parentheses, `lazy`, `let`, `fun`, pipes, or
+/// constructors like `set` and `dict` do not change that classification.
 ///
-/// An annotation, a pair of parentheses and a `lazy` fence nothing off, and a
-/// literal
-/// handed straight to what shapes it -- `set [ ... ]`, `dict [ ... ]` -- is
-/// still the literal being read. Where the parameters were written, beside the
-/// name or after a `fun`, says nothing either. A `let` standing in front of one
-/// only names something the table uses, and an object expression is a type
-/// written where an expression stands, whose members answer for themselves.
+/// A conditional is also data when both branches are data. If either branch
+/// contains code, the whole expression is treated as code.
 ///
-/// A table handed on by a pipe is the table still: `[| ... |] |> ofElements`
-/// says what `ofElements [| ... |]` says, and which way round it was written
-/// tells nothing about what is being read.
+/// Multiline strings, including interpolated strings, are treated as data too.
 ///
-/// A conditional is a table too where both of its branches are: which of two
-/// tables to hand back is not the sort of branching this rule is here to
-/// measure. One branch of code makes it code again.
-///
-/// A string spelled out down the page is a table of its own: help text, a
-/// banner, a sample of source. What is long about one is what it says, and
-/// there is no smaller function inside a quotation mark. A slot filled in on
-/// the way out does not change that, so an interpolated one reads the same.
-///
-/// What stands inside is not looked at. An entry running to several rows, a
-/// callback, a `for` that fills in the tail -- none of it changes that the
-/// whole is a table, and taking any of it out leaves the table no shorter.
+/// The contents of the data are not inspected. Callbacks, loops, or multiline
+/// entries inside it do not change how the outer expression is classified.
 let rec private isDataLiteral = function
   | SynExpr.Const(constant = SynConst.String _)
   | SynExpr.InterpolatedString _
@@ -153,40 +138,20 @@ let rec private tailOf (expr: SynExpr) =
   | _ ->
     expr
 
-/// How many rows a `match` or a loop may run to before the body holding it
-/// stops answering for its own length.
-let [<Literal>] private MaxEnumerationRows = 20
-
-/// True when the body reaches a `match` or a loop that runs past that.
+/// True when the body reaches a long `match` or loop.
 ///
-/// A long `match` is an enumeration of patterns and a long loop is one pass
-/// over a stream written out. Both take their length from how many cases or
-/// steps there are, and neither is any shorter for the body around it being cut
-/// in two: splitting one renames the enumeration rather than shortening it.
-/// Where one of them runs, it is what the body is about, however it was
-/// threaded in -- standing as the answer, bound to a name and handed on, or run
-/// as one statement between two others.
+/// A long `match` or loop defines the shape of the body. Splitting the
+/// surrounding body does not make that construct shorter, so it is handled
+/// separately from the normal row budget.
 ///
-/// Which loop was written makes no difference. `while` counting a cursor and
-/// `for` counting an index are the same pass over the same stream.
+/// `for` and `while` are treated the same way. Short matches and loops do not
+/// qualify, since the remaining body may still be too long.
 ///
-/// A short one is not. `match x with | 0 -> a | _ -> b` in front of forty rows
-/// of code leaves those forty rows exactly as long as they were, and they are
-/// what the budget is for.
+/// The search follows bindings, sequences, pipes, wrappers, loop and `try`
+/// bodies, conditional branches, local helpers, and a body-level lambda.
 ///
-/// What the body reaches is whatever its rows were counted from: what a name
-/// is bound to as much as what is done with it, statements sequenced, pipes
-/// threaded, the inside of parentheses, annotations and a `lazy`, the bodies of
-/// loops and of `try`, and either branch of a conditional. A helper written
-/// inside the body is the body's own rows, so a long `match` inside one answers
-/// for it -- splitting the caller would only move the helper, which is already
-/// split. A lambda standing as the body is the body too: `let f = fun x -> ...`
-/// only moved the parameter off the left of the `=`.
-///
-/// What stands under an arrow, or beside a call as its argument, is not
-/// reached -- searching there would turn up a `match` in almost every body and
-/// leave nothing measured at all. A lambda handed to a call is out of reach for
-/// being an argument, not for being a lambda.
+/// It does not descend under match arrows or into call arguments. Doing so
+/// would make nested control flow suppress warnings in unrelated code.
 let rec private holdsEnumeration (expr: SynExpr) =
   let rows (e: SynExpr) = e.Range.EndLine - e.Range.StartLine + 1
   match expr with

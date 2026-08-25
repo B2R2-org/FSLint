@@ -11,10 +11,10 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 /// scenario and means nothing cut in three.
 ///
 /// So is a body built around an enumeration -- a `match` or a `while` running
-/// past twenty rows, which takes its length from how many cases or steps there
-/// are and is no shorter for the body around it being split. A shorter one is
-/// a branch taken in passing and rescues nothing, or the rows in front of it
-/// would never be measured at all.
+/// past thirty-five rows, which takes its length from how many cases or steps
+/// there are and is no shorter for the body around it being split. A shorter
+/// one is a branch taken in passing and rescues nothing, or the rows in front
+/// of it would never be measured at all.
 ///
 /// The search for one covers whatever the body's rows were counted from: names
 /// bound, statements sequenced, pipes threaded, the bodies of loops and of
@@ -703,10 +703,9 @@ type RowLengthTests() =
 """
 
   /// The bar is what tells an enumeration from a branch taken in passing.
-  /// `match ... with` and twenty arms come to twenty-one rows, one past the
-  /// bar, so the thirty rows in front of it are not what the body is
-  /// about.
-  let goodMatchAtBarTest =
+  /// `match ... with` and twenty arms come to twenty-one rows, well short of
+  /// the bar, so the thirty rows in front of it go on being measured.
+  let badMatchAtBarTest =
     """
     let liftWithSetup (ins: Instruction) insLen bld =
       bld <!-- (ins.Address, insLen)
@@ -762,9 +761,8 @@ type RowLengthTests() =
       | Op.OP20 -> lift20 ins insLen bld
 """
 
-  /// The same body with one arm fewer. Now the `match` is a branch taken in
-  /// passing, and passing over the body for it would leave the thirty rows
-  /// in front of it unmeasured for good.
+  /// The same body with one arm fewer, shorter still. Passing over the body
+  /// for it would leave the thirty rows in front of it unmeasured for good.
   let badMatchUnderBarTest =
     """
     let liftWithSetup (ins: Instruction) insLen bld =
@@ -878,8 +876,10 @@ type RowLengthTests() =
       r12
 """
 
-  /// One that does reach it is enough, and it does not have to be the last.
-  let goodOneLongAmongShortTest =
+  /// Twelve short `match`es and one longer, and the longer one still falls
+  /// short of the bar at twenty-three rows. Nothing here rescues the
+  /// seventy-two rows the body runs to.
+  let badOneLongAmongShortTest =
     """
     let decode f01 f02 f03 f04 f05 f06 f07 f08 f09 f10 f11 f12 =
       let r01 =
@@ -1017,7 +1017,7 @@ type RowLengthTests() =
 
   /// A statement stands in the way as readily as a `let` does. Stopping at
   /// one but not the other would split two spellings of the same shape.
-  let goodMatchBehindStatementTest =
+  let badMatchBehindStatementTest =
     """
     let liftAndTrace (ins: Instruction) insLen bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -1520,9 +1520,10 @@ type RowLengthTests() =
 
   /// A binding written inside another is passed over. Its rows are already
   /// counted in the body holding it, and the two are not two lengths but
-  /// one; the outermost is where the splitting has to start. Here that one
-  /// reaches a long `match`, so nothing is asked of either.
-  let goodNestedBindingTest =
+  /// one; the outermost is where the splitting has to start. Here the
+  /// `match` it reaches falls short of the bar, so the outer body answers
+  /// for all fifty-two rows and the inner one is not asked twice.
+  let badNestedBindingTest =
     """
     let liftGroup (ins: Instruction) insLen bld =
       let liftOne src1 src2 src3 =
@@ -2598,9 +2599,9 @@ type RowLengthTests() =
         printsn description
 """
 
-  /// A `for` counting up to a bound reaches what it repeats, the way a
-  /// `while` does.
-  let goodForLoopTest =
+  /// A `for` counting up to a bound is reached the way a `while` is, and
+  /// twenty-four rows of it rescues no more than a `while` of that length.
+  let badForLoopTest =
     """
     let scan n x bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -2650,7 +2651,7 @@ type RowLengthTests() =
 """
 
   /// A `for` walking a sequence reads no differently.
-  let goodForEachTest =
+  let badForEachTest =
     """
     let scan xs bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -2856,9 +2857,9 @@ type RowLengthTests() =
       cur
 """
 
-  /// The bar is the same twenty rows a `match` answers to: `while ... do`
-  /// and twenty rows of body come to twenty-one.
-  let goodWhileAtBarTest =
+  /// The bar is the same thirty-five rows a `match` answers to, and
+  /// `while ... do` with twenty rows of body comes nowhere near it.
+  let badWhileAtBarTest =
     """
     let scan n bld =
       let mutable cur = 0
@@ -2911,7 +2912,7 @@ type RowLengthTests() =
       cur
 """
 
-  /// One row of body fewer and the loop is entered in passing.
+  /// One row of body fewer, and no nearer the bar for it.
   let badWhileUnderBarTest =
     """
     let scan n bld =
@@ -3069,10 +3070,11 @@ type RowLengthTests() =
         | _ -> raise InvalidOpcodeException
 """
 
-  /// What a pipe hands the answer to does not unmake the enumeration that
-  /// produced it. The body still runs one past twenty rows, and that is
-  /// what the body is about however the answer is adjusted afterwards.
-  let goodPipedOntoLambdaTest =
+  /// What a pipe hands the answer to does not unmake the `match` that
+  /// produced it -- but twenty-seven rows of it is a branch taken in
+  /// passing, and what stands inside the lambda is off the spine. The body
+  /// answers for all seventy-three rows.
+  let badPipedOntoLambdaTest =
     """
     let lift ins ys =
       match ins.Opcode with
@@ -3149,8 +3151,9 @@ type RowLengthTests() =
            v43)
 """
 
-  /// A guard on an arm is part of the arm.
-  let goodGuardedArmTest =
+  /// A guard on an arm is part of the arm, and twenty-four rows of guarded
+  /// arms is no nearer the bar than twenty-four plain ones.
+  let badGuardedArmTest =
     """
     let lift ins n bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -3199,8 +3202,9 @@ type RowLengthTests() =
       | _ -> raise InvalidOpcodeException
 """
 
-  /// Parentheses round an enumeration are still parentheses.
-  let goodParenMatchTest =
+  /// Parentheses round a `match` are still parentheses, and twenty-four
+  /// rows inside them is still a branch taken in passing.
+  let badParenMatchTest =
     """
     let lift ins bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -3249,8 +3253,9 @@ type RowLengthTests() =
        | _ -> raise InvalidOpcodeException)
 """
 
-  /// `do` says the answer is discarded, not that there is no enumeration.
-  let goodDoMatchTest =
+  /// `do` says the answer is discarded, not that what is discarded reaches
+  /// the bar.
+  let badDoMatchTest =
     """
     let lift ins bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -3300,7 +3305,7 @@ type RowLengthTests() =
 """
 
   /// `use` binds a name the way `let` does, and disposes of it after.
-  let goodUseBindingTest =
+  let badUseBindingTest =
     """
     let scan path ins bld =
       use stream = File.OpenRead path
@@ -3350,8 +3355,8 @@ type RowLengthTests() =
 """
 
   /// Two names bound together are two helpers written inside the body, and
-  /// either of them can hold what the body is about.
-  let goodRecAndBindingTest =
+  /// neither of these holds a `match` long enough to answer for it.
+  let badRecAndBindingTest =
     """
     let outer ins bld =
       bld <+ (t01 := src1 .+ numI32 1 32<rt>)
@@ -3403,8 +3408,9 @@ type RowLengthTests() =
 """
 
   /// An `elif` chain is conditionals nested inside conditionals, and the
-  /// last branch is reached through all of them.
-  let goodElifChainTest =
+  /// last branch is reached through all of them -- to a `match` that falls
+  /// short of the bar.
+  let badElifChainTest =
     """
     let pick ins c1 c2 bld =
       if c1 then
@@ -3459,8 +3465,10 @@ type RowLengthTests() =
         | Op.OP22 -> lift22 ins insLen bld
 """
 
-  /// Both bodies of a `try ... finally` are reached.
-  let goodTryFinallyMatchTest =
+  /// Both bodies of a `try ... finally` are reached, and the `match` the
+  /// `try` body comes down to falls short of the bar, so its forty-three
+  /// rows are measured as they stand.
+  let badTryFinallyMatchTest =
     """
     let scan ins bld =
       try
@@ -4049,11 +4057,11 @@ type RowLengthTests() =
     lint goodLongMatchTest
     lint goodFatClauseTest
 
-  /// Twenty rows tells an enumeration from a branch taken in passing, and the
-  /// two samples differ by one arm.
+  /// Thirty-five rows tells an enumeration from a branch taken in passing.
+  /// None of these reaches that, so each answers for every row it has.
   [<TestMethod>]
   member _.``[RowLength] Enumeration Budget Test``() =
-    lint goodMatchAtBarTest
+    lintAssertMsg "Split into smaller functions" badMatchAtBarTest
     lintAssertMsg "Split into smaller functions" badMatchUnderBarTest
     lintAssertMsg "Split into smaller functions" badManyShortMatchesTest
 
@@ -4061,8 +4069,8 @@ type RowLengthTests() =
   [<TestMethod>]
   member _.``[RowLength] Threaded Enumeration Test``() =
     lint goodMatchBehindLetTest
-    lint goodMatchBehindStatementTest
-    lint goodOneLongAmongShortTest
+    lintAssertMsg "Split into smaller functions" badMatchBehindStatementTest
+    lintAssertMsg "Split into smaller functions" badOneLongAmongShortTest
     lint goodMatchPipedTest
     lint goodMatchMidChainTest
 
@@ -4085,7 +4093,7 @@ type RowLengthTests() =
   [<TestMethod>]
   member _.``[RowLength] Inner Binding Test``() =
     lint goodInnerBindingTest
-    lint goodNestedBindingTest
+    lintAssertMsg "Split into smaller functions" badNestedBindingTest
 
   /// A table is passed over without being noted as covered, so a helper named
   /// in front of one is still reached and still answers for itself.
@@ -4146,14 +4154,14 @@ type RowLengthTests() =
     lint goodLiftedUsageTest
 
   /// A `for` reaches what it repeats the way a `while` does, and the bar a
-  /// loop answers to is the same twenty rows.
+  /// loop answers to is the same thirty-five rows.
   [<TestMethod>]
   member _.``[RowLength] Loop Test``() =
-    lint goodForLoopTest
-    lint goodForEachTest
+    lintAssertMsg "Split into smaller functions" badForLoopTest
+    lintAssertMsg "Split into smaller functions" badForEachTest
     lint goodLongForTest
     lint goodLongForEachTest
-    lint goodWhileAtBarTest
+    lintAssertMsg "Split into smaller functions" badWhileAtBarTest
     lintAssertMsg "Split into smaller functions" badWhileUnderBarTest
     lintAssertMsg "Split into smaller functions" badShortForTest
 
@@ -4162,23 +4170,25 @@ type RowLengthTests() =
   member _.``[RowLength] Enumeration Spelling Test``() =
     lint goodFunctionShorthandTest
     lint goodLambdaMatchTest
-    lint goodGuardedArmTest
-    lint goodPipedOntoLambdaTest
+    lintAssertMsg "Split into smaller functions" badGuardedArmTest
+    lintAssertMsg "Split into smaller functions" badPipedOntoLambdaTest
 
-  /// Everything that merely stands between the `=` and the enumeration.
+  /// Everything that merely stands between the `=` and a `match`, and none
+  /// of these `match`es is long enough for the body to be passed over.
   [<TestMethod>]
   member _.``[RowLength] Standing In The Way Test``() =
-    lint goodParenMatchTest
-    lint goodDoMatchTest
-    lint goodUseBindingTest
-    lint goodRecAndBindingTest
-    lint goodElifChainTest
+    lintAssertMsg "Split into smaller functions" badParenMatchTest
+    lintAssertMsg "Split into smaller functions" badDoMatchTest
+    lintAssertMsg "Split into smaller functions" badUseBindingTest
+    lintAssertMsg "Split into smaller functions" badRecAndBindingTest
+    lintAssertMsg "Split into smaller functions" badElifChainTest
 
   /// A `try ... finally` divides nothing by patterns, so each of its bodies
-  /// answers as it stands -- but either can still reach an enumeration.
+  /// answers as it stands, and neither of these reaches far enough to be
+  /// passed over.
   [<TestMethod>]
   member _.``[RowLength] Try Finally Test``() =
-    lint goodTryFinallyMatchTest
+    lintAssertMsg "Split into smaller functions" badTryFinallyMatchTest
     lintAssertMsg "Split into smaller functions" badTryFinallyBodyTest
 
   /// What opened the binding says nothing; whether its body runs says

@@ -45,11 +45,13 @@ let private (|PipedFrom|_|) expr =
 /// Which side of an `=` it was written on makes no difference: `let regs () =
 /// [| ... |]` names the same table `let regs = [| ... |]` does.
 ///
-/// An annotation and a pair of parentheses fence nothing off, and a literal
+/// An annotation, a pair of parentheses and a `lazy` fence nothing off, and a
+/// literal
 /// handed straight to what shapes it -- `set [ ... ]`, `dict [ ... ]` -- is
-/// still the literal being read. A `let` standing in front of one only names
-/// something the table uses, and an object expression is a type written where
-/// an expression stands, whose members answer for themselves.
+/// still the literal being read. Where the parameters were written, beside the
+/// name or after a `fun`, says nothing either. A `let` standing in front of one
+/// only names something the table uses, and an object expression is a type
+/// written where an expression stands, whose members answer for themselves.
 ///
 /// A table handed on by a pipe is the table still: `[| ... |] |> ofElements`
 /// says what `ofElements [| ... |]` says, and which way round it was written
@@ -61,13 +63,15 @@ let private (|PipedFrom|_|) expr =
 ///
 /// A string spelled out down the page is a table of its own: help text, a
 /// banner, a sample of source. What is long about one is what it says, and
-/// there is no smaller function inside a quotation mark.
+/// there is no smaller function inside a quotation mark. A slot filled in on
+/// the way out does not change that, so an interpolated one reads the same.
 ///
 /// What stands inside is not looked at. An entry running to several rows, a
 /// callback, a `for` that fills in the tail -- none of it changes that the
 /// whole is a table, and taking any of it out leaves the table no shorter.
 let rec private isDataLiteral = function
   | SynExpr.Const(constant = SynConst.String _)
+  | SynExpr.InterpolatedString _
   | SynExpr.Record _
   | SynExpr.AnonRecd _
   | SynExpr.ArrayOrList _
@@ -82,6 +86,8 @@ let rec private isDataLiteral = function
     builder.idText = "seq"
   | SynExpr.Paren(expr = inner)
   | SynExpr.Typed(expr = inner)
+  | SynExpr.Lazy(expr = inner)
+  | SynExpr.Lambda(body = inner)
   | SynExpr.LetOrUse(body = inner) ->
     isDataLiteral inner
   | SynExpr.IfThenElse(thenExpr = thenBranch; elseExpr = Some elseBranch) ->
@@ -110,6 +116,9 @@ let private isTest attrs =
 /// body is what is wrong, and underlining forty rows of it says nothing the
 /// count has not already said. A binding named by a pattern rather than an
 /// identifier is named at the pattern.
+/// A `do` block has neither, and is named where it was written: it is a
+/// declaration of its own, standing among the members of the type that holds
+/// it, and the type's own name would point at every other member too.
 let private reportTarget (pat: SynPat) =
   match pat with
   | SynPat.LongIdent(longDotId = SynLongIdent(id = ids)) when not ids.IsEmpty ->
@@ -144,13 +153,13 @@ let rec private tailOf (expr: SynExpr) =
   | _ ->
     expr
 
-/// How many rows a `match` or a `while` may run to before the body holding it
+/// How many rows a `match` or a loop may run to before the body holding it
 /// stops answering for its own length.
 let [<Literal>] private MaxEnumerationRows = 20
 
-/// True when the body reaches a `match` or a `while` that runs past that.
+/// True when the body reaches a `match` or a loop that runs past that.
 ///
-/// A long `match` is an enumeration of patterns and a long `while` is one pass
+/// A long `match` is an enumeration of patterns and a long loop is one pass
 /// over a stream written out. Both take their length from how many cases or
 /// steps there are, and neither is any shorter for the body around it being cut
 /// in two: splitting one renames the enumeration rather than shortening it.
@@ -158,26 +167,34 @@ let [<Literal>] private MaxEnumerationRows = 20
 /// threaded in -- standing as the answer, bound to a name and handed on, or run
 /// as one statement between two others.
 ///
+/// Which loop was written makes no difference. `while` counting a cursor and
+/// `for` counting an index are the same pass over the same stream.
+///
 /// A short one is not. `match x with | 0 -> a | _ -> b` in front of forty rows
 /// of code leaves those forty rows exactly as long as they were, and they are
 /// what the budget is for.
 ///
 /// What the body reaches is whatever its rows were counted from: what a name
 /// is bound to as much as what is done with it, statements sequenced, pipes
-/// threaded, the inside of parentheses and annotations, the bodies of loops and
-/// of `try`, and either branch of a conditional. A helper written inside the
-/// body is the body's own rows, so a long `match` inside one answers for it --
-/// splitting the caller would only move the helper, which is already split.
+/// threaded, the inside of parentheses, annotations and a `lazy`, the bodies of
+/// loops and of `try`, and either branch of a conditional. A helper written
+/// inside the body is the body's own rows, so a long `match` inside one answers
+/// for it -- splitting the caller would only move the helper, which is already
+/// split. A lambda standing as the body is the body too: `let f = fun x -> ...`
+/// only moved the parameter off the left of the `=`.
 ///
-/// What stands under an arrow, inside a lambda or beside a call as its
-/// argument is not reached -- searching there would turn up a `match` in almost
-/// every body and leave nothing measured at all.
+/// What stands under an arrow, or beside a call as its argument, is not
+/// reached -- searching there would turn up a `match` in almost every body and
+/// leave nothing measured at all. A lambda handed to a call is out of reach for
+/// being an argument, not for being a lambda.
 let rec private holdsEnumeration (expr: SynExpr) =
   let rows (e: SynExpr) = e.Range.EndLine - e.Range.StartLine + 1
   match expr with
   | SynExpr.Match _
   | SynExpr.MatchLambda _
-  | SynExpr.While _ when rows expr > MaxEnumerationRows ->
+  | SynExpr.While _
+  | SynExpr.For _
+  | SynExpr.ForEach _ when rows expr > MaxEnumerationRows ->
     true
   | SynExpr.LetOrUse(bindings = bindings; body = body) ->
     holdsEnumeration body
@@ -185,6 +202,8 @@ let rec private holdsEnumeration (expr: SynExpr) =
        |> List.exists (fun (SynBinding(expr = value)) -> holdsEnumeration value)
   | SynExpr.Paren(expr = inner)
   | SynExpr.Typed(expr = inner)
+  | SynExpr.Lazy(expr = inner)
+  | SynExpr.Lambda(body = inner)
   | SynExpr.Do(expr = inner)
   | SynExpr.While(doExpr = inner)
   | SynExpr.For(doBody = inner)

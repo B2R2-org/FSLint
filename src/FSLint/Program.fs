@@ -566,6 +566,8 @@ and checkTypeDefn src defn =
     ()
   ClassDefinition.checkAttributesLineSpacing src attrs trivia
   checkTypeDefnName src lid range attrs
+  (* a `do` block written among the members is named by the type it is in *)
+  if not lid.IsEmpty then noteEnclosingDecl (List.last lid).idRange else ()
   match implicitConstructor with
   | Some ctor -> checkImplicitCtor src repr trivia ctor
   | None -> checkTypeDefnEqual src info range repr trivia

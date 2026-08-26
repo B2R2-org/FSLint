@@ -166,6 +166,17 @@ let bad = [
     "delta\n" +
     quotes + " ]\n"
 
+  /// A multiline string element ending one of its lines in a semicolon. That
+  /// semicolon is a character the string spells rather than a separator the
+  /// literal wrote, and so is anything else standing on those lines.
+  let goodSeparatorInStringElementTest =
+    let quotes = "\"\"\""
+    "let texts =\n" +
+    "  [ " + quotes + "\n" +
+    "let x = 1;\n" +
+    "let y = 2\n" +
+    quotes + " ]\n"
+
   let goodNestedBracketSpacingTest =
     """
 [ [ 1; 2 ]; [ 3; 4 ] ]
@@ -322,12 +333,18 @@ let bad = [
   /// short of where a separator would have to start to be at the end of it,
   /// and reading that as a separator asked for the removal of a blank line
   /// that the string it stands in put there.
+  ///
+  /// Nor is the text of an element the literal's to answer for. The lines a
+  /// multiline string spans are the string's own, and a semicolon ending one
+  /// of them is a character it spells; only a separator standing outside
+  /// every element was written by the literal.
   [<TestMethod>]
   member _.``[ArrayOrList] List Separator Not In Line Ending Test``() =
     lint goodSeparatorNotInLineEndingTest
     lintAssert badSeparatorNotInLineEndingTest
     lintAssert badSeparatorOnOpeningLineTest
     lint goodBlankLineInStringElementTest
+    lint goodSeparatorInStringElementTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested List Bracket Spacing Test``() =

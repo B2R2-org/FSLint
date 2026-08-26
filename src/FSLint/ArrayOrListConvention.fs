@@ -161,6 +161,33 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
   else
     ()
 
+/// True where a position falls inside one of the literal's elements. A range
+/// runs from its first character to one past its last, so an element's own
+/// text falls inside it while the separator that closes it does not.
+///
+/// `Range.rangeContainsPos` will not do: it counts the end as inside, which
+/// takes the `;` of `[ 1;` for part of the `1`.
+let private standsInsideElement (elemRanges: range list) (pos: pos) =
+  let startsBefore (r: range) =
+    r.StartLine < pos.Line
+    || (r.StartLine = pos.Line && r.StartColumn <= pos.Column)
+  let endsAfter (r: range) =
+    pos.Line < r.EndLine
+    || (pos.Line = r.EndLine && pos.Column < r.EndColumn)
+  elemRanges |> List.exists (fun r -> startsBefore r && endsAfter r)
+
+/// Where a line of a literal ends in a separator the literal itself put
+/// there. A line holding no separator has none, and neither has one whose
+/// last separator stands inside an element: the lines a multiline string
+/// spans are the string's own text, and a semicolon among them is a character
+/// it spells rather than anything the literal wrote.
+let private trailingSeparatorOf elemRanges (lineString: string) lineNo =
+  let idx = lineString.LastIndexOf ";"
+  let isOwn () =
+    Position.mkPos lineNo idx |> standsInsideElement elemRanges |> not
+  if idx >= 0 && idx + 1 = lineString.Length && isOwn () then Some idx
+  else None
+
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.
 ///
@@ -169,22 +196,17 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
 /// lines from one and `GetLineString` counts from zero, so the first of them
 /// is `StartLine - 1`: reading from `StartLine` would step past the line the
 /// literal opens on and miss a separator left at the end of it.
-///
-/// A line with no separator on it answers -1, which lands one past the end of
-/// an empty line and would read as a separator sitting there. An empty line
-/// is asked for explicitly, since one inside a multiline string is a line of
-/// the literal like any other and cannot be taken out.
-let checkTrailingSeparator src fRange eRange =
+let checkTrailingSeparator src elemRanges fRange eRange =
   if (fRange: range).StartLine <> fRange.EndLine then
     for line in fRange.StartLine - 1 .. fRange.EndLine - 2 do
       let lineString = (src: ISourceText).GetLineString line
-      let lastSepaIdx = lineString.LastIndexOf ";"
-      if lastSepaIdx >= 0 && lastSepaIdx + 1 = lineString.Length then
-        (Position.mkPos (line + 1) lastSepaIdx,
+      match trailingSeparatorOf elemRanges lineString (line + 1) with
+      | Some idx ->
+        (Position.mkPos (line + 1) idx,
          Position.mkPos (line + 1) lineString.Length)
         ||> Range.mkRange ""
         |> reportTrailingSeparator src
-      else
+      | None ->
         ()
   else
     let gap = Range.mkRange "" (eRange: range).End fRange.End
@@ -204,9 +226,9 @@ let adjustRangeByComment (outerRange: range) (expr: SynExpr) =
     | Some range -> Range.unionRanges exprRange range, hasCommentInFront
     | None -> exprRange, hasCommentInFront
 
-let checkCommon src isArray full elem =
+let checkCommon src isArray elemRanges full elem =
   let distFstElemToOpeningBracket = if isArray then 3 else 2
-  checkTrailingSeparator src full elem
+  checkTrailingSeparator src elemRanges full elem
   checkBracketSpacing src distFstElemToOpeningBracket full elem
 
 let rec checkSingleLine src = function
@@ -256,7 +278,8 @@ let checkMultiLine src range = function
 
 let check src isArray (fRange: Range) expr =
   let elemRangeAdjusted, hasCommentInFront = adjustRangeByComment fRange expr
-  checkCommon src isArray fRange elemRangeAdjusted
+  let elemRanges = collectElementRanges expr
+  checkCommon src isArray elemRanges fRange elemRangeAdjusted
   checkSymmetry src elemRangeAdjusted fRange hasCommentInFront
   if fRange.StartLine = fRange.EndLine then checkSingleLine src expr
   else checkMultiLine src fRange expr

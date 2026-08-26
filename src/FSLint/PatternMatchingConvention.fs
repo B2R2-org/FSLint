@@ -417,11 +417,9 @@ and private checkArrayOrList src isArray elementPats (range: range) =
     else
       ()
   else
-    let elemRanges =
-      elementPats
-      |> List.map (fun pat -> pat.Range)
-      |> List.reduce Range.unionRanges
-    ArrayOrListConvention.checkCommon src isArray range elemRanges
+    let patRanges = elementPats |> List.map (fun pat -> pat.Range)
+    let elemRanges = patRanges |> List.reduce Range.unionRanges
+    ArrayOrListConvention.checkCommon src isArray patRanges range elemRanges
     if elemRanges.StartLine = elemRanges.EndLine then
       collectElemAndOptSeparatorRanges src elementPats
       |> ArrayOrListConvention.checkElementSpacing src

@@ -147,6 +147,25 @@ let bad = [
   3 ]
 """
 
+  /// A list whose elements are multiline strings. The blank lines inside them
+  /// are lines of the literal like any other, but unlike a blank line written
+  /// between two elements they are what the string says and cannot be taken
+  /// out. Assembled by hand, since a triple-quoted string cannot hold the
+  /// quotes that open and close another.
+  let goodBlankLineInStringElementTest =
+    let quotes = "\"\"\""
+    "let texts =\n" +
+    "  [ " + quotes + "\n" +
+    "alpha\n" +
+    "\n" +
+    "beta\n" +
+    quotes + "\n" +
+    "    " + quotes + "\n" +
+    "gamma\n" +
+    "\n" +
+    "delta\n" +
+    quotes + " ]\n"
+
   let goodNestedBracketSpacingTest =
     """
 [ [ 1; 2 ]; [ 3; 4 ] ]
@@ -297,12 +316,18 @@ let bad = [
   /// Every line the literal spans is read but the last, the one the closing
   /// bracket sits on. The line it opens on is one of them: a separator left
   /// at the end of that line is the same mistake as one left further down,
-  /// and reading from the line after it passed over the sample below.
+  /// and reading from the line after it passed over the second sample below.
+  ///
+  /// A line with nothing on it holds no separator either. It answers -1, one
+  /// short of where a separator would have to start to be at the end of it,
+  /// and reading that as a separator asked for the removal of a blank line
+  /// that the string it stands in put there.
   [<TestMethod>]
   member _.``[ArrayOrList] List Separator Not In Line Ending Test``() =
     lint goodSeparatorNotInLineEndingTest
     lintAssert badSeparatorNotInLineEndingTest
     lintAssert badSeparatorOnOpeningLineTest
+    lint goodBlankLineInStringElementTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested List Bracket Spacing Test``() =

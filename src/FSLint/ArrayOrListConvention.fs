@@ -169,12 +169,17 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
 /// lines from one and `GetLineString` counts from zero, so the first of them
 /// is `StartLine - 1`: reading from `StartLine` would step past the line the
 /// literal opens on and miss a separator left at the end of it.
+///
+/// A line with no separator on it answers -1, which lands one past the end of
+/// an empty line and would read as a separator sitting there. An empty line
+/// is asked for explicitly, since one inside a multiline string is a line of
+/// the literal like any other and cannot be taken out.
 let checkTrailingSeparator src fRange eRange =
   if (fRange: range).StartLine <> fRange.EndLine then
     for line in fRange.StartLine - 1 .. fRange.EndLine - 2 do
       let lineString = (src: ISourceText).GetLineString line
       let lastSepaIdx = lineString.LastIndexOf ";"
-      if lastSepaIdx + 1 = lineString.Length then
+      if lastSepaIdx >= 0 && lastSepaIdx + 1 = lineString.Length then
         (Position.mkPos (line + 1) lastSepaIdx,
          Position.mkPos (line + 1) lineString.Length)
         ||> Range.mkRange ""

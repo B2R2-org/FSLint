@@ -24,6 +24,26 @@ let fn (param: int[]) = 10
 let fn (param: int []) = 10
 """
 
+  let goodRankTwoArrayTest =
+    """
+let fn (grid: int[,]) = 10
+"""
+
+  let goodRankThreeArrayTest =
+    """
+let fn (cube: int[,,]) = 10
+"""
+
+  let badRankTwoArraySpacingTest =
+    """
+let fn (grid: int [,]) = 10
+"""
+
+  let badRankTwoArrayInnerSpacingTest =
+    """
+let fn (grid: int[ ,]) = 10
+"""
+
   let goodTypeAnnotationIntTest =
     """
 let fn (p: int) = 10
@@ -406,6 +426,17 @@ let fn (opcode: 'Op when 'Op: enum< int >) = opcode
   member _.``Type Annotation Int Array Test``() =
     lint goodTypeAnnotationIntArrayTest
     lintAssert badTypeAnnotationIntArrayTest
+
+  /// A rank is written with a comma for every dimension past the first, so a
+  /// rank-two array closes one column further out than a rank-one array does,
+  /// and a rank-three array two. Measuring the close against two rather than
+  /// against the rank read every `int[,]` as an `int[ ]`.
+  [<TestMethod>]
+  member _.``Type Annotation Array Rank Test``() =
+    lint goodRankTwoArrayTest
+    lint goodRankThreeArrayTest
+    lintAssert badRankTwoArraySpacingTest
+    lintAssert badRankTwoArrayInnerSpacingTest
 
   [<TestMethod>]
   member _.``Type Annotation(int) Test``() =

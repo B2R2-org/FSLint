@@ -140,6 +140,43 @@ let bad = [
   3 ]
 """
 
+  let badSeparatorOnOpeningLineTest =
+    """
+[ 1;
+  2
+  3 ]
+"""
+
+  /// A list whose elements are multiline strings. The blank lines inside them
+  /// are lines of the literal like any other, but unlike a blank line written
+  /// between two elements they are what the string says and cannot be taken
+  /// out. Assembled by hand, since a triple-quoted string cannot hold the
+  /// quotes that open and close another.
+  let goodBlankLineInStringElementTest =
+    let quotes = "\"\"\""
+    "let texts =\n" +
+    "  [ " + quotes + "\n" +
+    "alpha\n" +
+    "\n" +
+    "beta\n" +
+    quotes + "\n" +
+    "    " + quotes + "\n" +
+    "gamma\n" +
+    "\n" +
+    "delta\n" +
+    quotes + " ]\n"
+
+  /// A multiline string element ending one of its lines in a semicolon. That
+  /// semicolon is a character the string spells rather than a separator the
+  /// literal wrote, and so is anything else standing on those lines.
+  let goodSeparatorInStringElementTest =
+    let quotes = "\"\"\""
+    "let texts =\n" +
+    "  [ " + quotes + "\n" +
+    "let x = 1;\n" +
+    "let y = 2\n" +
+    quotes + " ]\n"
+
   let goodNestedBracketSpacingTest =
     """
 [ [ 1; 2 ]; [ 3; 4 ] ]
@@ -287,10 +324,27 @@ let bad = [
     lint goodSingleElementPerLineTest
     lintAssert badSingleElementPerLineTest
 
+  /// Every line the literal spans is read but the last, the one the closing
+  /// bracket sits on. The line it opens on is one of them: a separator left
+  /// at the end of that line is the same mistake as one left further down,
+  /// and reading from the line after it passed over the second sample below.
+  ///
+  /// A line with nothing on it holds no separator either. It answers -1, one
+  /// short of where a separator would have to start to be at the end of it,
+  /// and reading that as a separator asked for the removal of a blank line
+  /// that the string it stands in put there.
+  ///
+  /// Nor is the text of an element the literal's to answer for. The lines a
+  /// multiline string spans are the string's own, and a semicolon ending one
+  /// of them is a character it spells; only a separator standing outside
+  /// every element was written by the literal.
   [<TestMethod>]
   member _.``[ArrayOrList] List Separator Not In Line Ending Test``() =
     lint goodSeparatorNotInLineEndingTest
     lintAssert badSeparatorNotInLineEndingTest
+    lintAssert badSeparatorOnOpeningLineTest
+    lint goodBlankLineInStringElementTest
+    lint goodSeparatorInStringElementTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested List Bracket Spacing Test``() =

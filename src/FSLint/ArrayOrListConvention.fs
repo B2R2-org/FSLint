@@ -163,9 +163,15 @@ let checkSingleElementPerLine src (elemRanges: Range list) =
 
 /// In single-line, the last element must not be followed by a semicolon.
 /// In multi-line, semicolons must not appear at all.
+///
+/// Every line the literal spans is read but the last, which is where the
+/// closing bracket sits and so cannot end in a separator. A range counts its
+/// lines from one and `GetLineString` counts from zero, so the first of them
+/// is `StartLine - 1`: reading from `StartLine` would step past the line the
+/// literal opens on and miss a separator left at the end of it.
 let checkTrailingSeparator src fRange eRange =
   if (fRange: range).StartLine <> fRange.EndLine then
-    for line in fRange.StartLine .. fRange.EndLine - 1 do
+    for line in fRange.StartLine - 1 .. fRange.EndLine - 2 do
       let lineString = (src: ISourceText).GetLineString line
       let lastSepaIdx = lineString.LastIndexOf ";"
       if lastSepaIdx + 1 = lineString.Length then

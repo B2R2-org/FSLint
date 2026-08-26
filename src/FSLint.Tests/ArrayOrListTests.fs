@@ -140,6 +140,13 @@ let bad = [
   3 ]
 """
 
+  let badSeparatorOnOpeningLineTest =
+    """
+[ 1;
+  2
+  3 ]
+"""
+
   let goodNestedBracketSpacingTest =
     """
 [ [ 1; 2 ]; [ 3; 4 ] ]
@@ -287,10 +294,15 @@ let bad = [
     lint goodSingleElementPerLineTest
     lintAssert badSingleElementPerLineTest
 
+  /// Every line the literal spans is read but the last, the one the closing
+  /// bracket sits on. The line it opens on is one of them: a separator left
+  /// at the end of that line is the same mistake as one left further down,
+  /// and reading from the line after it passed over the sample below.
   [<TestMethod>]
   member _.``[ArrayOrList] List Separator Not In Line Ending Test``() =
     lint goodSeparatorNotInLineEndingTest
     lintAssert badSeparatorNotInLineEndingTest
+    lintAssert badSeparatorOnOpeningLineTest
 
   [<TestMethod>]
   member _.``[ArrayOrList] Nested List Bracket Spacing Test``() =

@@ -100,14 +100,23 @@ let rec private checkTupleSpacing src path =
   | [] ->
     ()
 
+/// What stands between the element type and the end of the array type: the
+/// brackets, and any whitespace that has crept in around or inside them.
+///
+/// A rank is written with one bracket for each end and a comma between every
+/// two dimensions, so `int[]` closes two columns past the element type and
+/// `int[,]` three. Measuring against the rank rather than against two is what
+/// tells `int[,]` from `int[ ]`, which are the same width.
 and checkArray (src: ISourceText) = function
-  | SynType.Array(elementType = SynType.LongIdent(longDotId = id)
+  | SynType.Array(rank = rank
+                  elementType = SynType.LongIdent(longDotId = id)
                   range = range) ->
     let gap = Range.mkRange "" id.Range.End range.End
     let str = gap |> src.GetSubTextFromRange
-    if id.Range.EndColumn + 2 <> range.EndColumn && str.StartsWith ' ' then
+    let isPadded = id.Range.EndColumn + rank + 1 <> range.EndColumn
+    if isPadded && str.StartsWith ' ' then
       reportWarn src gap "Remove whitespace before '['"
-    elif id.Range.EndColumn + 2 <> range.EndColumn && str.StartsWith '[' then
+    elif isPadded && str.StartsWith '[' then
       reportWarn src gap "Remove whitespace in '[]'"
     else
       ()

@@ -45,6 +45,11 @@ module Diagnostics =
   /// other.
   let coveredApplications = new AsyncLocal<ResizeArray<range>>()
 
+  /// Functions already answered for by one standing above them. A function
+  /// written inside another is part of that one's body, so the two are not two
+  /// lengths but one, and the outermost is where the demand belongs.
+  let coveredFunctions = new AsyncLocal<ResizeArray<range>>()
+
   let setCurrentFile (path: string) = currentFilePath.Value <- path
 
   let setCurrentLintContext (context: LintContext option) =
@@ -56,6 +61,7 @@ module Diagnostics =
     applicationArgs.Value <- ResizeArray()
     matchScrutinees.Value <- ResizeArray()
     coveredChains.Value <- ResizeArray()
+    coveredFunctions.Value <- ResizeArray()
     coveredApplications.Value <- ResizeArray()
 
   /// True when the store holds the very stretch given.
@@ -76,6 +82,18 @@ module Diagnostics =
   let noteCoveredChain (range: range) = coveredChains.Value.Add range
 
   let isCoveredChain range = holds coveredChains range
+
+  let noteCoveredFunction (range: range) = coveredFunctions.Value.Add range
+
+  /// True when the stretch lies inside a function already noted, and so is
+  /// part of a body that has answered for its length already.
+  let isInsideCoveredFunction (range: range) =
+    match box coveredFunctions.Value with
+    | null ->
+      false
+    | _ ->
+      coveredFunctions.Value
+      |> Seq.exists (fun outer -> Range.rangeContainsRange outer range)
 
   let noteCoveredApplication (range: range) =
     coveredApplications.Value.Add range
@@ -198,6 +216,12 @@ module CustomReports =
     reportWarn src range "Remove unnecessary line break"
 
   let reportBindToLet src range = reportWarn src range "Bind to fit the line"
+
+  /// A function body run past the budget. What it is told is what to do about
+  /// it rather than how long it is: the length is a symptom, and the count is
+  /// already in the settings for anyone who wants it.
+  let reportLongFunction src range =
+    reportWarn src range "Split into smaller functions"
 
   /// A `when` clause still sharing the line its type parameters stand on.
   /// Sending it down takes the constraints below it along, so it is the only

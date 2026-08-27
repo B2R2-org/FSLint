@@ -397,51 +397,59 @@ and checkIdOpt src case = function
   | None ->
     failwith "?"
 
+and checkAbstractSlot src isDelegate slotSig =
+  let SynValSig(ident = id; synType = synType; trivia = trivia) = slotSig
+  let SynIdent(ident = id) = id
+  if isDelegate then
+    ()
+  else
+    TypeAnnotation.checkAbstractSpacing src
+                                        id
+                                        synType
+                                        trivia.LeadingKeyword.Range
+  TypeAnnotation.checkAbstractSlot src id synType
+  TypeAnnotation.checkTypeAbbrevWithAnnotation src synType
+  TypeAnnotation.checkAnonRecdType src synType
+  IdentifierConvention.check src PascalCase true id.idText id.idRange
+
+and checkAutoProperty src id typ expr trivia =
+  TypeAnnotation.checkMember src id typ
+  ClassMemberConvention.checkAutoPropertySpacing src id typ expr trivia
+  IdentifierConvention.check src PascalCase true id.idText id.idRange
+  checkExpression src expr
+
+and checkMemberDefn src isDelegate memberDefn =
+  match memberDefn with
+  | SynMemberDefn.Member(binding, _) ->
+    checkBinding src PascalCase binding
+  | SynMemberDefn.GetSetMember(get, set, _, _) ->
+    if get.IsSome then checkBinding src PascalCase get.Value else ()
+    if set.IsSome then checkBinding src PascalCase set.Value else ()
+  | SynMemberDefn.LetBindings(bindings = bindings) ->
+    checkBindings src LowerCamelCase bindings
+  | SynMemberDefn.AbstractSlot(slotSig = slotSig) ->
+    checkAbstractSlot src isDelegate slotSig
+  | SynMemberDefn.Interface(members = Some members) ->
+    ClassMemberConvention.checkMemberOrder src members
+    checkMemberDefns src members isDelegate
+  | SynMemberDefn.ValField(SynField(idOpt = idOpt), _) ->
+    checkIdOpt src PascalCase idOpt
+  | SynMemberDefn.AutoProperty(ident = id
+                               typeOpt = typ
+                               synExpr = expr
+                               trivia = trivia) ->
+    checkAutoProperty src id typ expr trivia
+  | SynMemberDefn.ImplicitInherit(inheritArgs = inheritArgs) ->
+    checkExpression src inheritArgs
+  | SynMemberDefn.ImplicitCtor _
+  | SynMemberDefn.Inherit _ ->
+    () (* no need to check this *)
+  | _ ->
+    failwith $"{nameof checkMemberDefn} TODO: {memberDefn}"
+
 and checkMemberDefns src members isDelegate =
   for memberDefn in members do
-    match memberDefn with
-    | SynMemberDefn.Member(binding, _) ->
-      checkBinding src PascalCase binding
-    | SynMemberDefn.GetSetMember(get, set, _, _) ->
-      if get.IsSome then checkBinding src PascalCase get.Value else ()
-      if set.IsSome then checkBinding src PascalCase set.Value else ()
-    | SynMemberDefn.LetBindings(bindings = bindings) ->
-      checkBindings src LowerCamelCase bindings
-    | SynMemberDefn.AbstractSlot(slotSig = SynValSig(ident = id
-                                                     synType = synType
-                                                     trivia = trivia)) ->
-      let SynIdent(ident = id) = id
-      if isDelegate then
-        ()
-      else
-        TypeAnnotation.checkAbstractSpacing src
-                                            id
-                                            synType
-                                            trivia.LeadingKeyword.Range
-      TypeAnnotation.checkAbstractSlot src id synType
-      TypeAnnotation.checkTypeAbbrevWithAnnotation src synType
-      TypeAnnotation.checkAnonRecdType src synType
-      IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynMemberDefn.Interface(members = Some members) ->
-      ClassMemberConvention.checkMemberOrder src members
-      checkMemberDefns src members isDelegate
-    | SynMemberDefn.ValField(SynField(idOpt = idOpt), _) ->
-      checkIdOpt src PascalCase idOpt
-    | SynMemberDefn.AutoProperty(ident = id
-                                 typeOpt = typ
-                                 synExpr = expr
-                                 trivia = trivia) ->
-      TypeAnnotation.checkMember src id typ
-      ClassMemberConvention.checkAutoPropertySpacing src id typ expr trivia
-      IdentifierConvention.check src PascalCase true id.idText id.idRange
-      checkExpression src expr
-    | SynMemberDefn.ImplicitInherit(inheritArgs = inheritArgs) ->
-      checkExpression src inheritArgs
-    | SynMemberDefn.ImplicitCtor _
-    | SynMemberDefn.Inherit _ ->
-      () (* no need to check this *)
-    | _ ->
-      failwith $"{nameof checkMemberDefns} TODO: {memberDefn}"
+    checkMemberDefn src isDelegate memberDefn
 
 and checkTypeDefnSimpleRepr src trivia = function
   | SynTypeDefnSimpleRepr.Union(unionCases = cases; range = range) ->
@@ -494,6 +502,54 @@ and checkTypeDefnRepr src repr trivia =
   | SynTypeDefnRepr.Exception repr ->
     checkExceptionDefnRepr src repr
 
+and checkImplicitCtor src repr trivia ctor =
+  ClassDefinition.checkIdentifierWithParen src [ ctor ]
+  match ctor with
+  | SynMemberDefn.ImplicitCtor(ctorArgs = ctorArgs
+                               selfIdentifier = selfIdentifier
+                               trivia = innerTriv)
+    when ctorArgs.IsParen ->
+    ParenConvention.checkPat src ctorArgs
+    if Option.isSome innerTriv.AsKeyword then
+      TypeConstructor.checkAsSpacing src
+        ctorArgs.Range
+        innerTriv.AsKeyword.Value
+        selfIdentifier.Value.idRange
+      TypeConstructor.checkEqualSpacing src
+        selfIdentifier.Value.idRange
+        (repr: SynTypeDefnRepr).Range
+        (trivia: SynTypeDefnTrivia).EqualsRange
+    else
+      TypeConstructor.checkEqualSpacing src
+        ctorArgs.Range
+        repr.Range
+        trivia.EqualsRange
+  | _ ->
+    ()
+
+/// What stands to the left of the `=` where the type has no constructor: the
+/// type parameters where they were written postfix, and the name otherwise.
+and checkTypeDefnEqual src info range repr trivia =
+  match info with
+  | SynComponentInfo(typeParams = Some typeParams)
+    when typeParams.IsPostfixList ->
+    TypeConstructor.checkEqualSpacing src
+      typeParams.Range
+      (repr: SynTypeDefnRepr).Range
+      (trivia: SynTypeDefnTrivia).EqualsRange
+  | _ ->
+    TypeConstructor.checkEqualSpacing src range repr.Range trivia.EqualsRange
+
+/// The name a type is known by. A parse recovered from a broken declaration
+/// can leave it out altogether, and there is then no identifier to hold to the
+/// convention. A unit of measure is not a type name either.
+and checkTypeDefnName src (lid: LongIdent) range attrs =
+  match List.tryLast lid with
+  | Some last when not (hasAttr "Measure" attrs) ->
+    IdentifierConvention.check src PascalCase true last.idText range
+  | _ ->
+    ()
+
 and checkTypeDefn src defn =
   let SynTypeDefn(typeInfo = info
                   typeRepr = repr
@@ -509,47 +565,10 @@ and checkTypeDefn src defn =
   else
     ()
   ClassDefinition.checkAttributesLineSpacing src attrs trivia
-  (* A parse recovered from a broken declaration can leave the name out
-     altogether, and there is then no identifier to hold to the convention. *)
-  match List.tryLast lid with
-  | Some last when not (hasAttr "Measure" attrs) ->
-    IdentifierConvention.check src PascalCase true last.idText range
-  | _ ->
-    ()
-  if Option.isSome implicitConstructor then
-    ClassDefinition.checkIdentifierWithParen src [ implicitConstructor.Value ]
-    match implicitConstructor with
-    | Some(SynMemberDefn.ImplicitCtor(ctorArgs = ctorArgs
-                                      selfIdentifier = selfIdentifier
-                                      trivia = innerTriv))
-      when ctorArgs.IsParen ->
-      ParenConvention.checkPat src ctorArgs
-      if Option.isSome innerTriv.AsKeyword then
-        TypeConstructor.checkAsSpacing src
-          ctorArgs.Range
-          innerTriv.AsKeyword.Value
-          selfIdentifier.Value.idRange
-        TypeConstructor.checkEqualSpacing src
-          selfIdentifier.Value.idRange
-          repr.Range
-          trivia.EqualsRange
-      else
-        TypeConstructor.checkEqualSpacing src
-          ctorArgs.Range
-            repr.Range
-          trivia.EqualsRange
-    | _ ->
-      ()
-  else
-    match info with
-    | SynComponentInfo(typeParams = Some typeParams)
-      when typeParams.IsPostfixList ->
-      TypeConstructor.checkEqualSpacing src
-        typeParams.Range
-        repr.Range
-        trivia.EqualsRange
-    | _ ->
-      TypeConstructor.checkEqualSpacing src range repr.Range trivia.EqualsRange
+  checkTypeDefnName src lid range attrs
+  match implicitConstructor with
+  | Some ctor -> checkImplicitCtor src repr trivia ctor
+  | None -> checkTypeDefnEqual src info range repr trivia
   checkTypeDefnRepr src repr trivia
   checkMemberDefns src members false
 
@@ -581,6 +600,7 @@ and checkBinding src case binding =
   else
     ()
   DeclarationConvention.checkComputationExprPlacement src binding
+  RowLengthConvention.check src binding
   TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo
   PatternMatchingConvention.checkBody src pat
@@ -626,63 +646,77 @@ and checkTypeDefnWithContext src context typeDefn =
   |> List.iter (AccessModifierConvention.checkTypeMember src memberScopeContext)
   checkTypeDefn src typeDefn
 
+/// A nested module: its attributes, its name, the access it declares, and
+/// then what it holds, read under the access it opened.
+and checkNestedModule src context info dls rg trivia =
+  let SynComponentInfo(attributes = attrs
+                       longId = lid
+                       accessibility = access) = info
+  match (trivia: SynModuleDeclNestedModuleTrivia).ModuleKeyword with
+  | Some keyword ->
+    DeclarationConvention.checkAttributesLineSpacing src attrs keyword
+  | None ->
+    ()
+  for id in lid do
+    IdentifierConvention.check src PascalCase true id.idText id.idRange
+  match access with
+  | Some _ when getAccessLevel access <= (context: CheckContext).ModuleAccess ->
+    { ModuleAccess = context.ModuleAccess
+      TypeAccess = None }
+    |> AccessModifierConvention.checkNestModule src access rg
+  | _ ->
+    ()
+  { ModuleAccess =
+      match access with
+      | Some _ -> getAccessLevel access
+      | None -> context.ModuleAccess }
+  |> checkDeclarationsWithContext src dls
+
+and checkModuleLet src (context: CheckContext) bindings =
+  let scopeContext =
+    { ModuleAccess = context.ModuleAccess
+      TypeAccess = None }
+  for binding in bindings do
+    AccessModifierConvention.checkLetBinding src binding scopeContext
+  FunctionBodyConvention.checkBindings src bindings
+  checkBindings src LowerCamelCase bindings
+
+and checkModuleTypes src context typeDefns range =
+  if List.length typeDefns > 1 then
+    ClassDefinition.checkNestedTypeDefns src range typeDefns
+  else
+    ()
+  ClassDefinition.checkLineBreak src range
+  for typeDefn in typeDefns do
+    checkTypeDefnWithContext src context typeDefn
+
+and checkDeclaration src context decl =
+  match decl with
+  | SynModuleDecl.ModuleAbbrev(ident = id) ->
+    IdentifierConvention.check src PascalCase true id.idText id.idRange
+  | SynModuleDecl.NestedModule(moduleInfo = info
+                               decls = dls
+                               range = rg
+                               trivia = trivia) ->
+    checkNestedModule src context info dls rg trivia
+  | SynModuleDecl.Let(_, bindings, _) ->
+    checkModuleLet src context bindings
+  | SynModuleDecl.Expr(expr = expr) ->
+    checkExpression src expr
+  | SynModuleDecl.Types(typeDefns, range) ->
+    checkModuleTypes src context typeDefns range
+  | SynModuleDecl.Open _
+  | SynModuleDecl.HashDirective _
+  | SynModuleDecl.Exception _
+  | SynModuleDecl.Attributes _ ->
+    () (* no need to check this *)
+  | _ ->
+    failwith $"{nameof checkDeclaration} TODO: {decl}"
+
 and checkDeclarationsWithContext src decls (context: CheckContext) =
   DeclarationConvention.checkSingleBlankLine src decls
   for decl in decls do
-    match decl with
-    | SynModuleDecl.ModuleAbbrev(ident = id) ->
-      IdentifierConvention.check src PascalCase true id.idText id.idRange
-    | SynModuleDecl.NestedModule(moduleInfo = info
-                                 decls = dls
-                                 range = rg
-                                 trivia = trivia) ->
-      let SynComponentInfo(attributes = attrs
-                           longId = lid
-                           accessibility = access) = info
-      if Option.isSome trivia.ModuleKeyword then
-        DeclarationConvention.checkAttributesLineSpacing src
-          attrs
-          trivia.ModuleKeyword.Value
-      else
-        ()
-      for id in lid do
-        IdentifierConvention.check src PascalCase true id.idText id.idRange
-      match access with
-      | Some _ when getAccessLevel access <= context.ModuleAccess ->
-        { ModuleAccess = context.ModuleAccess
-          TypeAccess = None }
-        |> AccessModifierConvention.checkNestModule src access rg
-      | _ ->
-        ()
-      { ModuleAccess =
-          match access with
-          | Some _ -> getAccessLevel access
-          | None -> context.ModuleAccess }
-      |> checkDeclarationsWithContext src dls
-    | SynModuleDecl.Let(_, bindings, _) ->
-      let scopeContext =
-        { ModuleAccess = context.ModuleAccess
-          TypeAccess = None }
-      for binding in bindings do
-        AccessModifierConvention.checkLetBinding src binding scopeContext
-      FunctionBodyConvention.checkBindings src bindings
-      checkBindings src LowerCamelCase bindings
-    | SynModuleDecl.Expr(expr = expr) ->
-      checkExpression src expr
-    | SynModuleDecl.Types(typeDefns, range) ->
-      if typeDefns.Length > 1 then
-        ClassDefinition.checkNestedTypeDefns src range typeDefns
-      else
-        ()
-      ClassDefinition.checkLineBreak src range
-      for typeDefn in typeDefns do checkTypeDefnWithContext src context typeDefn
-    | SynModuleDecl.Open _
-    | SynModuleDecl.HashDirective _
-    | SynModuleDecl.Exception _
-    | SynModuleDecl.Attributes _ ->
-      () (* no need to check this *)
-    | _ ->
-      failwith $"{nameof checkDeclarations} TODO: {decl}"
+    checkDeclaration src context decl
 
 and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
   checkDeclarationsWithContext src decls { ModuleAccess = Public }

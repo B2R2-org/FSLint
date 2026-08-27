@@ -328,11 +328,10 @@ let checkStaticMemberSpacing src (longId: LongIdent) typarDecls args idTrivia =
   | _ ->
     ()
 
-let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
-  let idRange =
-    if Option.isSome (typ: Option<SynType>) then typ.Value.Range else id.idRange
-  let equalRange = (trivia: SynMemberDefnAutoPropertyTrivia).EqualsRange
-  match trivia.LeadingKeyword with
+/// `member` and `val` are two words of one keyword and take one space
+/// between them.
+let private checkMemberValSpacing src trivia =
+  match (trivia: SynMemberDefnAutoPropertyTrivia).LeadingKeyword with
   | SynLeadingKeyword.MemberVal(mRange, vRange) ->
     if mRange.EndColumn + 1 <> vRange.StartColumn
       && mRange.EndLine = vRange.StartLine then
@@ -343,61 +342,77 @@ let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
       ()
   | _ ->
     ()
-  if Option.isSome equalRange then
-    if idRange.EndColumn + 1 <> equalRange.Value.StartColumn
-      && idRange.EndLine = equalRange.Value.StartLine then
-      Range.mkRange "" idRange.End equalRange.Value.Start
+
+/// The `=` of an automatic property takes one space on either side, as any
+/// other does. What stands before it is the type where one was written and
+/// the name where none was.
+let private checkAutoEqualSpacing src (idRange: range) equalRange expr =
+  match equalRange with
+  | Some(equals: range) ->
+    if idRange.EndColumn + 1 <> equals.StartColumn
+      && idRange.EndLine = equals.StartLine then
+      Range.mkRange "" idRange.End equals.Start
       |> reportEqaulBeforeSpacing src
-    elif equalRange.Value.EndColumn + 1 <> (expr: SynExpr).Range.StartColumn
-      && equalRange.Value.EndLine = expr.Range.StartLine then
-      Range.mkRange "" equalRange.Value.End expr.Range.Start
+    elif equals.EndColumn + 1 <> (expr: SynExpr).Range.StartColumn
+      && equals.EndLine = expr.Range.StartLine then
+      Range.mkRange "" equals.End expr.Range.Start
       |> reportEqaulAfterSpacing src
     else
       ()
-  else
+  | None ->
     ()
-  if Option.isSome trivia.WithKeyword then
-    if expr.Range.EndColumn + 1 <> trivia.WithKeyword.Value.StartColumn
-      && expr.Range.EndLine = trivia.WithKeyword.Value.StartLine then
-      Range.mkRange "" expr.Range.End trivia.WithKeyword.Value.Start
+
+/// `with` stands one space after the value and one space before the
+/// accessors it introduces.
+let private checkWithSpacing src (expr: SynExpr) trivia =
+  match (trivia: SynMemberDefnAutoPropertyTrivia).WithKeyword with
+  | None ->
+    ()
+  | Some withKeyword ->
+    if expr.Range.EndColumn + 1 <> withKeyword.StartColumn
+      && expr.Range.EndLine = withKeyword.StartLine then
+      Range.mkRange "" expr.Range.End withKeyword.Start
       |> fun range -> reportWarn src range "Use single whitespace before 'with'"
     else
       ()
-    if Option.isSome trivia.GetSetKeywords then
-      let getSetRange = trivia.GetSetKeywords.Value.Range
-      if trivia.WithKeyword.Value.EndLine = getSetRange.StartLine
-        && trivia.WithKeyword.Value.EndColumn + 1 <> getSetRange.StartColumn
-      then
-        Range.mkRange "" trivia.WithKeyword.Value.End getSetRange.Start
-        |> fun range ->
-          reportWarn src range "Use single whitespace after 'with'"
+    match trivia.GetSetKeywords with
+    | Some getSet when
+        withKeyword.EndLine = getSet.Range.StartLine
+        && withKeyword.EndColumn + 1 <> getSet.Range.StartColumn ->
+      Range.mkRange "" withKeyword.End getSet.Range.Start
+      |> fun range -> reportWarn src range "Use single whitespace after 'with'"
+    | _ ->
+      ()
+
+/// `get` and `set` are divided by `, ` where they share a line: the comma
+/// straight after the one and a single space before the other.
+let private checkGetSetSpacing (src: ISourceText) trivia =
+  match (trivia: SynMemberDefnAutoPropertyTrivia).GetSetKeywords with
+  | Some(GetSetKeywords.GetSet(getRange, setRange)) when
+      getRange.EndLine = setRange.StartLine ->
+    let gap = Range.mkRange "" getRange.End setRange.Start
+    let gapStr = gap |> src.GetSubTextFromRange
+    if gap.EndColumn - gap.StartColumn <> 2 then
+      if gapStr.StartsWith ',' then
+        (Position.mkPos gap.StartLine (getRange.EndColumn + 1), setRange.Start)
+        ||> Range.mkRange ""
+        |> reportCommaAfterSpacing src
       else
-        ()
-    else
-      ()
-  else
-    ()
-  match trivia.GetSetKeywords with
-  | Some(GetSetKeywords.GetSet(getRange, setRange)) ->
-    if getRange.EndLine <> setRange.StartLine then
-      ()
-    else
-      let gap = Range.mkRange "" getRange.End setRange.Start
-      let gapStr = gap |> src.GetSubTextFromRange
-      if gap.EndColumn - gap.StartColumn <> 2 then
-        if gapStr.StartsWith ',' then
-          (Position.mkPos gap.StartLine (getRange.EndColumn + 1),
-           setRange.Start)
-          ||> Range.mkRange ""
-          |> reportCommaAfterSpacing src
-        else
-          reportCommaFormat src gap
-      elif gap.EndColumn - gap.StartColumn = 2 && gapStr.EndsWith ',' then
         reportCommaFormat src gap
-      else
-        ()
+    elif gapStr.EndsWith ',' then
+      reportCommaFormat src gap
+    else
+      ()
   | _ ->
     ()
+
+let checkAutoPropertySpacing src (id: Ident) typ expr trivia =
+  let idRange =
+    if Option.isSome (typ: Option<SynType>) then typ.Value.Range else id.idRange
+  checkMemberValSpacing src trivia
+  checkAutoEqualSpacing src idRange trivia.EqualsRange expr
+  checkWithSpacing src expr trivia
+  checkGetSetSpacing src trivia
 
 let checkSelfIdentifierUsage (src: ISourceText) pat body =
   match pat with

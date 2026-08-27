@@ -50,6 +50,34 @@ type LspServer(rpc: JsonRpc) =
         ex.Message
       None
 
+  /// The URI a diagnostic is published under. A rooted path already opens
+  /// with a separator, so it takes two slashes rather than three.
+  let uriOf (path: string) =
+    let normalized = path.Replace("\\", "/")
+    if normalized[0] = '/' then sprintf "file://%s" normalized
+    else sprintf "file:///%s" normalized
+
+  /// A file written with CRLF is reported on its first row. Three places ask
+  /// for this and none of them varies it.
+  let crlfDiagnostic =
+    { Range = { Start = { Line = 0; Character = 0 }
+                End = { Line = 0; Character = 1 } }
+      Severity = 2
+      Source = "FSLint"
+      Message = "Use Unix line endings 'LF'" }
+
+  /// `strict` as a settings object carries it, if it carries it at all. The
+  /// client sends it under `initializationOptions` when it starts and under
+  /// `settings.fslint` when it changes, and both arrive as a token that may
+  /// be null at any step.
+  let strictOption (settings: JToken) =
+    if isNull settings then
+      None
+    else
+      match settings["strict"] with
+      | null -> None
+      | value -> Some(value.Value<bool>())
+
   let lintDocument (uri: string) (content: string): LspDiagnostic[] =
     try
       isStrict <- strictMode
@@ -87,11 +115,7 @@ type LspServer(rpc: JsonRpc) =
     try
       if File.Exists(filePath) then
         let content = File.ReadAllText(filePath)
-        let normalizedPath = filePath.Replace("\\", "/")
-        let uri =
-          if normalizedPath[0] = '/' then sprintf "file://%s" normalizedPath
-          else sprintf "file:///%s" normalizedPath
-        lintDocument uri content
+        lintDocument (uriOf filePath) content
       else
         eprintfn "[LINT] File not found: %s" filePath
         [||]
@@ -148,6 +172,77 @@ type LspServer(rpc: JsonRpc) =
       eprintfn "[LSP] STACK: %s" ex.StackTrace
       Task.FromResult(())
 
+  /// Every F# source under the root, less what is built rather than written.
+  let sourceFiles root =
+    Directory.EnumerateFiles(root, "*.fs", SearchOption.AllDirectories)
+    |> Seq.filter (fun path ->
+      not (path.Contains("node_modules") ||
+           path.Contains("bin") ||
+           path.Contains("obj") ||
+           path.Contains(".git")))
+    |> Seq.toArray
+
+  /// The project and solution files under the root. `.slnx` is the newer
+  /// spelling of a solution and both are looked for.
+  let projectFiles root =
+    [| yield! Directory.GetFiles(root, "*.fsproj", SearchOption.AllDirectories)
+       yield! Directory.GetFiles(root, "*.sln", SearchOption.AllDirectories)
+       yield! Directory.GetFiles(root, "*.slnx", SearchOption.AllDirectories) |]
+
+  /// Lints every file, a processor's worth at a time, publishing as it goes.
+  /// One file failing must not stop the rest, so each answers for itself.
+  let lintInBatches files =
+    async {
+      for batch in Array.chunkBySize Environment.ProcessorCount files do
+        let! _ =
+          batch
+          |> Array.map (fun file ->
+            async {
+              try
+                let diagnostics = lintFile file
+                do! publishDiagnostics (uriOf file) diagnostics
+                    |> Async.AwaitTask
+                return Ok file
+              with ex ->
+                eprintfn "[SCAN] ERROR processing %s: %s" file ex.Message
+                return Error(file, ex.Message)
+            })
+          |> Async.Parallel
+        do! Async.Sleep 10
+    }
+
+  /// A project or solution file written with CRLF is reported on its first
+  /// row. These are not F# sources and do not go through the linter.
+  let checkLineEndings files =
+    async {
+      for file in files do
+        try
+          let content = File.ReadAllText file
+          if content.Contains LineConvention.WindowsLineEnding then
+            do! publishDiagnostics (uriOf file) [| crlfDiagnostic |]
+                |> Async.AwaitTask
+          else
+            ()
+        with ex ->
+          eprintfn "[SCAN] ERROR checking CRLF in %s: %s" file ex.Message
+    }
+
+  /// True when the URI names a project or solution rather than a source. A
+  /// build file is not F# and answers only for its line endings.
+  let isProjectFile (uri: string) =
+    uri.EndsWith ".fsproj" || uri.EndsWith ".sln" || uri.EndsWith ".slnx"
+
+  /// Publishes what the content's line endings answer for: the one complaint
+  /// where they are CRLF, and nothing where they are not. Publishing nothing
+  /// is what clears a complaint the last save left behind.
+  let publishLineEndings uri (content: string) =
+    async {
+      if content.Contains LineConvention.WindowsLineEnding then
+        do! publishDiagnostics uri [| crlfDiagnostic |] |> Async.AwaitTask
+      else
+        do! publishDiagnostics uri [||] |> Async.AwaitTask
+    }
+
   let scanWorkspace () =
     async {
       match workspaceRoot with
@@ -155,72 +250,11 @@ type LspServer(rpc: JsonRpc) =
         eprintfn "[SCAN] ERROR: No workspace root set"
       | Some root ->
         try
-          if not (Directory.Exists(root)) then
+          if not (Directory.Exists root) then
             eprintfn "[SCAN] ERROR: Directory does not exist: %s" root
           else
-            let fsFiles =
-              Directory.EnumerateFiles(root,
-                                       "*.fs",
-                                       SearchOption.AllDirectories)
-              |> Seq.filter (fun path ->
-                not (path.Contains("node_modules") ||
-                     path.Contains("bin") ||
-                     path.Contains("obj") ||
-                     path.Contains(".git")))
-              |> Seq.toArray
-            let batchSize = Environment.ProcessorCount
-            let batches = fsFiles |> Array.chunkBySize batchSize
-            for batch in batches do
-              let! results =
-                batch
-                |> Array.map (fun file ->
-                  async {
-                    try
-                      let diagnostics = lintFile file
-                      let normalizedPath = file.Replace("\\", "/")
-                      let uri =
-                        if normalizedPath.[0] = '/' then
-                          sprintf "file://%s" normalizedPath
-                        else
-                          sprintf "file:///%s" normalizedPath
-                      do! publishDiagnostics uri diagnostics |> Async.AwaitTask
-                      return Ok file
-                    with ex ->
-                      eprintfn "[SCAN] ERROR processing %s: %s" file ex.Message
-                      return Error(file, ex.Message)
-                  })
-                |> Async.Parallel
-              do! Async.Sleep 10
-            let fsprojFiles =
-              Directory.GetFiles(root, "*.fsproj", SearchOption.AllDirectories)
-            let slnFiles =
-              let net9 = "*.sln"
-              let net10 = "*.slnx"
-              Array.append
-                (Directory.GetFiles(root, net9, SearchOption.AllDirectories))
-                (Directory.GetFiles(root, net10, SearchOption.AllDirectories))
-            let projectFiles = Array.append fsprojFiles slnFiles
-            for file in projectFiles do
-              try
-                let content = File.ReadAllText(file)
-                if content.Contains LineConvention.WindowsLineEnding then
-                  let diagnostic =
-                    { Range = { Start = { Line = 0; Character = 0 }
-                                End = { Line = 0; Character = 1 } }
-                      Severity = 2
-                      Source = "FSLint"
-                      Message = "Use Unix line endings 'LF'" }
-                  let normalizedPath = file.Replace("\\", "/")
-                  let uri =
-                    if normalizedPath.[0] = '/' then
-                      sprintf "file://%s" normalizedPath
-                    else
-                      sprintf "file:///%s" normalizedPath
-                  do! publishDiagnostics uri [| diagnostic |] |> Async.AwaitTask
-                else
-                  ()
-              with ex ->
-                eprintfn "[SCAN] ERROR checking CRLF in %s: %s" file ex.Message
+            do! sourceFiles root |> lintInBatches
+            do! projectFiles root |> checkLineEndings
             eprintfn "[SCAN] Completed workspace scan"
         with ex ->
           eprintfn "[SCAN] FATAL ERROR: %s" ex.Message
@@ -256,65 +290,67 @@ type LspServer(rpc: JsonRpc) =
     | None ->
       ()
 
-  [<JsonRpcMethod("initialize")>]
-  member _.Initialize(p: JToken) =
-    let setupWorkspace path =
-      workspaceRoot <- Some path
-      editorConfig <- Configuration.getSettings path
-      eprintfn "[LSP] EditorConfig loaded"
-      startEditorConfigWatcher path
-    let rootUri = p["rootUri"]
-    if not (isNull rootUri) then
-      let uriStr = rootUri.ToString()
-      try
-        let decodedUri = Uri.UnescapeDataString(uriStr)
-        let uri = Uri(decodedUri)
-        let localPath = uri.LocalPath
-        setupWorkspace localPath
-        workspaceRoot <- Some localPath
-      with ex ->
-        eprintfn "[LSP] ERROR parsing URI: %s - %s" uriStr ex.Message
-        let path =
-          if uriStr.StartsWith("file:///") then
-            let rawPath = uriStr.Substring(8)
-            let decoded = Uri.UnescapeDataString(rawPath)
-            if decoded.Length >= 3 && decoded.[0] = '/' && decoded.[2] = ':'
-            then decoded.Substring(1).Replace("/", "\\")
-            else decoded.Replace("/", "\\")
-          elif uriStr.StartsWith("file://") then
-            let rawPath = uriStr.Substring(7)
-            Uri.UnescapeDataString(rawPath).Replace("/", "\\")
-          else
-            Uri.UnescapeDataString(uriStr)
-        eprintfn "[LSP] Workspace root (fallback): %s" path
-        setupWorkspace path
-    else
-      eprintfn "[LSP] WARNING: No rootUri"
-      editorConfig <- Configuration.defaultSettings
-    let initOptions = p["initializationOptions"]
-    if not (isNull initOptions) then
-      let strictVal = initOptions["strict"]
-      if not (isNull strictVal) then
-        strictMode <- strictVal.Value<bool>()
-        isStrict <- strictMode
-        eprintfn "[LSP] Strict mode: %b" strictMode
-      else
-        ()
-    else
-      ()
+  /// Takes the workspace as the root the client named.
+  let openWorkspace path =
+    workspaceRoot <- Some path
+    editorConfig <- Configuration.getSettings path
+    eprintfn "[LSP] EditorConfig loaded"
+    startEditorConfigWatcher path
+
+  /// The local path a `rootUri` names.
+  ///
+  /// One the framework refuses is read by hand: the scheme comes off, the
+  /// escapes are undone, and a Windows drive letter loses the separator that
+  /// `file:///C:/...` puts in front of it.
+  let pathOfRootUri (uriStr: string) =
+    try
+      Uri(Uri.UnescapeDataString uriStr).LocalPath
+    with ex ->
+      eprintfn "[LSP] ERROR parsing URI: %s - %s" uriStr ex.Message
+      let path =
+        if uriStr.StartsWith "file:///" then
+          let decoded = Uri.UnescapeDataString(uriStr.Substring 8)
+          if decoded.Length >= 3 && decoded[0] = '/' && decoded[2] = ':'
+          then decoded.Substring(1).Replace("/", "\\")
+          else decoded.Replace("/", "\\")
+        elif uriStr.StartsWith "file://" then
+          Uri.UnescapeDataString(uriStr.Substring 7).Replace("/", "\\")
+        else
+          Uri.UnescapeDataString uriStr
+      eprintfn "[LSP] Workspace root (fallback): %s" path
+      path
+
+  /// What the server tells the client it can do.
+  let capabilities () =
     let sync =
       JObject(JProperty("openClose", true),
               JProperty("change", 0),
               JProperty("save", JObject(JProperty("includeText", true))))
-    let workspace = JObject(JProperty("configuration", true))
-    let capabilities =
-      JObject(JProperty("textDocumentSync", sync),
-              JProperty("workspace", workspace))
-    let serverInfo =
-      JObject(JProperty("name", "FSLint Language Server"),
-              JProperty("version", "1.0.0"))
-    JObject(JProperty("capabilities", capabilities),
-            JProperty("serverInfo", serverInfo))
+    JObject(JProperty("textDocumentSync", sync),
+            JProperty("workspace", JObject(JProperty("configuration", true))))
+
+  /// What the server calls itself.
+  let serverInfo () =
+    JObject(JProperty("name", "FSLint Language Server"),
+            JProperty("version", "1.0.0"))
+
+  [<JsonRpcMethod("initialize")>]
+  member _.Initialize(p: JToken) =
+    match p["rootUri"] with
+    | null ->
+      eprintfn "[LSP] WARNING: No rootUri"
+      editorConfig <- Configuration.defaultSettings
+    | rootUri ->
+      openWorkspace (pathOfRootUri (rootUri.ToString()))
+    match strictOption p["initializationOptions"] with
+    | Some value ->
+      strictMode <- value
+      isStrict <- value
+      eprintfn "[LSP] Strict mode: %b" value
+    | None ->
+      ()
+    JObject(JProperty("capabilities", capabilities ()),
+            JProperty("serverInfo", serverInfo ()))
 
   [<JsonRpcMethod("initialized")>]
   member _.Initialized(p: JToken) =
@@ -333,25 +369,17 @@ type LspServer(rpc: JsonRpc) =
   member _.DidChangeConfiguration(p: JToken) =
     task {
       try
-        let settings = p["settings"]
-        if not (isNull settings) then
-          let fslint = settings["fslint"]
-          if not (isNull fslint) then
-            let strictVal = fslint["strict"]
-            if not (isNull strictVal) then
-              let newStrict = strictVal.Value<bool>()
-              if newStrict <> strictMode then
-                strictMode <- newStrict
-                isStrict <- newStrict
-                eprintfn "[LSP] Strict mode changed to: %b" newStrict
-                scanWorkspace () |> Async.Start
-              else
-                ()
-            else
-              ()
-          else
-            ()
-        else
+        let fslint =
+          match p["settings"] with
+          | null -> null
+          | settings -> settings["fslint"]
+        match strictOption fslint with
+        | Some value when value <> strictMode ->
+          strictMode <- value
+          isStrict <- value
+          eprintfn "[LSP] Strict mode changed to: %b" value
+          scanWorkspace () |> Async.Start
+        | _ ->
           ()
       with ex ->
         eprintfn "[LSP] ERROR in didChangeConfiguration: %s" ex.Message
@@ -376,46 +404,22 @@ type LspServer(rpc: JsonRpc) =
     async {
       try
         let uri = p["textDocument"].["uri"].ToString()
-        if uri.EndsWith(".fsproj") ||
-          uri.EndsWith(".sln") ||
-          uri.EndsWith(".slnx") then
-          match p["text"] with
+        let text = p["text"]
+        if isProjectFile uri then
+          match text with
           | null ->
             try
-              let filePath = Uri(uri).LocalPath
-              let content = File.ReadAllText(filePath)
-              if content.Contains LineConvention.WindowsLineEnding then
-                let diagnostic =
-                  { Range = { Start = { Line = 0; Character = 0 }
-                              End = { Line = 0; Character = 1 } }
-                    Severity = 2
-                    Source = "FSLint"
-                    Message = "Use Unix line endings 'LF'" }
-                do! publishDiagnostics uri [| diagnostic |]
-                    |> Async.AwaitTask
-              else
-                do! publishDiagnostics uri [||] |> Async.AwaitTask
+              do! publishLineEndings uri (File.ReadAllText(Uri(uri).LocalPath))
             with ex ->
               eprintfn "[LSP] ERROR reading file in didSave: %s" ex.Message
           | text ->
-            let content = text.ToString()
-            if content.Contains LineConvention.WindowsLineEnding then
-              let diagnostic =
-                { Range = { Start = { Line = 0; Character = 0 }
-                            End = { Line = 0; Character = 1 } }
-                  Severity = 2
-                  Source = "FSLint"
-                  Message = "Use Unix line endings 'LF'" }
-              do! publishDiagnostics uri [| diagnostic |] |> Async.AwaitTask
-            else
-              do! publishDiagnostics uri [||] |> Async.AwaitTask
+            do! publishLineEndings uri (text.ToString())
         else
-          match p["text"] with
+          match text with
           | null ->
             ()
           | text ->
-            let content = text.ToString()
-            let diagnostics = lintDocument uri content
+            let diagnostics = lintDocument uri (text.ToString())
             do! publishDiagnostics uri diagnostics |> Async.AwaitTask
       with ex ->
         eprintfn "[LSP] ERROR in didSave: %s" ex.Message

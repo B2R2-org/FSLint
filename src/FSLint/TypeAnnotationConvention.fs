@@ -202,77 +202,77 @@ let getFieldDeclaration (src: ISourceText) (field: SynField) =
   | None ->
     ""
 
+/// What follows a field on its row, up to two characters of it. A row with
+/// nothing after the field gives back what little there is.
+let private tailAfter (src: ISourceText) (front: range) =
+  let frontStr = src.GetLineString(front.StartLine - 1)
+  let stop =
+    if frontStr.Length - front.EndColumn > 1 then front.EndColumn + 2
+    else frontStr.Length
+  Range.mkRange "" front.End (Position.mkPos front.StartLine stop)
+  |> src.GetSubTextFromRange
+
+/// Two fields sharing a row are divided by ` * `, and a gap wider than that
+/// is reported on whichever side carries the extra spaces.
+let private checkStarOnRow src (front: range) (back: range) (str: string) =
+  let starIndex = str.IndexOf '*'
+  let before = str.Substring(0, starIndex)
+  let after = str.Substring(starIndex + 1)
+  let leftSpaces = before.Length - before.TrimEnd().Length
+  let rightSpaces = after.Length - after.TrimStart().Length
+  if leftSpaces = 1 && rightSpaces = 1 then
+    ()
+  elif leftSpaces > rightSpaces then
+    Range.mkRange ""
+      front.End
+      (Position.mkPos front.StartLine (front.EndColumn + leftSpaces))
+    |> reportConsecutiveSpacing src
+  else
+    Range.mkRange ""
+      (Position.mkPos back.StartLine (back.StartColumn - rightSpaces))
+      back.Start
+    |> reportConsecutiveSpacing src
+
+/// A star ending a row takes a space before it and nothing after, since the
+/// break stands where the space would have been.
+let private checkStarAtRowEnd src (front: range) (str: string) tail =
+  if (tail: string).StartsWith "*" then
+    Range.mkRange ""
+      front.End
+      (Position.mkPos front.StartLine (front.EndColumn + 1))
+    |> fun range -> reportWarn src range "Use ' *'"
+  elif tail <> " *" && tail <> "" then
+    let endIdx = (str: string).TrimEnd().IndexOf '*' + front.EndColumn
+    Range.mkRange "" front.End (Position.mkPos front.StartLine endIdx)
+    |> fun range -> reportWarn src range "Use ' *'"
+  else
+    ()
+
+/// The gap between two fields, and the star that has to stand in it.
+let private checkFieldGap (src: ISourceText) (front: range) (back: range) =
+  let str =
+    Range.mkRange "" front.End back.Start |> src.GetSubTextFromRange
+  if front.StartLine = back.StartLine then
+    if back.StartColumn - front.EndColumn > 3 then
+      checkStarOnRow src front back str
+    elif str.Contains " * " |> not then
+      Range.mkRange "" front.End back.Start |> reportStarFormat src
+    else
+      ()
+  elif front.EndLine = back.StartLine && str.Contains "* " |> not then
+    Range.mkRange "" front.End back.Start |> reportStarFormat src
+  else
+    checkStarAtRowEnd src front str (tailAfter src front)
+
 /// The gap between two fields is read out of the source text by column, so a
-/// range landing past the end of a line throws rather than answering. What is
+/// range landing past the end of a row throws rather than answering. What is
 /// guarded here is that; a report raised from inside is let through.
 let private checkFieldsWidth (src: ISourceText) (fields: SynField list) =
   try
     fields
     |> List.map (fun field -> field.Range)
     |> List.pairwise
-    |> List.iter (fun (front, back) ->
-      Range.mkRange "" front.End back.Start
-      |> fun range ->
-        let str = src.GetSubTextFromRange range
-        let lastElemToDoubleCol =
-          let frontStr = src.GetLineString(front.StartLine - 1)
-          if frontStr.Length - front.EndColumn > 1 then
-            Range.mkRange ""
-              front.End
-              (Position.mkPos front.StartLine (front.EndColumn + 2))
-            |> src.GetSubTextFromRange
-          else
-            Range.mkRange ""
-              front.End
-              (Position.mkPos front.StartLine frontStr.Length)
-            |> src.GetSubTextFromRange
-        if front.StartLine = back.StartLine
-          && back.StartColumn - front.EndColumn > 3
-        then
-          let starIndex = str.IndexOf('*')
-          let before = str.Substring(0, starIndex)
-          let after = str.Substring(starIndex + 1)
-          let leftSpaces = before.Length - before.TrimEnd().Length
-          let rightSpaces = after.Length - after.TrimStart().Length
-          if leftSpaces = 1 && rightSpaces = 1 then
-            ()
-          elif leftSpaces > rightSpaces then
-            Range.mkRange ""
-              front.End
-              (Position.mkPos front.StartLine (front.EndColumn + leftSpaces))
-            |> reportConsecutiveSpacing src
-          else
-            Range.mkRange ""
-              (Position.mkPos back.StartLine (back.StartColumn - rightSpaces))
-              back.Start
-            |> reportConsecutiveSpacing src
-        elif front.StartLine = back.StartLine &&
-          str.Contains " * " |> not
-          && front.EndLine = back.StartLine
-        then
-          Range.mkRange "" front.End back.Start |> reportStarFormat src
-        elif front.StartLine <> back.StartLine &&
-          str.Contains "* " |> not
-          && front.EndLine = back.StartLine
-        then
-          Range.mkRange "" front.End back.Start |> reportStarFormat src
-        elif front.StartLine <> back.StartLine
-          && lastElemToDoubleCol.StartsWith "*"
-        then
-          Range.mkRange ""
-            front.End
-            (Position.mkPos front.StartLine (front.EndColumn + 1))
-          |> fun range -> reportWarn src range "Use ' *'"
-        elif front.StartLine <> back.StartLine
-          && lastElemToDoubleCol <> " *" &&
-          lastElemToDoubleCol <> ""
-        then
-          let endIdx = str.TrimEnd().IndexOf '*' + front.EndColumn
-          Range.mkRange "" front.End (Position.mkPos front.StartLine endIdx)
-          |> fun range -> reportWarn src range "Use ' *'"
-        else
-          ()
-    )
+    |> List.iter (fun (front, back) -> checkFieldGap src front back)
   with
   | LintException _ ->
     (* A report is not a failure. Without a lint context `reportWarn` raises

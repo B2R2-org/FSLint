@@ -52,6 +52,7 @@
     <Compile Include="DeclarationConvention.fs" />
     <Compile Include="FunctionBodyConvention.fs" />
     <Compile Include="IfThenElseConvention.fs" />
+    <Compile Include="RowLengthConvention.fs" />
     <Compile Include="ILintable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

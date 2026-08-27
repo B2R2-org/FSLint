@@ -2,6 +2,30 @@
 
 All notable changes to the FSLint extension.
 
+## 1.2.0
+
+- Added a row-length rule for strict mode: a binding body may run to 42 rows,
+  and past that the binding is asked to be split. The report names the binding
+  rather than underlining the whole of its body.
+- Exempted a body built around a long `match` or loop: one running past 35 rows
+  takes its length from how many cases or steps there are, so splitting the
+  body around it leaves it no shorter. A shorter one is a branch taken in
+  passing and rescues nothing.
+- Exempted a body that is one piece of data written out -- a record, a
+  collection, a `seq`, a multiline string, or whatever shapes one on the way --
+  and a test, which is one scenario and means nothing cut in three.
+- Counted a binding written inside another once, in the body holding it, so
+  that the outermost is where the splitting starts.
+- Added `Split into smaller functions`.
+- Fixed rank-N array annotations being read as whitespace: `int[,]` was
+  reported as an `int[ ]`.
+- Fixed blank lines inside a multiline list or array being reported as trailing
+  separators.
+- Fixed a semicolon inside an element's own text -- a line of a multiline
+  string, say -- being reported as the literal's separator.
+- Fixed a separator left at the end of the line a literal opens on going
+  unreported.
+
 ## 1.1.9
 
 - Removed the 80-column line length check.

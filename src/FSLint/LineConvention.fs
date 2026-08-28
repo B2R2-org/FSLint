@@ -71,7 +71,7 @@ let check src (txt: string) =
   let maxLineLength = getCurrentMaxLineLength ()
   let eachRow reader =
     rowsOf txt |> Array.iteri (fun i line -> reader (i + 1) line)
-  match hasPassed, currentLintContext.Value with
+  match hasPassed, currentLintContext () with
   | Ok(), Some context ->
     eachRow (recordRow context.Source maxLineLength)
   | Ok(), None ->

@@ -198,6 +198,16 @@ let fn () =
             anotherRatherLongArgumentNameThatAlsoGoesOnForAWhileYet)
 """
 
+/// Where a gap beside a comma is reported matters as much as whether it is.
+/// The run of comments in the gap belongs to the element, so what is left to
+/// point at is the space between the run's far edge and the comma.
+module CommaCommentRunSamples =
+
+  let badCommaRunTest =
+    """
+let fn () = (1 (* a *) (* b *) , 2)
+"""
+
 [<TestClass>]
 type TupleTests() =
 
@@ -389,3 +399,15 @@ match bad with
       TuplePlacementSamples.badBlockOverBudgetTest
     lintAssertMsg "Bind to fit the line"
       TuplePlacementSamples.badBlockNeighbourBlockTest
+
+  /// Pointing at the end of the first comment instead of the last puts the
+  /// caret inside the run, on text the author cannot change to satisfy it.
+  [<TestMethod>]
+  member _.``[Tuple] Comma Comment Run Test``() =
+    let errors = lintErrors CommaCommentRunSamples.badCommaRunTest
+    Assert.AreEqual<int>(1, errors.Length)
+    let error = errors.Head
+    StringAssert.Contains(error.Message, "Remove whitespace before ','")
+    (* 7 is the width of `(* b *)`, the last comment of the run. *)
+    let runEnd = error.LineContent.IndexOf "(* b *)" + 7
+    Assert.AreEqual<int>(runEnd, error.Range.StartColumn)

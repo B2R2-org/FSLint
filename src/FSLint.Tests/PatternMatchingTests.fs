@@ -100,6 +100,26 @@ let fn c bin =
     aRatherLongFunctionNameHere c bin |> anotherRatherLongFunctionNameHere
 """
 
+/// The cons operator reads the space beside it the way a keyword does, and a
+/// run of comments in front of it belongs to the pattern on its left.
+module ConsCommentRunSamples =
+
+  let goodConsRunTest =
+    """
+let fn xs =
+  match xs with
+  | y (* a *) (* b *) :: _ -> y
+  | _ -> 0
+"""
+
+  let badConsRunTest =
+    """
+let fn xs =
+  match xs with
+  | y (* a *) (* b *)  :: _ -> y
+  | _ -> 0
+"""
+
 [<TestClass>]
 type PatternMatchingTests() =
 
@@ -238,3 +258,12 @@ match x with
     lint GuardLayoutSamples.goodParenGroupGuardTest
     lintAssertMsg "Use consistent line breaks"
       GuardLayoutSamples.badMixedGuardTest
+
+  /// Reading only the first comment of the run leaves the operator looking a
+  /// run's width from the pattern, and the clause is reported for a space its
+  /// author never wrote.
+  [<TestMethod>]
+  member _.``[PatternMatching] Cons Comment Run Test``() =
+    lint ConsCommentRunSamples.goodConsRunTest
+    lintAssertMsg "Use single whitespace before ':'"
+      ConsCommentRunSamples.badConsRunTest

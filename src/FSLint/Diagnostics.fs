@@ -1,132 +1,166 @@
 namespace B2R2.FSLint
 
 open System
+open System.Collections.Generic
 open System.IO
 open System.Threading
 open FSharp.Compiler.Text
+open FSharp.Compiler.SyntaxTrivia
 
 exception LintException of string
 
 module Diagnostics =
   let private outputLock = obj ()
 
-  let currentFilePath = new AsyncLocal<string>()
+  /// The state of the file being read. One `AsyncLocal` and not one per thing
+  /// kept, for the reason `FileState` gives.
+  let private perFile = AsyncLocal<FileState>()
 
-  let cliEditorConfig = new AsyncLocal<Configuration.EditorConfig>()
+  let private emptyState () =
+    { Path = null
+      EditorConfig = Configuration.defaultSettings
+      Context = None
+      DirectiveLines = []
+      Trivia = Unchecked.defaultof<ParsedInputTrivia>
+      Comments = null
+      Directives = null
+      ApplicationArgs = null
+      MatchScrutinees = null
+      CoveredChains = null
+      CoveredApplications = null
+      CoveredFunctions = null
+      LastCovered = -1 }
 
-  let currentLintContext = new AsyncLocal<LintContext option>()
+  /// What a task holding no state of its own reads. Nothing writes here: a
+  /// write installs a clone, so this stays as empty as it was made.
+  let private blank = emptyState ()
 
-  /// The lines the conditional-compilation directives of the file sit on.
-  let directiveLines = new AsyncLocal<int list>()
+  /// The state of the file this task is reading.
+  let internal current () =
+    let state = perFile.Value
+    if obj.ReferenceEquals(state, null) then blank else state
 
-  /// The expressions standing as the argument of an application. A comma list
-  /// there is a parameter list, which nothing else in the tree tells apart
-  /// from a tuple of data, and the two are not laid out the same way: a
-  /// parameter list too wide for its line breaks at every comma, while a
-  /// tuple of data is asked to be named instead.
-  let applicationArgs = new AsyncLocal<ResizeArray<range>>()
+  /// Hands this task a state of its own, leaving the state another task reads
+  /// its own file against untouched.
+  let private install (state: FileState) = perFile.Value <- state
 
-  /// The expressions a match is taken on. A comma list there pairs the things
-  /// being tested rather than building a value, so it is never asked for a
-  /// name; what it answers for is only that its gaps agree.
-  let matchScrutinees = new AsyncLocal<ResizeArray<range>>()
-
-  /// Sub-chains already answered for by a longer chain above them. An operator
-  /// chain nests to the left, so every prefix of it is an expression in its
-  /// own right and would otherwise be judged again on its own; a short prefix
-  /// of a long chain looks as though it could close up when the chain holding
-  /// it cannot.
-  let coveredChains = new AsyncLocal<ResizeArray<range>>()
-
-  /// Applications already answered for by a longer one above them. A curried
-  /// application nests to the left in the same way a chain does, so `f a b` is
-  /// an expression of its own inside `f a b c` and would be judged twice. It is
-  /// kept apart from the chains above so that noting one can never silence the
-  /// other.
-  let coveredApplications = new AsyncLocal<ResizeArray<range>>()
-
-  /// Functions already answered for by one standing above them. A function
-  /// written inside another is part of that one's body, so the two are not two
-  /// lengths but one, and the outermost is where the demand belongs.
-  let coveredFunctions = new AsyncLocal<ResizeArray<range>>()
-
-  let setCurrentFile (path: string) = currentFilePath.Value <- path
+  let setCurrentFile (path: string) =
+    install { current () with Path = path }
 
   let setCurrentLintContext (context: LintContext option) =
-    currentLintContext.Value <- context
+    install { current () with Context = context }
 
-  let setDirectiveLines (lines: int list) = directiveLines.Value <- lines
+  let currentLintContext () = (current ()).Context
+
+  let setDirectiveLines (lines: int list) =
+    install { current () with DirectiveLines = lines }
+
+  /// Puts the trivia of the file, and the buckets read from it, in reach of
+  /// the searches over them.
+  let internal installTrivia trivia comments directives =
+    install { current () with
+                Trivia = trivia
+                Comments = comments
+                Directives = directives }
+
+  /// Puts them out of reach again once the file has been read.
+  let internal dropTrivia () =
+    install { current () with
+                Trivia = Unchecked.defaultof<ParsedInputTrivia>
+                Comments = null
+                Directives = null }
+
+  let internal currentTrivia () = (current ()).Trivia
+
+  let internal commentBuckets () = (current ()).Comments
+
+  let internal directiveBuckets () = (current ()).Directives
 
   let beginReadings () =
-    applicationArgs.Value <- ResizeArray()
-    matchScrutinees.Value <- ResizeArray()
-    coveredChains.Value <- ResizeArray()
-    coveredFunctions.Value <- ResizeArray()
-    coveredApplications.Value <- ResizeArray()
+    install { current () with
+                ApplicationArgs = HashSet()
+                MatchScrutinees = HashSet()
+                CoveredChains = HashSet()
+                CoveredApplications = HashSet()
+                CoveredFunctions = ResizeArray()
+                LastCovered = -1 }
+
+  /// What identifies a stretch, so that a store can be keyed by it.
+  let inline private keyOf (range: range) =
+    RangeKey(range.StartLine, range.StartColumn, range.EndLine, range.EndColumn)
 
   /// True when the store holds the very stretch given.
-  let private holds (store: AsyncLocal<ResizeArray<range>>) (range: range) =
-    match box store.Value with
-    | null ->
-      false
-    | _ ->
-      store.Value
-      |> Seq.exists (fun (seen: range) ->
-        seen.StartLine = range.StartLine && seen.StartColumn = range.StartColumn
-        && seen.EndLine = range.EndLine && seen.EndColumn = range.EndColumn)
+  let private holds (store: HashSet<RangeKey>) (range: range) =
+    not (isNull store) && store.Contains(keyOf range)
 
-  let noteApplicationArg (range: range) = applicationArgs.Value.Add range
+  let noteApplicationArg (range: range) =
+    (current ()).ApplicationArgs.Add(keyOf range) |> ignore
 
-  let noteMatchScrutinee (range: range) = matchScrutinees.Value.Add range
+  let noteMatchScrutinee (range: range) =
+    (current ()).MatchScrutinees.Add(keyOf range) |> ignore
 
-  let noteCoveredChain (range: range) = coveredChains.Value.Add range
+  let noteCoveredChain (range: range) =
+    (current ()).CoveredChains.Add(keyOf range) |> ignore
 
-  let isCoveredChain range = holds coveredChains range
+  let isCoveredChain range = holds (current ()).CoveredChains range
 
-  let noteCoveredFunction (range: range) = coveredFunctions.Value.Add range
+  let noteCoveredFunction (range: range) =
+    (current ()).CoveredFunctions.Add range
 
   /// True when the stretch lies inside a function already noted, and so is
-  /// part of a body that has answered for its length already.
+  /// part of a body that has answered for its length already. The one that
+  /// answered last is asked first: a walk goes down a branch before it goes
+  /// along, so the answer is nearly always the same as the one before it.
   let isInsideCoveredFunction (range: range) =
-    match box coveredFunctions.Value with
+    let state = current ()
+    match state.CoveredFunctions with
     | null ->
       false
-    | _ ->
-      coveredFunctions.Value
-      |> Seq.exists (fun outer -> Range.rangeContainsRange outer range)
+    | outers ->
+      let covers index = Range.rangeContainsRange outers[index] range
+      if state.LastCovered >= 0 && covers state.LastCovered then
+        true
+      else
+        let mutable index = 0
+        let mutable found = false
+        while not found && index < outers.Count do
+          if covers index then
+            state.LastCovered <- index
+            found <- true
+          else
+            index <- index + 1
+        found
 
   let noteCoveredApplication (range: range) =
-    coveredApplications.Value.Add range
+    (current ()).CoveredApplications.Add(keyOf range) |> ignore
 
-  let isCoveredApplication range = holds coveredApplications range
+  let isCoveredApplication range = holds (current ()).CoveredApplications range
 
   /// True when the stretch is an application's argument, and so a parameter
   /// list rather than a tuple standing on its own.
-  let isApplicationArg range = holds applicationArgs range
+  let isApplicationArg range = holds (current ()).ApplicationArgs range
 
   /// True when the stretch is what a match is taken on. Its commas pair the
   /// things being tested rather than build a value, so there is no tuple there
   /// to be given a name.
-  let isMatchScrutinee range = holds matchScrutinees range
+  let isMatchScrutinee range = holds (current ()).MatchScrutinees range
 
   /// True when a directive stands between the two lines, so that what they
   /// hold is not one stretch of code but a different stretch per build. A
   /// group reaching across such a line is read differently in each, and the
   /// two readings can want opposite things of it.
   let straddlesDirective (startLine: int) (endLine: int) =
-    match box directiveLines.Value with
-    | null ->
-      false
-    | _ ->
-      directiveLines.Value
-      |> List.exists (fun line -> line > startLine && line < endLine)
+    (current ()).DirectiveLines
+    |> List.exists (fun line -> line > startLine && line < endLine)
 
-  let setCliEditorConfig config = cliEditorConfig.Value <- config
+  let setCliEditorConfig config =
+    install { current () with EditorConfig = config }
 
   let getCurrentMaxLineLength () =
-    match currentLintContext.Value with
+    let state = current ()
+    match state.Context with
     | Some ctx -> ctx.EditorConfig.MaxLineLength
-    | None -> cliEditorConfig.Value.MaxLineLength
+    | None -> state.EditorConfig.MaxLineLength
 
   let exitWithError (message: string) =
     Console.WriteLine message
@@ -135,7 +169,7 @@ module Diagnostics =
   let warn (message: string) = Console.Error.WriteLine message
 
   let raiseWithWarn (message: string) =
-    match currentLintContext.Value with
+    match currentLintContext () with
     | Some context ->
       let dummyRange =
         Range.mkRange "" (Position.mkPos 1 0) (Position.mkPos 1 0)
@@ -149,7 +183,7 @@ module Diagnostics =
       raise <| LintException message
 
   let reportWarn (src: ISourceText) (range: range) message =
-    match currentLintContext.Value with
+    match currentLintContext () with
     | Some context ->
       let isDuplicate =
         context.Errors
@@ -171,7 +205,7 @@ module Diagnostics =
     | None ->
       lock outputLock (fun () ->
         let fileName =
-          let path = currentFilePath.Value
+          let path = (current ()).Path
           if isNull path || String.IsNullOrEmpty path then ""
           else Path.GetFileName path
         if String.IsNullOrEmpty fileName then

@@ -10,7 +10,7 @@ open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.SyntaxTrivia
 
-let asyncLocal = AsyncLocal<ParsedInputTrivia>()
+open Diagnostics
 
 let mutable isStrict = false
 
@@ -35,28 +35,74 @@ let extractComparisonOperator = function
 let isBlankLine (src: ISourceText) lineIdx =
   src.GetLineString(lineIdx - 1) |> String.IsNullOrWhiteSpace
 
-/// Checks if there are compiler directives between two ranges
-let findDirectivesBetween prev next =
-  asyncLocal.Value.ConditionalDirectives
-  |> List.tryFind (function
+/// Buckets the trivia by the line it starts on. A range starting past the last
+/// line is dropped: it cannot stand between two lines the file does not reach.
+let private bucketsOf (lineCount: int) (trivia: ParsedInputTrivia) =
+  let comments = Array.create (lineCount + 2) []
+  let directives = Array.create (lineCount + 2) []
+  let add (buckets: range list array) (range: range) =
+    if range.StartLine >= 0 && range.StartLine < buckets.Length then
+      buckets[range.StartLine] <- range :: buckets[range.StartLine]
+    else
+      ()
+  for comment in trivia.CodeComments do
+    match comment with
+    | CommentTrivia.LineComment range
+    | CommentTrivia.BlockComment range -> add comments range
+  for directive in trivia.ConditionalDirectives do
+    match directive with
     | ConditionalDirectiveTrivia.If(_, range)
     | ConditionalDirectiveTrivia.Else range
-    | ConditionalDirectiveTrivia.EndIf range ->
-      range.StartLine > (prev: range).EndLine &&
-      range.EndLine < (next: range).StartLine
-  )
+    | ConditionalDirectiveTrivia.EndIf range -> add directives range
+  comments, directives
+
+/// Takes in the trivia of the file about to be read, bucketed by line.
+let setTrivia (lineCount: int) (trivia: ParsedInputTrivia) =
+  let comments, directives = bucketsOf lineCount trivia
+  installTrivia trivia comments directives
+
+/// Lets go of it once the file has been read.
+let clearTrivia () = dropTrivia ()
+
+/// The first range in the buckets from `firstLine` to `lastLine` that answers
+/// `pick`. Reading only those buckets is what makes this cheap: the lines a
+/// pair of neighbours spans are few, however many comments the file holds.
+let private tryPickBetween (buckets: range list array) firstLine lastLine pick =
+  let last = min lastLine (buckets.Length - 1)
+  let mutable line = max 0 firstLine
+  let mutable found = None
+  while found.IsNone && line <= last do
+    found <- buckets[line] |> List.tryFind pick
+    line <- line + 1
+  found
+
+/// Checks if there are compiler directives between two ranges
+let findDirectivesBetween prev next =
+  match directiveBuckets () with
+  | null ->
+    None
+  | buckets ->
+    tryPickBetween buckets
+                   (prev: range).EndLine
+                   (next: range).StartLine
+                   (fun range ->
+                     range.StartLine > prev.EndLine
+                     && range.EndLine < next.StartLine)
 
 /// Checks if there are comments between two ranges using trivia information
 let findCommentsBetween startRange endRange =
-  asyncLocal.Value.CodeComments
-  |> List.tryPick (function
-    | CommentTrivia.LineComment range
-    | CommentTrivia.BlockComment range when
-      range.StartLine >= (startRange: range).EndLine
-      && range.EndLine <= (endRange: range).StartLine
-      && Range.rangeContainsRange (Range.unionRanges startRange endRange) range
-      -> Some range
-    | _ -> None)
+  match commentBuckets () with
+  | null ->
+    None
+  | buckets ->
+    let whole = Range.unionRanges startRange endRange
+    tryPickBetween buckets
+                   (startRange: range).EndLine
+                   (endRange: range).StartLine
+                   (fun range ->
+                     range.StartLine >= startRange.EndLine
+                     && range.EndLine <= endRange.StartLine
+                     && Range.rangeContainsRange whole range)
 
 let combineRangeWithComment startPos endPos combineToStartPos returnRange =
   match findCommentsBetween startPos endPos with
@@ -68,16 +114,19 @@ let combineRangeWithComment startPos endPos combineToStartPos returnRange =
 
 /// Counts lines occupied by comments between two ranges
 let countCommentLines (prev: range) next =
-  asyncLocal.Value.CodeComments
-  |> List.filter (function
-    | CommentTrivia.LineComment r ->
-      r.StartLine > prev.EndLine && r.EndLine < (next: range).StartLine
-    | CommentTrivia.BlockComment r ->
-      r.StartLine > prev.EndLine && r.EndLine < next.StartLine
-  )
-  |> List.sumBy (function
-    | CommentTrivia.LineComment _ -> 1
-    | CommentTrivia.BlockComment r -> r.EndLine - r.StartLine + 1)
+  match commentBuckets () with
+  | null ->
+    0
+  | buckets ->
+    let last = min ((next: range).StartLine - 1) (buckets.Length - 1)
+    let mutable total = 0
+    for line in max 0 (prev.EndLine + 1) .. last do
+      for range in buckets[line] do
+        if range.EndLine < next.StartLine then
+          total <- total + range.EndLine - range.StartLine + 1
+        else
+          ()
+    total
 
 /// Collects all .fs source files under the given root directory
 let getFsFiles (root: string) =
@@ -128,13 +177,38 @@ let directiveLinesOf (src: ISourceText) =
 /// absent from that tree altogether and no rule can reach it, so the second
 /// parse brings it in; between the two, both sides of a plain `#if`/`#else`
 /// are read. A file naming no symbols is parsed once.
-let parseFile src (path: string) =
-  let checker = FSharpChecker.Create()
+/// The one checker every parse goes through. It is built to hold the caches a
+/// parse reads, so one per file throws all of them away before they are used
+/// twice.
+let private checker = lazy FSharpChecker.Create()
+
+/// The parsing options a run works with, once they are known. What the script
+/// resolver answers does not turn on which file asked -- it is the conditional
+/// defines and the language version -- but asking it costs a walk of the
+/// script's references, and a run that asks per file spends most of its time
+/// there.
+let mutable private knownOptions: FSharpParsingOptions option = None
+
+/// Asks the script resolver what the parsing options are.
+let private resolveOptions (src: ISourceText) (path: string) =
+  let checker = checker.Force()
   let projOptions, _ =
     checker.GetProjectOptionsFromScript(path, src)
     |> Async.RunSynchronously
-  let parsingOptions, _ =
-    checker.GetParsingOptionsFromProjectOptions projOptions
+  checker.GetParsingOptionsFromProjectOptions projOptions |> fst
+
+/// Works the parsing options out ahead of a run, so that the parses of it read
+/// them rather than each asking again. A run that never calls this still works:
+/// every parse then resolves them as it goes, which is what one file wants.
+let prepareParsing (src: ISourceText) (path: string) =
+  knownOptions <- Some(resolveOptions src path)
+
+let parseFile src (path: string) =
+  let checker = checker.Force()
+  let parsingOptions =
+    match knownOptions with
+    | Some options -> options
+    | None -> resolveOptions src path
   let parseWith (options: FSharpParsingOptions) =
     checker.ParseFile(path, src, options)
     |> Async.RunSynchronously

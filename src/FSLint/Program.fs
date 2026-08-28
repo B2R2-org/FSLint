@@ -721,11 +721,11 @@ and checkDeclarationsWithContext src decls (context: CheckContext) =
 and checkDeclarations (src: ISourceText) (decls: SynModuleDecl list) =
   checkDeclarationsWithContext src decls { ModuleAccess = Public }
 
-let checkWithAST src = function
+let checkWithAST (src: ISourceText) = function
   | ParsedInput.ImplFile(ParsedImplFileInput(contents = modules
                                              trivia = codeTrivia)) ->
     try
-      asyncLocal.Value <- codeTrivia
+      setTrivia (src.GetLineCount()) codeTrivia
       modules
       |> List.iter (fun m ->
         let SynModuleOrNamespace(longId = lid
@@ -744,7 +744,7 @@ let checkWithAST src = function
         |> checkDeclarationsWithContext src decls
       )
     finally
-      asyncLocal.Value <- Unchecked.defaultof<ParsedInputTrivia>
+      clearTrivia ()
   | ParsedInput.SigFile _ ->
     () (* ignore fsi files *)
 
@@ -767,7 +767,7 @@ let linterForFsWithContext context =
         let runCheck fn =
           try fn () with LintException _ when context.IsSome -> ()
         runCheck (fun () ->
-          let src = SourceText.ofString txt
+          let src = CachingSourceText(SourceText.ofString txt) :> ISourceText
           if path = FakeFsPath then
             setCliEditorConfig Configuration.defaultSettings
           else
@@ -878,6 +878,14 @@ let main args =
       let txt = System.Text.Encoding.UTF8.GetString bytes
       linterForProjSln.Lint(p, txt)
     )
-    if getFsFiles path |> runParallelByOrder editorConfig opts then 1 else 0
+    let files = getFsFiles path
+    (* One file is enough to settle the parsing options for all of them, and
+       settling them here keeps the parses below from each asking again. *)
+    match Array.tryHead files with
+    | Some first ->
+      File.ReadAllText first |> SourceText.ofString |> prepareParsing <| first
+    | None ->
+      ()
+    if runParallelByOrder editorConfig opts files then 1 else 0
   else
     exitWithError $"File or directory '{path}' not found"

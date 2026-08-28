@@ -2,6 +2,21 @@
 
 All notable changes to the FSLint extension.
 
+## 1.2.1
+
+- Speed up a whole-tree run
+- Fixed spacing read wrongly where a gap holds more than one comment, as in
+  `[ (* a *) (* b *) 1 ]`. The comments standing in a gap belong to the code
+  beside it, and only the nearest of them was taken as such, so what was left
+  of the gap got measured from the middle of the run.
+- One comment in a gap always read correctly, and two or more did not:
+  `Use single whitespace between bracket and element` and
+  `Use single whitespace before ':'` were reported on gaps holding exactly one
+  space, `Use single whitespace before 'then'` and
+  `Use single whitespace after 'then'` the same way under strict mode, and
+  `Remove whitespace before ','` pointed into the comment run rather than at
+  the space it meant.
+
 ## 1.2.0
 
 - Added a row-length rule for strict mode: a binding body may run to 42 rows,

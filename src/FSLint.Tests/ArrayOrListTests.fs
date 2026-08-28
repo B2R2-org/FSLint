@@ -18,6 +18,32 @@ let a = [ (expr: SynExpr).Range ]
 let b = [ (expr: SynExpr).Range ;(other: SynExpr).Range ]
 """
 
+/// A run of comments inside a bracket belongs to the element beside it, at
+/// whichever end it stands: in front, the element begins where the run does;
+/// behind, it ends where the run ends. Taking the wrong end of the run leaves
+/// the bracket looking a run's width away from what follows it.
+module BracketCommentRunSamples =
+
+  let goodFrontRunTest =
+    """
+let xs = [ (* a *) (* b *) 1 ]
+"""
+
+  let goodBackRunTest =
+    """
+let xs = [ 1 (* a *) (* b *) ]
+"""
+
+  let goodArrayFrontRunTest =
+    """
+let xs = [| (* a *) (* b *) 1 |]
+"""
+
+  let badFrontRunTest =
+    """
+let xs = [  (* a *) (* b *) 1 ]
+"""
+
 [<TestClass>]
 type ArrayOrListTests() =
 
@@ -408,3 +434,13 @@ let bad = [
     lint AnnotatedElementSamples.goodAnnotatedElementTest
     lintAssertMsg "Remove whitespace before ';'"
       AnnotatedElementSamples.badAnnotatedElementTest
+
+  /// The comments go with the element, so the bracket is read against the
+  /// edge of the run and not against the element behind it.
+  [<TestMethod>]
+  member _.``[ArrayOrList] Bracket Comment Run Test``() =
+    lint BracketCommentRunSamples.goodFrontRunTest
+    lint BracketCommentRunSamples.goodBackRunTest
+    lint BracketCommentRunSamples.goodArrayFrontRunTest
+    lintAssertMsg "Use single whitespace between bracket and element"
+      BracketCommentRunSamples.badFrontRunTest

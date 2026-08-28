@@ -33,6 +33,46 @@ let fn x i xs =
   else false
 """
 
+/// A gap can hold more than one comment, and what a keyword answers for is
+/// the space between it and the code, not the space the comments left. Read as
+/// the first comment alone, the gap before `then` looks wrong; read as the last
+/// alone, the gap after it does. They are one run, and either side is measured
+/// from the run's far edge.
+module CommentRunSamples =
+
+  let goodBeforeThenRunTest =
+    """
+let fn x =
+  if x (* a *) (* b *) then 1 else 2
+"""
+
+  let goodAfterThenRunTest =
+    """
+let fn x =
+  if x then (* a *) (* b *) 1 else 2
+"""
+
+  /// However long the run, the answer is the same one.
+  let goodLongRunTest =
+    """
+let fn x =
+  if x (* a *) (* b *) (* c *) then 1 else 2
+"""
+
+  /// The run is absorbed, not excused: the space beside the keyword is still
+  /// read, and a second one is still one too many.
+  let badBeforeThenRunTest =
+    """
+let fn x =
+  if x (* a *) (* b *)  then 1 else 2
+"""
+
+  let badAfterThenRunTest =
+    """
+let fn x =
+  if x then  (* a *) (* b *) 1 else 2
+"""
+
 [<TestClass>]
 type IfThenElseTests() =
 
@@ -542,3 +582,20 @@ let changeToAliasOfLDM bin =
   member _.``[IfThenElse] Paren Inner If Test``() =
     lintAssertMsg "Use consistent line breaks"
       BareInnerIfSamples.badParenInnerIfTest
+
+  /// One comment in the gap has always read correctly, because the first of a
+  /// run of one is also its last. Two is where the two ends part.
+  [<TestMethod>]
+  member _.``[IfThenElse] Comment Run Before Then Test``() =
+    lint CommentRunSamples.goodBeforeThenRunTest
+    lint CommentRunSamples.goodLongRunTest
+    lintAssertMsg "Use single whitespace before 'then'"
+      CommentRunSamples.badBeforeThenRunTest
+
+  /// The other side of the same gap, which wants the near edge of the run
+  /// rather than its far one.
+  [<TestMethod>]
+  member _.``[IfThenElse] Comment Run After Then Test``() =
+    lint CommentRunSamples.goodAfterThenRunTest
+    lintAssertMsg "Use single whitespace after 'then'"
+      CommentRunSamples.badAfterThenRunTest

@@ -89,20 +89,42 @@ let findDirectivesBetween prev next =
                      range.StartLine > prev.EndLine
                      && range.EndLine < next.StartLine)
 
-/// Checks if there are comments between two ranges using trivia information
+/// Everything in the buckets from `firstLine` to `lastLine` that answers
+/// `pick`, taken as one stretch.
+///
+/// A gap can hold more than one comment, and a caller absorbing them into the
+/// code on one side of the gap wants the far edge of the whole run: which one
+/// came first is not what it is asking. Taking the union answers both
+/// directions at once, and leaves the order the buckets happen to hold
+/// without bearing on the answer.
+let private unionBetween (buckets: range list array) firstLine lastLine pick =
+  let last = min lastLine (buckets.Length - 1)
+  let mutable found = None
+  for line in max 0 firstLine .. last do
+    for range in buckets[line] do
+      if pick range then
+        found <-
+          match found with
+          | Some sofar -> Some(Range.unionRanges sofar range)
+          | None -> Some range
+      else
+        ()
+  found
+
+/// The comments between two ranges, as one stretch, using trivia information
 let findCommentsBetween startRange endRange =
   match commentBuckets () with
   | null ->
     None
   | buckets ->
     let whole = Range.unionRanges startRange endRange
-    tryPickBetween buckets
-                   (startRange: range).EndLine
-                   (endRange: range).StartLine
-                   (fun range ->
-                     range.StartLine >= startRange.EndLine
-                     && range.EndLine <= endRange.StartLine
-                     && Range.rangeContainsRange whole range)
+    unionBetween buckets
+                 (startRange: range).EndLine
+                 (endRange: range).StartLine
+                 (fun range ->
+                   range.StartLine >= startRange.EndLine
+                   && range.EndLine <= endRange.StartLine
+                   && Range.rangeContainsRange whole range)
 
 let combineRangeWithComment startPos endPos combineToStartPos returnRange =
   match findCommentsBetween startPos endPos with

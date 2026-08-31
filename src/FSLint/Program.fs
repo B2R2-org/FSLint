@@ -472,7 +472,7 @@ and checkTypeDefnSimpleRepr src trivia = function
       IdentifierConvention.check src PascalCase false id.idText range
   | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
     TypeAnnotation.checkRecordFields src fields
-    RecordConvention.checkDefinition src fields range trivia
+    RecordConvention.checkDefinition src fields range
     for field in fields do
       let SynField(idOpt = idOpt; fieldType = fieldType) = field
       TypeAnnotation.checkTypeAbbrevWithAnnotation src fieldType

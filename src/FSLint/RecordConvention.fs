@@ -47,60 +47,63 @@ let private checkFieldTypeSpacing (src: ISourceText) fields =
       ()
   ) fields
 
-/// Checks that the '=' and '{' in a record definition are on the same line.
-/// Ensures record definitions follow the convention: `type T = { ... }`
-let private checkOpeningBracketPosition src range (trivia: SynTypeDefnTrivia) =
-  if isStrict then
-    if trivia.EqualsRange.IsSome && (range: range).StartLine <> range.EndLine
-    then
-      if trivia.EqualsRange.Value.StartLine = range.StartLine then
-        (src: ISourceText).GetLineString(range.StartLine - 1).Length
-        |> fun lastIdx ->
-          Range.mkRange "" range.Start (Position.mkPos range.StartLine lastIdx)
-        |> fun wRange -> reportWarn src wRange "Move '{' to next line"
-      else
-        ()
-    else
-      ()
-  else
-    ()
+/// Where the brace opening a record definition stands.
+///
+/// The range the parser gives for the definition opens at the access modifier
+/// when the definition carries one, so the brace is looked for rather than
+/// taken to be where the definition begins. Reading the modifier as the brace
+/// puts every column below it two columns out.
+let private openingBrace (src: ISourceText) (range: range) =
+  let mutable line = range.StartLine
+  let mutable found = None
+  while found.IsNone && line <= range.EndLine do
+    let text = src.GetLineString(line - 1)
+    let start = if line = range.StartLine then range.StartColumn else 0
+    let index = if start < text.Length then text.IndexOf('{', start) else -1
+    if index >= 0 then found <- Some(Position.mkPos line index)
+    else line <- line + 1
+  found
 
-let private checkFieldCompFlag src fullRange innerRange ranges isOpenBracket =
-  (Position.mkPos ((innerRange: range).EndLine + 1) 0,
-   Position.mkPos (fullRange: range).EndLine 0)
-  ||> Range.mkRange ""
-  |> (src: ISourceText).GetSubTextFromRange
-  |> fun subStr ->
-    subStr.Split([| '\n' |], StringSplitOptions.None)
-    |> fun strArr ->
-      let flagStartIsWrong =
-        (Array.head strArr).TrimStart().StartsWith "#if" |> not
-      let flagEndIsWrong = Array.last strArr |> String.IsNullOrEmpty |> not
-      flagEndIsWrong || flagStartIsWrong
+/// The brace closing a record definition, so that a report can point at it
+/// rather than at the field above it.
+let private closingBrace (range: range) =
+  Range.mkRange ""
+    (Position.mkPos range.EndLine (max 0 (range.EndColumn - 1)))
+    range.End
 
+/// A record definition writes its braces one of two ways: each beside the
+/// field it fences, or each on a line of its own. Which of the two is left to
+/// whoever writes it -- one is the tighter, the other leaves the fields a
+/// column of their own -- but they are read as a pair, and taking the top from
+/// one and the bottom from the other is not a third way. It reads as a line
+/// gone missing.
+///
+/// A brace beside its field takes one space between the two. A brace on a line
+/// of its own has no such gap to answer for, so the spacing is asked only of
+/// the layout that has one.
 let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
-  fields
-  |> List.map (fun (SynField(range = range)) -> range)
-  |> fun ranges ->
-    ranges
-    |> List.reduce Range.unionRanges
-    |> fun innerRange ->
-      let isOpenBracket = fullRange.StartLine <> innerRange.StartLine
-      if fullRange.StartLine <> innerRange.StartLine
-        || fullRange.EndLine <> innerRange.EndLine
-        && checkFieldCompFlag src fullRange innerRange ranges isOpenBracket
-      then
+  if List.isEmpty fields then
+    ()
+  else
+    let innerRange =
+      fields
+      |> List.map (fun (SynField(range = range)) -> range)
+      |> List.reduce Range.unionRanges
+    match openingBrace src fullRange with
+    | None ->
+      ()
+    | Some brace ->
+      let openIsBeside = brace.Line = innerRange.StartLine
+      let closeIsBeside = fullRange.EndLine = innerRange.EndLine
+      if openIsBeside <> closeIsBeside then
         if isStrict then
-          Range.mkRange "" (Position.mkPos fullRange.EndLine 0) fullRange.End
-          |> fun wRange -> reportWarn src wRange "Move to inline with bracket"
+          closingBrace fullRange |> reportBracketSymmetry src
         else
           ()
-      elif fullRange.StartColumn + 2 <> innerRange.StartColumn
-      then
-        Range.mkRange "" fullRange.Start innerRange.Start
+      elif openIsBeside && brace.Column + 2 <> innerRange.StartColumn then
+        Range.mkRange "" brace innerRange.Start
         |> reportLeftCurlyBraceSpacing src
-      elif fullRange.EndColumn - 2 <> innerRange.EndColumn
-      then
+      elif closeIsBeside && fullRange.EndColumn - 2 <> innerRange.EndColumn then
         Range.mkRange "" innerRange.End fullRange.End
         |> reportRightCurlyBraceSpacing src
       else
@@ -358,8 +361,7 @@ let checkConstructor src copyInfo (fields: list<SynExprRecordField>) range =
   fields |> List.choose getFieldRange |> checkSingleFieldPerLine src range
 
 /// Checks a record definition for convention compliance.
-let checkDefinition src fields range trivia =
-  checkOpeningBracketPosition src range trivia
+let checkDefinition src fields range =
   checkFieldIsInlineWithBracket src range fields
   checkFieldTypeSpacing src fields
 

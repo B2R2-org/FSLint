@@ -124,9 +124,9 @@ type ArrayOrListTests() =
   let goodOpeningBracketInlineWithLetTest =
     """
 let good =
- [ 1
-   2
-   3 ]
+  [ 1
+    2
+    3 ]
 """
 
   let badOpeningBracketInlineWithLetTest =

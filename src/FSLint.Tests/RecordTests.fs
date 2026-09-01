@@ -5,6 +5,10 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 [<TestClass>]
 type RecordTests() =
 
+  /// Which layout a record definition is written in is left to whoever writes
+  /// it: braces beside the fields, braces on lines of their own, or the
+  /// opening one left up beside the `=`. What is read is the space between a
+  /// brace and the field it fences, and only where the two share a line.
   let goodBracketPositionTest =
     """
 type InsSize =
@@ -14,25 +18,101 @@ type InsSize =
     SizeCond: OperandsSizeCondition }
 """
 
-  let badBracketPositionTest =
+  let goodBracesOnOwnLinesTest =
     """
 type InsSize =
   {
     MemSize: MemorySize
     RegSize: RegType
-    OperationSize: RegType
-    SizeCond: OperandsSizeCondition
   }
 """
 
-  let badBracketPositionWithEqualTest =
+  let goodBraceBesideEqualTest =
     """
 type InsSize = {
   MemSize: MemorySize
   RegSize: RegType
-  OperationSize: RegType
-  SizeCond: OperandsSizeCondition
+}
+"""
+
+  /// The range the parser gives a record definition opens at its access
+  /// modifier and not at its brace. Read as the brace, every column below it
+  /// comes out short by the width of the modifier, and a record spaced exactly
+  /// right is reported for it -- with the caret on `private`, at that.
+  let goodPrivateBesideEqualTest =
+    """
+type Foo = private {
+  A: int
+  B: int
+}
+"""
+
+  let goodPrivateOnOwnLineTest =
+    """
+type Foo =
+  private
+    { A: int
+      B: int }
+"""
+
+  let goodPrivateWithBraceTest =
+    """
+type Foo =
+  private {
+    A: int
+    B: int
   }
+"""
+
+  let goodPrivateInlineTest =
+    """
+type Foo = private { A: int }
+"""
+
+  let badPrivateLeftSpacingTest =
+    """
+type Foo = private {A: int }
+"""
+
+  let badPrivateRightSpacingTest =
+    """
+type Foo = private { A: int}
+"""
+
+  /// The two braces are read as a pair. Either both stand beside the fields
+  /// they fence or both stand on lines of their own; a definition taking the
+  /// top from one layout and the bottom from the other reads as a line gone
+  /// missing, and each of the three accepted layouts has such a twin.
+  let badBraceOpenAloneTest =
+    """
+type Foo = private {
+  A: int
+  B: int }
+"""
+
+  let badBraceCloseAloneTest =
+    """
+type Foo =
+  private
+    { A: int
+      B: int
+    }
+"""
+
+  let badBraceCloseTightTest =
+    """
+type Foo =
+  private {
+    A: int
+    B: int}
+"""
+
+  /// Nothing about this turns on the modifier: it is where the braces went.
+  let badBraceNoModifierTest =
+    """
+type Foo = {
+  A: int
+  B: int }
 """
 
   let badFieldTypeSpacingTest =
@@ -215,11 +295,27 @@ type Shape =
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
     lint goodBracketPositionTest
-    lintAssert badBracketPositionTest
+    lint goodBracesOnOwnLinesTest
+    lint goodBraceBesideEqualTest
 
+  /// The space beside a brace is still read once a modifier stands in front of
+  /// it, and it is read from the brace.
   [<TestMethod>]
-  member _.``[Record] Bracket Position Inline With Equal Test``() =
-    lintAssert badBracketPositionWithEqualTest
+  member _.``[Record] Access Modifier Brace Test``() =
+    lint goodPrivateBesideEqualTest
+    lint goodPrivateOnOwnLineTest
+    lint goodPrivateWithBraceTest
+    lint goodPrivateInlineTest
+    lintAssertMsg "Use single whitespace after '{'" badPrivateLeftSpacingTest
+    lintAssertMsg "Use single whitespace before '}'" badPrivateRightSpacingTest
+
+  /// Each accepted layout paired with the twin that mixes it with the other.
+  [<TestMethod>]
+  member _.``[Record] Brace Agreement Test``() =
+    lintAssertMsg "Use consistent bracket placement" badBraceOpenAloneTest
+    lintAssertMsg "Use consistent bracket placement" badBraceCloseAloneTest
+    lintAssertMsg "Use consistent bracket placement" badBraceCloseTightTest
+    lintAssertMsg "Use consistent bracket placement" badBraceNoModifierTest
 
   [<TestMethod>]
   member _.``[Record] Field Type Spacing Test``() =

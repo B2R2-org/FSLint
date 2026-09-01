@@ -251,6 +251,12 @@ module CustomReports =
 
   let reportBindToLet src range = reportWarn src range "Bind to fit the line"
 
+  /// A body opening a line of its own at the wrong column. What it is told is
+  /// where the body belongs rather than how far out it went: the number it is
+  /// out by is of no use to anyone reading the line.
+  let reportBodyIndent src range =
+    reportWarn src range "Indent the body by two columns"
+
   /// A function body run past the budget. What it is told is what to do about
   /// it rather than how long it is: the length is a symptom, and the count is
   /// already in the settings for anyone who wants it.
@@ -280,6 +286,10 @@ module CustomReports =
   let reportBracketSpacingError src range =
     reportWarn src range "Use single whitespace between bracket and element"
 
+  /// A pair of brackets placed differently: one beside what it fences and the
+  /// other on a line of its own. A record definition asks this of its braces
+  /// as a literal asks it of its brackets, and the report points at the
+  /// closing one, since the opening one is what sets the layout.
   let reportBracketSymmetry src range =
     reportWarn src range "Use consistent bracket placement"
 

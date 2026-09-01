@@ -848,6 +848,48 @@ let linterForProjSln =
         else checkBOM src (path |> File.ReadAllBytes)
         LineConvention.checkWindowsLineEndings src txt |> ignore }
 
+/// Lints every project and solution file under the root, answering whether any
+/// of them had something to say.
+///
+/// A finding is written out by the time it is raised, so catching it here loses
+/// nothing and keeps it from standing in the way of everything after it: the
+/// project files that follow, and the sources the run was actually asked about.
+/// One file with the wrong line endings is no reason to leave every source
+/// unread.
+let private lintProjOrSln path =
+  let mutable failed = false
+  getProjOrSlnFiles path
+  |> Array.iter (fun p ->
+    setCurrentFile p
+    let bytes = File.ReadAllBytes p
+    let txt = System.Text.Encoding.UTF8.GetString bytes
+    try
+      linterForProjSln.Lint(p, txt)
+    with LintException _ ->
+      failed <- true
+  )
+  failed
+
+/// Lints every source under the root, answering the same way.
+///
+/// One file is enough to settle the parsing options for all of them, and
+/// settling them here keeps the parses below from each asking again.
+let private lintSources editorConfig opts path =
+  let files = getFsFiles path
+  match Array.tryHead files with
+  | Some first ->
+    File.ReadAllText first |> SourceText.ofString |> prepareParsing <| first
+  | None ->
+    ()
+  runParallelByOrder editorConfig opts files
+
+/// Lints a whole tree: the project files, and then the sources. Each is read
+/// whatever the other found.
+let private lintDirectory editorConfig opts path =
+  let projFailed = lintProjOrSln path
+  let sourcesFailed = lintSources editorConfig opts path
+  if projFailed || sourcesFailed then 1 else 0
+
 [<EntryPoint>]
 let main args =
   System.Diagnostics.Trace.Listeners.Clear()
@@ -871,21 +913,6 @@ let main args =
     else
       0
   elif Directory.Exists path then
-    getProjOrSlnFiles path
-    |> Array.iter (fun p ->
-      setCurrentFile p
-      let bytes = File.ReadAllBytes p
-      let txt = System.Text.Encoding.UTF8.GetString bytes
-      linterForProjSln.Lint(p, txt)
-    )
-    let files = getFsFiles path
-    (* One file is enough to settle the parsing options for all of them, and
-       settling them here keeps the parses below from each asking again. *)
-    match Array.tryHead files with
-    | Some first ->
-      File.ReadAllText first |> SourceText.ofString |> prepareParsing <| first
-    | None ->
-      ()
-    if runParallelByOrder editorConfig opts files then 1 else 0
+    lintDirectory editorConfig opts path
   else
     exitWithError $"File or directory '{path}' not found"

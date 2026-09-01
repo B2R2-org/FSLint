@@ -2,6 +2,12 @@
 
 All notable changes to the FSLint extension.
 
+## 1.2.2
+
+- Add indentation checker for strict mode
+- Remove record brace rules, remain only symmetric checker
+- Fixed a finding in a project or solution file ending the whole run.
+
 ## 1.2.1
 
 - Speed up a whole-tree run

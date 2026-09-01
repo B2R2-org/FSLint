@@ -251,6 +251,12 @@ module CustomReports =
 
   let reportBindToLet src range = reportWarn src range "Bind to fit the line"
 
+  /// A body opening a line of its own at the wrong column. What it is told is
+  /// where the body belongs rather than how far out it went: the number it is
+  /// out by is of no use to anyone reading the line.
+  let reportBodyIndent src range =
+    reportWarn src range "Indent the body by two columns"
+
   /// A function body run past the budget. What it is told is what to do about
   /// it rather than how long it is: the length is a symptom, and the count is
   /// already in the settings for anyone who wants it.

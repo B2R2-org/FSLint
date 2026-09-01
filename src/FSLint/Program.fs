@@ -569,6 +569,7 @@ and checkTypeDefn src defn =
   match implicitConstructor with
   | Some ctor -> checkImplicitCtor src repr trivia ctor
   | None -> checkTypeDefnEqual src info range repr trivia
+  DeclarationConvention.checkReprIndent src trivia repr
   checkTypeDefnRepr src repr trivia
   checkMemberDefns src members false
 
@@ -600,6 +601,7 @@ and checkBinding src case binding =
   else
     ()
   DeclarationConvention.checkComputationExprPlacement src binding
+  DeclarationConvention.checkBodyIndent src trivia body
   RowLengthConvention.check src binding
   TypeAnnotation.checkParamTypeSpacing src pat
   TypeAnnotation.checkReturnInfo src pat returnInfo

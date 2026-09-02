@@ -2,6 +2,21 @@
 
 All notable changes to the FSLint extension.
 
+## 1.2.3
+
+- Recognise two brace layouts in a record definition and no third: the fields
+  beside the braces, or the opening brace left at the end of the row the
+  definition opens on with the closing brace on a row of its own. A brace alone
+  on a row below the `=` is neither, and 1.2.2 let it pass.
+- Read the rows a lone bracket fences against that bracket, so a list or array
+  opened on a bracket of its own answers for the column its items open in.
+- Fixed a comment beside a closing brace making a record that agrees with
+  itself look as though it did not.
+- Fixed `Use ': ' between field and type` reported on a field whose type runs
+  onto a second row.
+- Report the gap between a record field and its type once. It was answered
+  twice, as `Use ': '` and again as `Use ': ' between field and type`.
+
 ## 1.2.2
 
 - Add indentation checker for strict mode

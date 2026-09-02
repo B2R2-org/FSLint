@@ -175,18 +175,26 @@ and checkTypeInternal src synType =
   | _ ->
     ()
 
-let checkFieldWidth (src: ISourceText) field =
+/// The gap between the name of a field and its type: `: ` and nothing else.
+///
+/// Only a union case field is asked this here. A record field is asked the same
+/// thing where the rest of a record is read, and asking it twice reported one
+/// gap as two findings.
+let checkFieldColon (src: ISourceText) field =
   let SynField(idOpt = idOpt; fieldType = fieldType) = field
-  if Option.isSome idOpt then
-    Range.unionRanges idOpt.Value.idRange.EndRange fieldType.Range.StartRange
+  match idOpt with
+  | None ->
+    ()
+  | Some id ->
+    Range.unionRanges id.idRange.EndRange fieldType.Range.StartRange
     |> fun gap ->
       if src.GetSubTextFromRange gap <> ": " then reportWarn src gap "Use ': '"
       else ()
-    collectArraysRange fieldType [] |> checkGapBetweenArrays src
-    checkTypeInternal src fieldType
-  else
-    collectArraysRange fieldType [] |> checkGapBetweenArrays src
-    checkTypeInternal src fieldType
+
+let checkFieldWidth (src: ISourceText) field =
+  let SynField(fieldType = fieldType) = field
+  collectArraysRange fieldType [] |> checkGapBetweenArrays src
+  checkTypeInternal src fieldType
 
 let getFieldDeclaration (src: ISourceText) (field: SynField) =
   let SynField(idOpt = idOpt; fieldType = fieldType) = field
@@ -325,6 +333,7 @@ let private checkInlineSpacing src (frontCase, endCase) =
 /// reads is the spacing round that star.
 let checkUnionFields src fields =
   fields |> checkFieldsWidth src
+  fields |> List.iter (checkFieldColon src)
   fields |> List.iter (checkFieldWidth src)
 
 /// A record's fields are divided by `;` or by a line break, never by a star.

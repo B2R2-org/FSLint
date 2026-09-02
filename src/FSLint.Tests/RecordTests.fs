@@ -18,7 +18,9 @@ type InsSize =
     SizeCond: OperandsSizeCondition }
 """
 
-  let goodBracesOnOwnLinesTest =
+  /// A brace alone on a row below the `=` is neither layout: nothing shares
+  /// its row, so it reads as a row that lost whatever belonged on it.
+  let badBracesOnOwnLinesTest =
     """
 type InsSize =
   {
@@ -67,6 +69,18 @@ type Foo =
   let goodPrivateInlineTest =
     """
 type Foo = private { A: int }
+"""
+
+  /// A brace alone on a row is neither layout whether a modifier stands above
+  /// it or not: what decides is that nothing shares the brace's own row.
+  let badPrivateBraceAloneTest =
+    """
+type Foo =
+  private
+    {
+      A: int
+      B: int
+    }
 """
 
   let badPrivateLeftSpacingTest =
@@ -295,8 +309,9 @@ type Shape =
   [<TestMethod>]
   member _.``[Record] Bracket Position Test``() =
     lint goodBracketPositionTest
-    lint goodBracesOnOwnLinesTest
     lint goodBraceBesideEqualTest
+    lintAssertMsg "Use consistent bracket placement"
+      badBracesOnOwnLinesTest
 
   /// The space beside a brace is still read once a modifier stands in front of
   /// it, and it is read from the brace.
@@ -308,6 +323,7 @@ type Shape =
     lint goodPrivateInlineTest
     lintAssertMsg "Use single whitespace after '{'" badPrivateLeftSpacingTest
     lintAssertMsg "Use single whitespace before '}'" badPrivateRightSpacingTest
+    lintAssertMsg "Use consistent bracket placement" badPrivateBraceAloneTest
 
   /// Each accepted layout paired with the twin that mixes it with the other.
   [<TestMethod>]
@@ -384,3 +400,33 @@ type Shape =
     lintErrors badFieldsSharingALineTest
     |> List.filter (fun e -> e.Message = "Use one element per line")
     |> fun errors -> Assert.AreEqual<int>(2, errors.Length)
+
+  /// A comment keeping a brace company counts as company. A comment is prose
+  /// and its place is the author's business, so a note left in front of a
+  /// closing brace must not make a record that agrees with itself look as
+  /// though it did not. A note on a row of its own keeps nobody company, and
+  /// the record is read as it would be without the note.
+  [<TestMethod>]
+  member _.``[Record] Brace Symmetry Reads A Comment As Company``() =
+    lint "type T =\n  { A: int\n    B: int\n    (* note *) }\n"
+    lint "type T =\n  { (* note *)\n    A: int\n    B: int }\n"
+    lintAssertMsg "Use consistent bracket placement"
+      "type T =\n  { A: int\n    B: int\n    (* note *)\n  }\n"
+
+  /// The gap between a field's name and its type is read where those two
+  /// stand. A type running onto a second row leaves the field ending well
+  /// below its own name, and reading the gap on that row reads some other part
+  /// of the field.
+  [<TestMethod>]
+  member _.``[Record] Field Colon Of A Multiline Type Test``() =
+    lint "type T =\n  { A: Map<string,\n           int> }\n"
+    lintAssertMsg "Use ': ' between field and type"
+      "type T =\n  { A: int\n    B:  Map<string,\n            int> }\n"
+
+  /// One gap, one finding. A record field was answering for the colon twice,
+  /// once here and once where the type annotation of a field is read.
+  [<TestMethod>]
+  member _.``[Record] Field Colon Is Reported Once Test``() =
+    lintErrors "type T =\n  { A:int }\n"
+    |> List.filter (fun e -> e.Message.Contains "': '")
+    |> fun errors -> Assert.AreEqual<int>(1, errors.Length)

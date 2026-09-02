@@ -31,20 +31,33 @@ let private checkBracketSpacing src (range: range) (innerRange: range) =
 
 /// Checks for correct spacing around ':' in record field definitions.
 /// Ensures the format `Field: type`.
+///
+/// What is read is the gap between the name and the type, so both ends are
+/// taken from where those two stand rather than from the row the field happens
+/// to end on: a type running onto a second row leaves the field ending well
+/// below its own name, and reading the gap on that row reads some other part of
+/// the field altogether.
+///
+/// A type opening on a row of its own has no gap here to answer for. Where it
+/// went is a question of line breaks, and it is asked elsewhere.
 let private checkFieldTypeSpacing (src: ISourceText) fields =
   List.iter (fun field ->
-    let SynField(idOpt = idOpt; fieldType = fieldType; range = range) = field
-    if idOpt.IsSome then
-      (Position.mkPos range.EndLine idOpt.Value.idRange.EndColumn,
-       Position.mkPos range.EndLine fieldType.Range.StartColumn)
-      ||> Range.mkRange ""
-      |> fun colonRange ->
-        if src.GetSubTextFromRange colonRange <> ": " then
-          reportWarn src colonRange "Use ': ' between field and type"
-        else
-          ()
-    else
+    let SynField(idOpt = idOpt; fieldType = fieldType) = field
+    match idOpt with
+    | None ->
       ()
+    | Some id ->
+      let nameEnd = id.idRange.End
+      let typeStart = fieldType.Range.Start
+      if nameEnd.Line <> typeStart.Line then
+        ()
+      else
+        Range.mkRange "" nameEnd typeStart
+        |> fun colonRange ->
+          if src.GetSubTextFromRange colonRange <> ": " then
+            reportWarn src colonRange "Use ': ' between field and type"
+          else
+            ()
   ) fields
 
 /// Where the brace opening a record definition stands.
@@ -81,6 +94,30 @@ let private closingBrace (range: range) =
 /// A brace beside its field takes one space between the two. A brace on a line
 /// of its own has no such gap to answer for, so the spacing is asked only of
 /// the layout that has one.
+/// True when a brace has anything beside it on the side of its row given.
+///
+/// Read off the row rather than from where the fields are, so that a comment
+/// keeping a brace company counts as company. A comment is prose and its place
+/// is the author's business, and a rule on where the braces went must not turn
+/// on it: with the fields alone standing for company, a note left in front of a
+/// closing brace made a record that agrees with itself look as though it did
+/// not.
+let private hasCompany (text: string) = text.Trim().Length > 0
+
+/// Which of the two layouts a record definition is written in, or none.
+///
+/// A definition either keeps its fields beside its braces, or opens on a brace
+/// left at the end of the row the definition itself opens on and closes on a
+/// brace of its own. A brace standing alone on a row below the `=` is neither:
+/// nothing shares its row, so it reads as a row that lost whatever belonged on
+/// it.
+type private BraceLayout =
+  /// `{ A: int` ... `B: int }`
+  | Beside
+  /// `type T = {` ... `}`
+  | Fenced
+  | Neither
+
 let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
   if List.isEmpty fields then
     ()
@@ -93,17 +130,40 @@ let private checkFieldIsInlineWithBracket src (fullRange: range) fields =
     | None ->
       ()
     | Some brace ->
-      let openIsBeside = brace.Line = innerRange.StartLine
-      let closeIsBeside = fullRange.EndLine = innerRange.EndLine
-      if openIsBeside <> closeIsBeside then
+      let openRow = (src: ISourceText).GetLineString(brace.Line - 1)
+      let closeRow = src.GetLineString(fullRange.EndLine - 1)
+      let afterBrace = openRow.Substring(min (brace.Column + 1) openRow.Length)
+      let beforeBrace =
+        let upTo = max 0 (fullRange.EndColumn - 1)
+        closeRow.Substring(0, min upTo closeRow.Length)
+      let beforeOpen = openRow.Substring(0, min brace.Column openRow.Length)
+      let openIsBeside = hasCompany afterBrace
+      let closeIsBeside = hasCompany beforeBrace
+      (* What the opening brace has beside it says which layout was chosen, and
+         what the closing one has beside it has to answer the same way. *)
+      let layout =
+        if openIsBeside then Beside
+        elif hasCompany beforeOpen then Fenced
+        else Neither
+      let agrees =
+        match layout with
+        | Beside -> closeIsBeside
+        | Fenced -> not closeIsBeside
+        | Neither -> false
+      (* The spacing is a matter of columns, so it is asked only where the
+         brace and the field it fences actually share a row. *)
+      let openSharesRow = brace.Line = innerRange.StartLine
+      let closeSharesRow = fullRange.EndLine = innerRange.EndLine
+      let innerEnd = innerRange.EndColumn
+      if not agrees then
         if isStrict then
           closingBrace fullRange |> reportBracketSymmetry src
         else
           ()
-      elif openIsBeside && brace.Column + 2 <> innerRange.StartColumn then
+      elif openSharesRow && brace.Column + 2 <> innerRange.StartColumn then
         Range.mkRange "" brace innerRange.Start
         |> reportLeftCurlyBraceSpacing src
-      elif closeIsBeside && fullRange.EndColumn - 2 <> innerRange.EndColumn then
+      elif closeSharesRow && fullRange.EndColumn - 2 <> innerEnd then
         Range.mkRange "" innerRange.End fullRange.End
         |> reportRightCurlyBraceSpacing src
       else

@@ -140,22 +140,30 @@ let private firstCodeRow (src: ISourceText) fromLine lastLine =
     else line <- line + 1
   found
 
-/// A body whose bracket stayed up beside the `=` fences its rows under it, and
-/// those rows are the body: the first of them opens two columns in from the
-/// keyword, as a body sent below the `=` does. Only the first is read. A row
-/// after it lines up with whatever the first one opened, and there is no
+/// True when a row holds nothing but the bracket opening a body.
+let private opensAlone (text: string) =
+  match text.Trim() with
+  | "{"
+  | "["
+  | "[|"
+  | "{|" -> true
+  | _ -> false
+
+/// The rows a bracket fences open two columns in from `baseColumn`, the column
+/// whatever put the bracket there stands in. Only the first of them is read: a
+/// row after it lines up with whatever the first one opened, and there is no
 /// column this rule could ask of it.
-let private checkFencedBody src (keyword: range) (body: range) =
+let private checkFencedRows src baseColumn openRow (body: range) =
   if isFenced src body |> not then
     ()
   else
-    match firstCodeRow src (body.StartLine + 1) (body.EndLine - 1) with
+    match firstCodeRow src (openRow + 1) (body.EndLine - 1) with
     | None ->
       ()
     | Some(line, indent) ->
-      if straddlesDirective body.StartLine line then
+      if straddlesDirective openRow line then
         ()
-      elif indent = declarationColumn src keyword + BodyIndent then
+      elif indent = baseColumn + BodyIndent then
         ()
       else
         (Position.mkPos line 0, Position.mkPos line indent)
@@ -174,7 +182,7 @@ let private checkIndentOf src (keyword: range) (equals: range) (body: range) =
   if keyword.StartLine <> equals.EndLine then
     ()
   elif body.StartLine <= equals.EndLine then
-    checkFencedBody src keyword body
+    checkFencedRows src (declarationColumn src keyword) body.StartLine body
   elif straddlesDirective equals.EndLine body.StartLine then
     ()
   else
@@ -182,12 +190,16 @@ let private checkIndentOf src (keyword: range) (equals: range) (body: range) =
     | None ->
       ()
     | Some(line, indent) ->
-      if indent = declarationColumn src keyword + BodyIndent then
-        ()
-      else
+      if indent <> declarationColumn src keyword + BodyIndent then
         (Position.mkPos line 0, Position.mkPos line indent)
         ||> Range.mkRange ""
         |> reportBodyIndent src
+      elif opensAlone ((src: ISourceText).GetLineString(line - 1)) then
+        (* The body opened on a bracket of its own, so what it fences is read
+           against that bracket rather than against the keyword above it. *)
+        checkFencedRows src indent line body
+      else
+        ()
 
 /// The keywords whose body this rule reads: every one that opens a body the
 /// author wrote and put an `=` in front of, which a member does as much as a

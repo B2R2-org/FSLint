@@ -465,3 +465,27 @@ let processData input =
     |> fun errors ->
       Assert.AreEqual<int>(1, errors.Length)
       Assert.AreEqual<int>(3, errors.Head.Range.StartLine)
+
+  /// A bracket standing on a row of its own anchors what it fences: those rows
+  /// open two columns in from the bracket, not from the keyword above it. The
+  /// bracket has already answered for its own column against the keyword.
+  [<TestMethod>]
+  member _.``[Declaration] Fenced Body Indent Reads The Bracket Row``() =
+    lint ("let xs =\n" +
+          "  [\n" +
+          "    1\n" +
+          "  ]\n")
+    lint ("let xs =\n" +
+          "  [|\n" +
+          "    1\n" +
+          "  |]\n")
+    lintAssertMsg "Indent the body by two columns"
+      ("let xs =\n" +
+       "  [\n" +
+       "     1\n" +
+       "  ]\n")
+    lintAssertMsg "Indent the body by two columns"
+      ("let xs =\n" +
+       "  [|\n" +
+       "     1\n" +
+       "  |]\n")

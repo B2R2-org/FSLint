@@ -587,3 +587,11 @@ let fn (opcode: 'Op when 'Op: enum< int >) = opcode
     lintErrors badConstrainedColonAfterTest
     |> List.filter (fun e -> e.Message = "Use single whitespace after ':'")
     |> fun errors -> Assert.AreEqual<int>(1, errors.Length)
+
+  /// A union case field is asked the gap between its name and its type here.
+  /// A record field is asked it where the rest of a record is read, and this
+  /// is the only place a union case gets the question.
+  [<TestMethod>]
+  member _.``[TypeAnnotation] Union Case Field Colon Test``() =
+    lint "type T =\n  | X of a: int * b: int\n"
+    lintAssertMsg "Use ': '" "type T =\n  | X of a:int * b: int\n"

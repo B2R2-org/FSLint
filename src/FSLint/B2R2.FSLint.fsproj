@@ -59,7 +59,7 @@
 
   <ItemGroup>
     <PackageReference Include="B2R2.FsOptParse" Version="0.7.1" />
-    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.100" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.13.101" />
   </ItemGroup>
 
 </Project>

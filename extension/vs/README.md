@@ -59,7 +59,7 @@ Developed at KAIST SoftSec Lab for the [B2R2 binary analysis platform](https://g
 
 ## Requirements
 
-- .NET SDK 10.0+
+- .NET SDK 11.0+
 - F# source files (`.fs`)
 
 ## Extension Settings

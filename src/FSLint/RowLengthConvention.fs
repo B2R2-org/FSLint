@@ -73,7 +73,7 @@ let rec private isDataLiteral = function
   | SynExpr.Typed(expr = inner)
   | SynExpr.Lazy(expr = inner)
   | SynExpr.Lambda(body = inner)
-  | SynExpr.LetOrUse(body = inner) ->
+  | SynExpr.LetOrUse { Body = inner } ->
     isDataLiteral inner
   | SynExpr.IfThenElse(thenExpr = thenBranch; elseExpr = Some elseBranch) ->
     isDataLiteral thenBranch && isDataLiteral elseBranch
@@ -123,14 +123,14 @@ let private reportTarget (pat: SynPat) =
 /// question about the whole body, everything stepped over included.
 let rec private tailOf (expr: SynExpr) =
   match expr with
-  | SynExpr.LetOrUse(bindings = [ SynBinding(expr = value) ]; body = body) ->
+  | SynExpr.LetOrUse { Bindings = [ SynBinding(expr = value) ]; Body = body } ->
     (* `let ins = match ... with ... in ins |> f` names the answer and hands
        it straight on. Where the body comes down to nothing but a name, the
        substance is what the name was bound to. *)
     match tailOf body with
     | SynExpr.Ident _ -> tailOf value
     | tail -> tail
-  | SynExpr.LetOrUse(body = body)
+  | SynExpr.LetOrUse { Body = body }
   | SynExpr.Sequential(expr2 = body) ->
     tailOf body
   | PipedFrom piped ->
@@ -161,7 +161,7 @@ let rec private holdsEnumeration (expr: SynExpr) =
   | SynExpr.For _
   | SynExpr.ForEach _ when rows expr > MaxEnumerationRows ->
     true
-  | SynExpr.LetOrUse(bindings = bindings; body = body) ->
+  | SynExpr.LetOrUse { Bindings = bindings; Body = body } ->
     holdsEnumeration body
     || bindings
        |> List.exists (fun (SynBinding(expr = value)) -> holdsEnumeration value)

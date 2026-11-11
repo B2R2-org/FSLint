@@ -141,7 +141,7 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
         | _ ->
           acc
       )
-  | SynExpr.LetOrUse(bindings = bindings; body = body) ->
+  | SynExpr.LetOrUse { Bindings = bindings; Body = body } ->
     bindings
     |> List.exists (fun (SynBinding(expr = expr)) ->
       findSelfIdentifierInApp src patIdent acc expr
@@ -157,10 +157,13 @@ let rec private findSelfIdentifierInApp src patIdent acc = function
       false
   | SynExpr.Record(recordFields = recordFields) ->
     recordFields
-    |> List.exists (fun field ->
-      let SynExprRecordField(expr = expr) = field
-      if expr.IsSome then findSelfIdentifierInApp src patIdent acc expr.Value
-      else acc
+    |> List.exists (fun entry ->
+      match entry with
+      | SynExprRecordFieldOrSpread.Field(SynExprRecordField(expr = Some e), _)
+      | SynExprRecordFieldOrSpread.Spread(SynExprSpread(expr = e), _) ->
+        findSelfIdentifierInApp src patIdent acc e
+      | SynExprRecordFieldOrSpread.Field _ ->
+        acc
     )
   | _ ->
     acc

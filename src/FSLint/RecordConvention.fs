@@ -275,14 +275,18 @@ let rec private checkOperatorSpacing src = function
   | [] ->
     ()
 
-let private collectFieldsInfo fields =
-  fields
-  |> List.choose (fun field ->
-    let SynExprRecordField(fieldName = fieldName; expr = expr
-                           blockSeparator = blockSeparator) = field
-    let SynLongIdent(id = id), _ = fieldName
-    if expr.IsSome then Some(id.Head.idRange, expr.Value.Range, blockSeparator)
-    else None
+let private collectFieldsInfo entries =
+  entries
+  |> List.choose (function
+    | SynExprRecordFieldOrSpread.Field(field, blockSeparator) ->
+      let SynExprRecordField(fieldName = fieldName; expr = expr) = field
+      let SynLongIdent(id = id), _ = fieldName
+      if expr.IsSome then
+        Some(id.Head.idRange, expr.Value.Range, blockSeparator)
+      else
+        None
+    | SynExprRecordFieldOrSpread.Spread _ ->
+      None
   )
 
 let checkSeparatorSpacing src fields =
@@ -414,10 +418,18 @@ let private checkSingleFieldPerLine src (range: range) (fields: range list) =
   else
     ()
 
-let checkConstructor src copyInfo (fields: list<SynExprRecordField>) range =
+let checkConstructor src
+                     copyInfo
+                     (entries: list<SynExprRecordFieldOrSpread>)
+                     range =
+  let fields =
+    entries
+    |> List.choose (function
+      | SynExprRecordFieldOrSpread.Field(field, _) -> Some field
+      | SynExprRecordFieldOrSpread.Spread _ -> None)
   checkBracketSpacingAndFormat src copyInfo fields range
   checkOperatorSpacing src fields
-  checkSeparatorSpacing src fields
+  checkSeparatorSpacing src entries
   fields |> List.choose getFieldRange |> checkSingleFieldPerLine src range
 
 /// Checks a record definition for convention compliance.

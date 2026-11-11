@@ -70,7 +70,7 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <LanguageServerSource>..\..\src\FSLint.LanguageServer\bin\$(Configuration)\net10.0</LanguageServerSource>
+    <LanguageServerSource>..\..\src\FSLint.LanguageServer\bin\$(Configuration)\net11.0</LanguageServerSource>
   </PropertyGroup>
 
   <Target Name="IncludeLanguageServerInVSIX" BeforeTargets="GetVsixSourceItems">
@@ -140,7 +140,7 @@
 
   <Target Name="CheckLanguageServer" BeforeTargets="BeforeBuild">
     <PropertyGroup>
-      <LanguageServerExe>..\..\src\FSLint.LanguageServer\bin\$(Configuration)\net10.0\B2R2.FSLint.LanguageServer.exe</LanguageServerExe>
+      <LanguageServerExe>..\..\src\FSLint.LanguageServer\bin\$(Configuration)\net11.0\B2R2.FSLint.LanguageServer.exe</LanguageServerExe>
     </PropertyGroup>
 
     <Message Importance="high" Text="Checking Language Server: $(LanguageServerExe)" />

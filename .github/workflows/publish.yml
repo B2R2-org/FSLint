@@ -31,6 +31,8 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
 
       - name: Restore project
         run: dotnet restore
@@ -72,7 +74,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -125,7 +127,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -141,7 +143,7 @@ jobs:
       - name: Copy Language Server
         shell: pwsh
         run: |
-          $sourceDir = "src\FSLint.LanguageServer\bin\Release\net10.0"
+          $sourceDir = "src\FSLint.LanguageServer\bin\Release\net11.0"
           $destDir = "extension\vs\bin\Release"
           New-Item -ItemType Directory -Path $destDir -Force | Out-Null
           Copy-Item "$sourceDir\*" -Destination $destDir -Include "*.exe","*.dll","*.json" -Exclude "*.deps.json" -Force

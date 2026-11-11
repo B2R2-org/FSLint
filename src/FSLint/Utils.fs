@@ -52,6 +52,7 @@ let private bucketsOf (lineCount: int) (trivia: ParsedInputTrivia) =
   for directive in trivia.ConditionalDirectives do
     match directive with
     | ConditionalDirectiveTrivia.If(_, range)
+    | ConditionalDirectiveTrivia.Elif(_, range)
     | ConditionalDirectiveTrivia.Else range
     | ConditionalDirectiveTrivia.EndIf range -> add directives range
   comments, directives

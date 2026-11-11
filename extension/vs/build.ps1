@@ -44,7 +44,7 @@ try {
         throw "Language Server build failed"
     }
 
-    $ServerExe = "bin\$Configuration\net10.0\B2R2.FSLint.LanguageServer.exe"
+    $ServerExe = "bin\$Configuration\net11.0\B2R2.FSLint.LanguageServer.exe"
     if (-not (Test-Path $ServerExe)) {
         throw "Language Server executable not found: $ServerExe"
     }
@@ -60,7 +60,7 @@ try {
         New-Item -ItemType Directory -Path $ExtensionBinPath -Force | Out-Null
     }
     
-    $ServerBinPath = "bin\$Configuration\net10.0"
+    $ServerBinPath = "bin\$Configuration\net11.0"
     
     Copy-Item "$ServerBinPath\B2R2.FSLint.LanguageServer.exe" -Destination $ExtensionBinPath -Force
     Copy-Item "$ServerBinPath\*.dll" -Destination $ExtensionBinPath -Force

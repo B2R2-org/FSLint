@@ -15,7 +15,7 @@ let rec objExprRanges acc = function
   | SynExpr.Paren(expr = expr)
   | SynExpr.Typed(expr = expr) ->
     objExprRanges acc expr
-  | SynExpr.LetOrUse(bindings = bindings; body = body) ->
+  | SynExpr.LetOrUse { Bindings = bindings; Body = body } ->
     bindings
     |> List.fold (fun acc (SynBinding(expr = b)) -> objExprRanges acc b) acc
     |> fun acc -> objExprRanges acc body

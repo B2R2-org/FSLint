@@ -134,12 +134,27 @@ and checkMatchClause (src: ISourceText) clause =
 
 and checkExpression src = function
   | SynExpr.AnonRecd(copyInfo = info
-                     recordFields = fields
+                     recordFields = entries
                      range = range
                      trivia = trivia) ->
+    let fields =
+      entries
+      |> List.choose (function
+        | SynExprAnonRecordFieldOrSpread.Field(field, _) ->
+          let SynExprAnonRecordField(fieldName = name
+                                     equalsRange = equals
+                                     expr = expr) = field
+          Some(name, equals, expr)
+        | SynExprAnonRecordFieldOrSpread.Spread _ ->
+          None)
     RecordConvention.checkAnonymousRecord src info fields range trivia
     if Option.isSome info then info.Value |> fst |> checkExpression src else ()
-    fields |> List.iter (fun (_, _, expr) -> checkExpression src expr)
+    for entry in entries do
+      match entry with
+      | SynExprAnonRecordFieldOrSpread.Field(SynExprAnonRecordField(expr = e),
+                                             _)
+      | SynExprAnonRecordFieldOrSpread.Spread(SynExprSpread(expr = e), _) ->
+        checkExpression src e
   | SynExpr.Paren(expr = SynExpr.Tuple(isStruct = isStruct
                                        exprs = exprs
                                        commaRanges = commas
@@ -175,7 +190,7 @@ and checkExpression src = function
       checkExpression src expr
     else
       checkExpression src body
-  | SynExpr.LetOrUse(bindings = bindings; body = body) ->
+  | SynExpr.LetOrUse { Bindings = bindings; Body = body } ->
     checkBindings src LowerCamelCase bindings
     checkExpression src body
   | SynExpr.ForEach(pat = pat; enumExpr = enumExpr; bodyExpr = bodyExpr) ->
@@ -321,9 +336,13 @@ and checkExpression src = function
                    recordFields = recordFields
                    range = range) ->
     RecordConvention.checkConstructor src copyInfo recordFields range
-    for recordField in recordFields do
-      let SynExprRecordField(expr = expr) = recordField
-      if expr.IsSome then checkExpression src expr.Value else ()
+    for entry in recordFields do
+      match entry with
+      | SynExprRecordFieldOrSpread.Field(SynExprRecordField(expr = Some e), _)
+      | SynExprRecordFieldOrSpread.Spread(SynExprSpread(expr = e), _) ->
+        checkExpression src e
+      | SynExprRecordFieldOrSpread.Field _ ->
+        ()
   | SynExpr.Lazy(expr = expr) ->
     checkExpression src expr
   | SynExpr.InferredUpcast(expr = expr)
@@ -470,7 +489,13 @@ and checkTypeDefnSimpleRepr src trivia = function
         (Some trivia.EqualsRange)
       TypeUseConvention.checkBarAlignment src id.idRange trivia.BarRange
       IdentifierConvention.check src PascalCase false id.idText range
-  | SynTypeDefnSimpleRepr.Record(recordFields = fields; range = range) ->
+  | SynTypeDefnSimpleRepr.Record(recordFieldsAndSpreads = entries
+                                 range = range) ->
+    let fields =
+      entries
+      |> List.choose (function
+        | SynFieldOrSpread.Field field -> Some field
+        | SynFieldOrSpread.Spread _ -> None)
     TypeAnnotation.checkRecordFields src fields
     RecordConvention.checkDefinition src fields range
     for field in fields do
@@ -556,10 +581,10 @@ and checkTypeDefn src defn =
                   members = members
                   implicitConstructor = implicitConstructor
                   trivia = trivia) = defn
-  let SynComponentInfo(longId = lid
-                       typeParams = typeParams
+  let SynComponentInfo(typeParams = typeParams
                        range = range
                        attributes = attrs) = info
+  let lid = info.LongIdent
   if Option.isSome typeParams then
     ClassDefinition.checkSynTypar src range typeParams.Value
   else
@@ -652,8 +677,8 @@ and checkTypeDefnWithContext src context typeDefn =
 /// then what it holds, read under the access it opened.
 and checkNestedModule src context info dls rg trivia =
   let SynComponentInfo(attributes = attrs
-                       longId = lid
                        accessibility = access) = info
+  let lid = info.LongIdent
   match (trivia: SynModuleDeclNestedModuleTrivia).ModuleKeyword with
   | Some keyword ->
     DeclarationConvention.checkAttributesLineSpacing src attrs keyword
@@ -701,7 +726,7 @@ and checkDeclaration src context decl =
                                range = rg
                                trivia = trivia) ->
     checkNestedModule src context info dls rg trivia
-  | SynModuleDecl.Let(_, bindings, _) ->
+  | SynModuleDecl.Let(bindings = bindings) ->
     checkModuleLet src context bindings
   | SynModuleDecl.Expr(expr = expr) ->
     checkExpression src expr

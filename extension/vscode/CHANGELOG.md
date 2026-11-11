@@ -2,6 +2,16 @@
 
 All notable changes to the FSLint extension.
 
+## 1.2.4
+
+- Move to .NET 11. The command-line tool, the language server and both
+  extensions now need the .NET 11 runtime (SDK 11.0 or later).
+- Update FSharp.Compiler.Service to 43.13.101, the parser that ships with the
+  .NET SDK 11.0.100. Findings on existing code are unchanged.
+- Read `#elif`, new in F# 11, as a directive row like `#if` and `#else`.
+- Parse record spreads, new in F# 11 (`{ ...x; A = 1 }`), and check the
+  expressions inside them. The record layout rules do not look at a spread yet.
+
 ## 1.2.3
 
 - Recognise two brace layouts in a record definition and no third: the fields
